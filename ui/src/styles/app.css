@@ -1,0 +1,169 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* Tailwind is mapped onto the design tokens only: no stock palette, no stock fonts. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --shadow-*: initial;
+  --text-*: initial;
+
+  --text-micro: 11px;
+  --text-xs: 11.5px;
+  --text-sm: 12px;
+  --text-meta: 12.5px;
+  --text-ui: 13px;
+  --text-base: 13.5px;
+  --text-md: 14.5px;
+  --text-lg: 15px;
+  --text-xl: 19px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+  --text-display: 44px;
+
+  --radius-ctl: 7px;
+  --radius-btn: 8px;
+  --radius-panel: 12px;
+  --radius-card: 14px;
+
+  --animate-zpulse: zpulse 1.6s infinite;
+  --animate-zspin: zspin 0.9s linear infinite;
+
+  @keyframes zpulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+  @keyframes zspin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+@theme inline {
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-inv-bg: var(--inv-bg);
+  --color-inv-text: var(--inv-text);
+  --color-code: var(--code);
+  --color-run: var(--run);
+  --color-run-bg: var(--run-bg);
+  --color-wait: var(--wait);
+  --color-wait-bg: var(--wait-bg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-s3: var(--s3);
+  --color-accent: #f25c2a;
+
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+  --font-display: var(--display);
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--line);
+  }
+  html,
+  body {
+    background: var(--bg);
+    color: var(--text);
+  }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-variant-numeric: tabular-nums;
+  }
+  a {
+    color: var(--text);
+  }
+  a:hover {
+    color: var(--text-2);
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  th {
+    font-weight: 500;
+    text-align: left;
+  }
+  ::placeholder {
+    color: var(--text-3);
+  }
+  ::selection {
+    background: var(--line-2);
+  }
+  /* Visible focus everywhere (docs/09 §8): the only shadow allowed. */
+  :focus-visible {
+    outline: 2px solid var(--run);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: 0;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--run);
+  }
+  dialog {
+    color: var(--text);
+  }
+  dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@utility font-display-face {
+  font-family: var(--display);
+  font-weight: var(--display-w);
+  letter-spacing: var(--display-ls);
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
