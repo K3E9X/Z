@@ -47,7 +47,7 @@ z-cli = { workspace = true }
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["ui", "design", "poc", "docs", "*.md", "**/alembic/versions"]
+extend-exclude = ["ui", "design", "poc", "docs", "*.md", "**/alembic/versions", ".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "C4", "SIM", "RUF"]

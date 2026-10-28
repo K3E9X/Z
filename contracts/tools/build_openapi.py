@@ -1898,7 +1898,9 @@ op(
     params=["id"],
     resp=ref("Artifact"),
     status=201,
-    content={"multipart/form-data": {"schema": obj({"file": {"type": "string", "format": "binary"}, "name": S}, ["file"])}},
+    content={
+        "multipart/form-data": {"schema": obj({"file": {"type": "string", "format": "binary"}, "name": S}, ["file"])}
+    },
     req={},
     desc="Only while the mission is draft or planned. Files land in the job workspace (mode files) as /workspace/<name>, after the judge scan of staged inputs.",
 )
