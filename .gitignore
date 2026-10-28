@@ -37,3 +37,6 @@ artifacts/
 .idea/
 .vscode/
 .DS_Store
+
+# agent worktrees (Claude Code)
+.claude/worktrees/

@@ -8,17 +8,17 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Item | Workstream | Status |
 |---|---|---|
 | Contracts frozen (`contracts-v1`) | A | done |
-| Missions, plans, fan-out, scheduler, resume | B1 | todo |
+| Missions, plans, fan-out, scheduler, resume | B1 | doing (API, scheduler, runner protocol and review done and tested; draft-plan, take-over and save-as-playbook pending) |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | todo |
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | todo |
 | CLI: subcommands, headless, interactive session | B4 | todo |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | todo |
-| Judge, routing policy (key allowlists), evals, memory | B6 | todo |
+| Judge, routing policy (key allowlists), evals, memory | B6 | doing (deterministic judge stage, key allowlists per class and raise on C2+ done; z-judge model stage, evals, memory approval pending) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
 | Inference monitor (inferX health on the Inference screen) | B1 | todo |
 | Named agents (rename, handle, avatar, duplicate) | B1, B5 | doing (API done; web pending) |
 | GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |
-| RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (action approval rules come with Review) |
+| RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (incl. approval rules: four-eyes, two approvers for destructive) |
 | Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
 | Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | doing (forwarding and the hourly checkpoint worker pending) |
 | CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | doing (python job, supply-chain checks) |
