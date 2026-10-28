@@ -6070,6 +6070,21 @@ components:
       - $ref: agent.schema.json#/$defs/AgentProfile
       - $ref: '#/components/schemas/AgentServerFields'
       unevaluatedProperties: false
+      required:
+      - name
+      - display_name
+      - handle
+      - version
+      - role
+      - model
+      - skills
+      - tools
+      - autonomy
+      - limits
+      - id
+      - status
+      - created_at
+      - updated_at
       description: Agent profile (agent.schema.json) plus server fields.
     AgentCreate:
       description: A full profile, or {template, display_name, handle} to start from a template.
@@ -6300,9 +6315,20 @@ components:
       - updated_at
     Playbook:
       allOf:
-      - $ref: playbook.schema.json
+      - $ref: playbook.schema.json#/$defs/PlaybookProps
       - $ref: '#/components/schemas/PlaybookServerFields'
-      description: Playbook manifest plus server fields. Server fields are not part of playbook.schema.json, so validate the manifest part only.
+      unevaluatedProperties: false
+      required:
+      - name
+      - version
+      - description
+      - team
+      - steps
+      - id
+      - usage_count
+      - created_at
+      - updated_at
+      description: Playbook manifest plus server fields.
     PlaybookRun:
       type: object
       properties:

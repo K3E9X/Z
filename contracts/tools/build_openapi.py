@@ -321,6 +321,22 @@ schemas = {
     "Agent": {
         "allOf": [ext("agent.schema.json#/$defs/AgentProfile"), ref("AgentServerFields")],
         "unevaluatedProperties": False,
+        "required": [
+            "name",
+            "display_name",
+            "handle",
+            "version",
+            "role",
+            "model",
+            "skills",
+            "tools",
+            "autonomy",
+            "limits",
+            "id",
+            "status",
+            "created_at",
+            "updated_at",
+        ],
         "description": "Agent profile (agent.schema.json) plus server fields.",
     },
     "AgentCreate": {
@@ -423,8 +439,20 @@ schemas = {
         extra=True,
     ),
     "Playbook": {
-        "allOf": [ext("playbook.schema.json"), ref("PlaybookServerFields")],
-        "description": "Playbook manifest plus server fields. Server fields are not part of playbook.schema.json, so validate the manifest part only.",
+        "allOf": [ext("playbook.schema.json#/$defs/PlaybookProps"), ref("PlaybookServerFields")],
+        "unevaluatedProperties": False,
+        "required": [
+            "name",
+            "version",
+            "description",
+            "team",
+            "steps",
+            "id",
+            "usage_count",
+            "created_at",
+            "updated_at",
+        ],
+        "description": "Playbook manifest plus server fields.",
     },
     "PlaybookRun": obj(
         {
