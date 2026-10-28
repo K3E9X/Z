@@ -170,5 +170,7 @@ def test_openapi_is_generated_from_its_source(repo: Path, tmp_path: Path) -> Non
     import sys
 
     out = tmp_path / "openapi.yaml"
-    subprocess.run([sys.executable, str(repo / "contracts/tools/build_openapi.py"), str(out)], check=True, capture_output=True)
+    subprocess.run(
+        [sys.executable, str(repo / "contracts/tools/build_openapi.py"), str(out)], check=True, capture_output=True
+    )
     assert out.read_text() == (repo / "contracts/openapi.yaml").read_text(), "regenerate contracts/openapi.yaml"
