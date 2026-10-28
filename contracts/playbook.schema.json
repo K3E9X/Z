@@ -2,91 +2,271 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.z.example/contracts/playbook.schema.json",
   "title": "Playbook",
-  "description": "playbooks/<name>.yaml (03 §4). Templates use {{ inputs.* }}, {{ item.* }} (fan-out item), {{ steps.<id>.output.* }} and, in triggers, {{ event.* }}.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["name", "version", "description", "team", "steps"],
-  "properties": {
-    "name": { "$ref": "common.schema.json#/$defs/Slug" },
-    "version": { "$ref": "common.schema.json#/$defs/SemVer" },
-    "domain": { "type": "string" },
-    "description": { "type": "string", "minLength": 1 },
-    "inputs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": { "schema": { "type": "object", "description": "JSON Schema of the mission inputs." } }
-    },
-    "team": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "minItems": 1, "uniqueItems": true, "description": "Every step agent must be in the team." },
-    "connectors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "uniqueItems": true, "description": "Becomes Mission.connectors (scope of gateway:@read)." },
-    "steps": { "type": "array", "items": { "$ref": "#/$defs/Step" }, "minItems": 1 },
-    "trigger": { "$ref": "#/$defs/PlaybookTrigger" },
-    "autonomy": { "$ref": "common.schema.json#/$defs/Autonomy" },
-    "four_eyes": { "type": "boolean", "default": false, "description": "When true the mission starter cannot approve its writes." },
-    "budget": { "$ref": "common.schema.json#/$defs/MissionBudget" },
-    "data_class": { "$ref": "common.schema.json#/$defs/DataClass", "description": "Initial mission class; default from routing_policy.default_mission_class." },
-    "baseline_minutes": { "type": "integer", "minimum": 0, "description": "Human time one run replaces, for Analytics (hours saved = baseline × completed)." }
-  },
+  "description": "playbooks/<name>.yaml (03 \u00a74). Templates use {{ inputs.* }}, {{ item.* }} (fan-out item), {{ steps.<id>.output.* }} and, in triggers, {{ event.* }}.",
+  "$ref": "#/$defs/PlaybookProps",
+  "required": [
+    "name",
+    "version",
+    "description",
+    "team",
+    "steps"
+  ],
+  "unevaluatedProperties": false,
   "$defs": {
-    "StepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$" },
+    "PlaybookProps": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "common.schema.json#/$defs/Slug"
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/SemVer"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "schema": {
+              "type": "object",
+              "description": "JSON Schema of the mission inputs."
+            }
+          }
+        },
+        "team": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/Slug"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Every step agent must be in the team."
+        },
+        "connectors": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/Slug"
+          },
+          "uniqueItems": true,
+          "description": "Becomes Mission.connectors (scope of gateway:@read)."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "minItems": 1
+        },
+        "trigger": {
+          "$ref": "#/$defs/PlaybookTrigger"
+        },
+        "autonomy": {
+          "$ref": "common.schema.json#/$defs/Autonomy"
+        },
+        "four_eyes": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true the mission starter cannot approve its writes."
+        },
+        "budget": {
+          "$ref": "common.schema.json#/$defs/MissionBudget"
+        },
+        "data_class": {
+          "$ref": "common.schema.json#/$defs/DataClass",
+          "description": "Initial mission class; default from routing_policy.default_mission_class."
+        },
+        "baseline_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Human time one run replaces, for Analytics (hours saved = baseline \u00d7 completed)."
+        }
+      }
+    },
+    "StepId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+    },
     "Fanout": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["over"],
+      "required": [
+        "over"
+      ],
       "properties": {
-        "over": { "type": "string", "pattern": "^steps\\.[a-z0-9_-]+\\.(output(\\.[A-Za-z0-9_]+)+|outputs)$", "description": "steps.<id>.output.<path to a list> (the source step needs an output schema) or steps.<id>.outputs (all outputs of a fan-out step)." },
-        "concurrency": { "type": "integer", "minimum": 1, "maximum": 64, "default": 8 },
-        "when": { "type": "string", "description": "Expression evaluated per item; items where it is false are skipped." }
+        "over": {
+          "type": "string",
+          "pattern": "^steps\\.[a-z0-9_-]+\\.(output(\\.[A-Za-z0-9_]+)+|outputs)$",
+          "description": "steps.<id>.output.<path to a list> (the source step needs an output schema) or steps.<id>.outputs (all outputs of a fan-out step)."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 8
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression evaluated per item; items where it is false are skipped."
+        }
       }
     },
     "StepOutput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema"],
+      "required": [
+        "schema"
+      ],
       "properties": {
-        "schema": { "type": "string", "description": "Path of a JSON Schema relative to the pack (schemas/x.json, ../dev/schemas/x.json)." },
-        "max_repair_attempts": { "type": "integer", "minimum": 0, "maximum": 5, "default": 2 }
+        "schema": {
+          "type": "string",
+          "description": "Path of a JSON Schema relative to the pack (schemas/x.json, ../dev/schemas/x.json)."
+        },
+        "max_repair_attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 2
+        }
       }
     },
     "StepCore": {
       "type": "object",
       "properties": {
-        "id": { "$ref": "#/$defs/StepId" },
-        "title": { "type": "string" },
-        "agent": { "$ref": "common.schema.json#/$defs/Slug" },
-        "prompt": { "type": "string", "minLength": 1 },
-        "depends_on": { "type": "array", "items": { "$ref": "#/$defs/StepId" }, "uniqueItems": true },
-        "fanout": { "oneOf": [{ "$ref": "#/$defs/Fanout" }, { "type": "null" }] },
-        "inputs_from": { "type": "string", "pattern": "^steps\\.[a-z0-9_-]+\\.(output(\\.[A-Za-z0-9_]+)*|outputs)$", "description": "Fan-in: steps.<id>.outputs is the list of all outputs of a fan-out step." },
-        "when": { "type": "string", "description": "Expression over earlier outputs; the step is skipped when false." },
-        "output": { "$ref": "#/$defs/StepOutput" },
-        "writes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/WriteOperationId" }, "uniqueItems": true, "description": "Full operation ids this step may propose. propose_action is only available in steps that list writes." },
-        "workspace": { "$ref": "common.schema.json#/$defs/WorkspaceMode" },
-        "repo": { "type": "string", "description": "Repository (templated) for workspace git_clone." },
-        "credentials": { "$ref": "common.schema.json#/$defs/CredentialScope", "description": "service (default) or user (only when the starter or trigger owner is that user)." },
-        "model": { "$ref": "common.schema.json#/$defs/ModelAlias" }
+        "id": {
+          "$ref": "#/$defs/StepId"
+        },
+        "title": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "common.schema.json#/$defs/Slug"
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StepId"
+          },
+          "uniqueItems": true
+        },
+        "fanout": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Fanout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inputs_from": {
+          "type": "string",
+          "pattern": "^steps\\.[a-z0-9_-]+\\.(output(\\.[A-Za-z0-9_]+)*|outputs)$",
+          "description": "Fan-in: steps.<id>.outputs is the list of all outputs of a fan-out step."
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression over earlier outputs; the step is skipped when false."
+        },
+        "output": {
+          "$ref": "#/$defs/StepOutput"
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/WriteOperationId"
+          },
+          "uniqueItems": true,
+          "description": "Full operation ids this step may propose. propose_action is only available in steps that list writes."
+        },
+        "workspace": {
+          "$ref": "common.schema.json#/$defs/WorkspaceMode"
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository (templated) for workspace git_clone."
+        },
+        "credentials": {
+          "$ref": "common.schema.json#/$defs/CredentialScope",
+          "description": "service (default) or user (only when the starter or trigger owner is that user)."
+        },
+        "model": {
+          "$ref": "common.schema.json#/$defs/ModelAlias"
+        }
       }
     },
     "Step": {
       "$ref": "#/$defs/StepCore",
-      "required": ["id", "agent", "prompt"],
+      "required": [
+        "id",
+        "agent",
+        "prompt"
+      ],
       "unevaluatedProperties": false
     },
     "PlaybookTrigger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "properties": {
-        "kind": { "$ref": "common.schema.json#/$defs/TriggerKind" },
-        "cron": { "type": "string", "description": "schedule triggers, 5-field cron, UTC unless timezone is set." },
-        "timezone": { "type": "string" },
-        "event": { "type": "string", "description": "gitlab/jira event name, e.g. merge_request, issue." },
-        "filter": { "type": "object", "description": "Kind-specific filter, e.g. {label: security, action: [open, update]}." },
-        "owner_user": { "type": "string", "description": "Identity triggered missions run as (user credentials, budgets, audit)." },
-        "inputs": { "type": "object", "description": "Mission inputs, templated; event triggers use {{ event.* }}." },
-        "auto_start": { "type": "boolean", "default": true, "description": "false creates a Task on the board instead of starting a mission." }
+        "kind": {
+          "$ref": "common.schema.json#/$defs/TriggerKind"
+        },
+        "cron": {
+          "type": "string",
+          "description": "schedule triggers, 5-field cron, UTC unless timezone is set."
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string",
+          "description": "gitlab/jira event name, e.g. merge_request, issue."
+        },
+        "filter": {
+          "type": "object",
+          "description": "Kind-specific filter, e.g. {label: security, action: [open, update]}."
+        },
+        "owner_user": {
+          "type": "string",
+          "description": "Identity triggered missions run as (user credentials, budgets, audit)."
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Mission inputs, templated; event triggers use {{ event.* }}."
+        },
+        "auto_start": {
+          "type": "boolean",
+          "default": true,
+          "description": "false creates a Task on the board instead of starting a mission."
+        }
       },
       "allOf": [
-        { "if": { "properties": { "kind": { "const": "schedule" } } }, "then": { "required": ["cron"] } }
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "schedule"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "cron"
+            ]
+          }
+        }
       ]
     }
   }
