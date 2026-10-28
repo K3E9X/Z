@@ -7,12 +7,14 @@ environment as soon as it is read). Exit codes: see runner/README.md.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ctypes
 import json
 import logging
 import os
 import signal
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
@@ -75,7 +77,52 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+_FORWARDED = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2)
+
+
+def _init_process(run: Callable[[], int]) -> int:
+    """PID 1 of a container: run the job in a child, forward signals to it and reap every orphan.
+
+    Processes started by the agent can leave orphans that the kernel re-parents to PID 1; without an init they
+    stay zombies. This is what tini does, without an extra binary in the image.
+    """
+    _no_core_dumps()  # the initial environment of PID 1 (bootstrap token) must not be readable either
+    child = os.fork()
+    if child == 0:  # the runner
+        code = 1
+        try:
+            code = run()
+        except SystemExit as exc:  # argparse --help / --version
+            code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+        finally:
+            logging.shutdown()
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(code)
+
+    def forward(signum: int, frame: FrameType | None) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(child, signum)
+
+    for sig in _FORWARDED:
+        signal.signal(sig, forward)
+    while True:
+        try:
+            pid, status = os.wait()
+        except ChildProcessError:
+            return 1
+        if pid == child:
+            code = os.waitstatus_to_exitcode(status)
+            return code if code >= 0 else 128 - code
+
+
 def main(argv: list[str] | None = None) -> int:
+    if os.getpid() == 1 and os.environ.get("Z_RUNNER_NO_INIT") != "1":
+        return _init_process(lambda: _main(argv))
+    return _main(argv)
+
+
+def _main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     redactor = Redactor()
     handler = logging.StreamHandler(sys.stderr)
@@ -83,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
     handler.addFilter(_RedactingFilter(redactor))
     logging.basicConfig(level=args.log_level.upper(), handlers=[handler], force=True)
     log = logging.getLogger("z_runner")
+    for chatty in ("httpx", "httpcore", "mcp", "LiteLLM", "litellm"):
+        logging.getLogger(chatty).setLevel(max(logging.WARNING, logging.getLogger().level))
 
     server_url = os.environ.get("Z_SERVER_URL", "")
     env_job = os.environ.get("Z_JOB_ID", "")

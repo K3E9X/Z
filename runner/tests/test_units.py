@@ -442,3 +442,31 @@ def test_cli_bootstrap_failure_exit_code(tmp_path: Path) -> None:
     assert proc.returncode == 10
     assert "bootstrap-token-value" not in proc.stderr
     assert json.loads(proc.stderr.strip().splitlines()[-1])["level"] == "error"
+
+
+INIT_SCRIPT = """
+import signal, sys, time
+from z_runner.__main__ import _init_process
+mode = sys.argv[1]
+def job():
+    if mode == "exit":
+        return 3
+    if mode == "help":
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(7))
+    print("ready", flush=True)
+    time.sleep(30)
+    return 1
+sys.exit(_init_process(job))
+"""
+
+
+@pytest.mark.parametrize(("mode", "code"), [("exit", 3), ("help", 0), ("signal", 7)])
+def test_init_process_propagates_exit_codes_and_forwards_signals(tmp_path: Path, mode: str, code: int) -> None:
+    script = tmp_path / "init_script.py"
+    script.write_text(INIT_SCRIPT)
+    proc = subprocess.Popen([sys.executable, str(script), mode], stdout=subprocess.PIPE, text=True)
+    if mode == "signal":
+        assert proc.stdout is not None and proc.stdout.readline().strip() == "ready"
+        proc.send_signal(15)
+    assert proc.wait(30) == code
