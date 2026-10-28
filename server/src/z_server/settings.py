@@ -26,6 +26,8 @@ class Settings:
     artifacts_dir: Path = Path("data/artifacts")
     litellm_url: str = "http://litellm:4000"
     litellm_master_key: str = ""
+    internal_url: str = "http://z-server:8000"  # how runners reach z-server (internal API and gateway)
+    runner_litellm_url: str = ""  # how runners reach LiteLLM; defaults to litellm_url
     executor: str = "docker"
     breakglass: bool = False
     test_account_passwords: str = ""
@@ -81,6 +83,8 @@ def from_env(env: dict[str, str] | None = None) -> Settings:
         artifacts_dir=Path(e.get("Z_ARTIFACTS_DIR", "data/artifacts")),
         litellm_url=e.get("LITELLM_URL", "http://litellm:4000").rstrip("/"),
         litellm_master_key=e.get("LITELLM_MASTER_KEY", ""),
+        internal_url=e.get("Z_INTERNAL_URL", "http://z-server:8000").rstrip("/"),
+        runner_litellm_url=e.get("Z_RUNNER_LITELLM_URL", "").rstrip("/"),
         executor=e.get("Z_EXECUTOR", str(config.get("executor", {}).get("kind", "docker"))),
         breakglass=e.get("Z_BREAKGLASS", "false").lower() == "true",
         test_account_passwords=e.get("Z_TEST_ACCOUNT_PASSWORDS", ""),

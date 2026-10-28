@@ -14,6 +14,8 @@ from z_server.auth.identity import Lifetimes
 from z_server.auth.oidc import OIDCClient
 from z_server.crypto import AuditSigner, Sealer
 from z_server.db.models import Setting
+from z_server.events import EventHub
+from z_server.llm.litellm import KeyAdmin
 from z_server.settings import Settings
 
 AUTH_SETTINGS_KEY = "auth_settings"
@@ -45,6 +47,8 @@ class AppState:
     http: httpx.AsyncClient
     sealer: Sealer
     signer: AuditSigner
+    llm_keys: KeyAdmin
+    hub: EventHub
     limiter: RateLimiter = field(default_factory=RateLimiter)
     _oidc: OIDCClient | None = None
     _oidc_key: tuple[str, str, str] | None = None

@@ -16,6 +16,8 @@ from z_server import __version__, errors
 from z_server.api import routes_admin, routes_audit, routes_auth, routes_catalog, routes_connectors
 from z_server.crypto import AuditSigner, Sealer
 from z_server.db.session import make_engine, make_sessionmaker
+from z_server.events import EventHub
+from z_server.llm.litellm import KeyAdmin, LiteLLMKeyAdmin
 from z_server.security import SecurityHeaders
 from z_server.settings import Settings
 from z_server.startup import prepare
@@ -31,7 +33,13 @@ ROUTERS = (
 )
 
 
-def create_app(settings: Settings, *, http: httpx.AsyncClient | None = None, run_startup: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings,
+    *,
+    http: httpx.AsyncClient | None = None,
+    run_startup: bool = True,
+    llm_keys: KeyAdmin | None = None,
+) -> FastAPI:
     settings.check()
 
     @asynccontextmanager
@@ -45,8 +53,11 @@ def create_app(settings: Settings, *, http: httpx.AsyncClient | None = None, run
             http=client,
             sealer=Sealer(settings.secret_key),
             signer=AuditSigner(settings.secret_key),
+            llm_keys=llm_keys or LiteLLMKeyAdmin(settings.litellm_url, settings.litellm_master_key, client),
+            hub=EventHub(settings.database_url),
         )
         app.state.z = state
+        await state.hub.start()
         if run_startup:
             await prepare(state)
         try:
@@ -54,6 +65,7 @@ def create_app(settings: Settings, *, http: httpx.AsyncClient | None = None, run
         finally:
             if http is None:
                 await client.aclose()
+            await state.hub.stop()
             await engine.dispose()
 
     app = FastAPI(
