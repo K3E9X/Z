@@ -1,0 +1,67 @@
+# LiteLLM gateway for Z — the only component allowed to reach any model.
+# Copy to config/litellm.yaml and replace <...> with the real model IDs served by inferX.
+# Check the syntax against the LiteLLM docs of the version you deploy.
+# Run the official proxy image pinned by digest. Never use LiteLLM 1.82.7 or 1.82.8 (backdoored on PyPI, March 2026).
+
+model_list:
+  # Heavy: planning, code, architecture reviews, learning proposals
+  - model_name: z-heavy
+    litellm_params:
+      model: openai/<GLM_MODEL_ID>          # openai/ prefix = OpenAI-compatible endpoint
+      api_base: os.environ/INFERENCE_API_BASE
+      api_key: os.environ/INFERENCE_API_KEY
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Fast: triage at scale, extraction, browsing
+  - model_name: z-fast
+    litellm_params:
+      model: openai/<QWEN_MODEL_ID>
+      api_base: os.environ/INFERENCE_API_BASE
+      api_key: os.environ/INFERENCE_API_KEY
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Judge: injection scan, pre-action checks, routing, classification, eval grading
+  - model_name: z-judge
+    litellm_params:
+      model: openai/<SMALL_MODEL_ID>
+      api_base: os.environ/INFERENCE_API_BASE
+      api_key: os.environ/INFERENCE_API_KEY
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Embeddings: memory and skill search
+  - model_name: z-embed
+    litellm_params:
+      model: openai/<EMBEDDING_MODEL_ID>
+      api_base: os.environ/INFERENCE_API_BASE
+      api_key: os.environ/INFERENCE_API_KEY
+    model_info: { mode: embedding, provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # --- Optional external providers. Keep commented unless enabled in config/z.yaml ---
+  # - model_name: ext-claude
+  #   litellm_params:
+  #     model: anthropic/<CLAUDE_MODEL_ID>
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+  #   model_info: { provider_name: anthropic, data_classes: [C0, C1] }
+  # - model_name: ext-azure
+  #   litellm_params:
+  #     model: azure/<DEPLOYMENT_NAME>
+  #     api_base: os.environ/AZURE_OPENAI_API_BASE
+  #     api_key: os.environ/AZURE_OPENAI_API_KEY
+  #   model_info: { provider_name: azure-openai, data_classes: [C0, C1] }
+  # - model_name: ext-mistral
+  #   litellm_params:
+  #     model: mistral/<MISTRAL_MODEL_ID>
+  #     api_key: os.environ/MISTRAL_API_KEY
+  #   model_info: { provider_name: mistral, data_classes: [C0, C1] }
+
+litellm_settings:
+  drop_params: true            # ignore params a model does not support instead of failing
+  request_timeout: 600
+
+router_settings:
+  num_retries: 2
+  # No cross-provider fallbacks here: the Z routing policy decides (config/z.yaml).
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY        # used by z-server only
+  database_url: os.environ/LITELLM_DATABASE_URL    # needed for virtual keys, budgets, spend logs

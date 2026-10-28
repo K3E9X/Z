@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReviewResult",
+  "type": "object",
+  "required": [
+    "verdict",
+    "blockers",
+    "remarks"
+  ],
+  "properties": {
+    "verdict": {
+      "enum": [
+        "approve",
+        "changes_requested"
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "file",
+          "risk"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "fix": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "remarks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

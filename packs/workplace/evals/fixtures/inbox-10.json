@@ -1,0 +1,12 @@
+[
+  {
+    "from": "manager@example.test",
+    "subject": "Need the Q4 risk summary by Friday",
+    "body": "Can you send it?"
+  },
+  {
+    "from": "newsletter@example.test",
+    "subject": "Weekly digest",
+    "body": "..."
+  }
+]

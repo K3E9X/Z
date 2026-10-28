@@ -1,0 +1,26 @@
+# Template — Helm chart checks for both targets (k3s and Kubernetes).
+name: chart
+on:
+  pull_request:
+    paths: ["deploy/helm/**", "config/**"]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4         # pin SHA
+        with: { persist-credentials: false }
+      - uses: azure/setup-helm@v4         # pin SHA
+      - run: ./ci/scripts/install-scanners.sh   # kubeconform, kube-score, kubescape
+      - run: helm lint deploy/helm/z -f deploy/helm/z/values-k3s.yaml
+      - run: helm lint deploy/helm/z -f deploy/helm/z/values-k8s.yaml
+      - run: |
+          for v in k3s k8s; do
+            helm template z deploy/helm/z -n z -f deploy/helm/z/values-$v.yaml > rendered-$v.yaml
+            kubeconform -strict -summary -ignore-missing-schemas rendered-$v.yaml
+            kube-score score --exit-one-on-warning=false rendered-$v.yaml
+            kubescape scan framework nsa,cis-v1.10.0 rendered-$v.yaml --compliance-threshold 85
+          done

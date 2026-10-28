@@ -1,0 +1,52 @@
+# 13 — CI/CD
+
+Two equivalent pipelines ship as **templates** in `ci/`, because the code does not exist yet and a workflow that runs on an empty repo only fails:
+- `ci/github/*.yml` → copied to `.github/workflows/` in BUILD phase A (the repo lives on GitHub);
+- `ci/gitlab/.gitlab-ci.yml` → copied to the repo root for the internal GitLab mirror, which also **deploys to the team's k3s**.
+
+Both run the same stages with the same open-source tools, so results match.
+
+## 1. Stages
+| Stage | What | Blocks merge when |
+|---|---|---|
+| **lint** | `ruff`, `mypy --strict` (server, runner, cli), `eslint`, `tsc --noEmit`, `prettier --check`, `hadolint` (Dockerfiles), `yamllint`, `actionlint` (GitHub) | any error |
+| **test** | `pytest` with coverage (server, runner, cli), UI unit and component tests, contract tests (examples validate, OpenAPI diff vs `main` must be additive unless labelled `breaking`), pack lint, RBAC matrix and route-permission tests, audit-chain test | any failure; coverage < 80 % on `server/` and `runner/` |
+| **security** | `gitleaks` (secrets), `semgrep` (SAST: Python, TS, Dockerfile, Kubernetes rulesets) and `bandit`, `osv-scanner` + `pip-audit` + `pnpm audit` (dependencies), `trivy fs` and `trivy config` (repo, IaC), license check (allowlist) | any secret; high/critical findings without an accepted exception in `security/exceptions.yaml` (owner + expiry) |
+| **build** | Multi-arch images (amd64, arm64) for `z-server`, `z-runner`, `z-browser`, `z-ui` with BuildKit (GitHub) or rootless Buildah/Kaniko (GitLab, no privileged Docker-in-Docker); reproducible tags `sha-<short>`, `vX.Y.Z` | build failure |
+| **scan** | `trivy image` on each image, `dockle` (image best practices) | critical vulnerability with a fix available |
+| **sbom and sign** | `syft` SBOM (SPDX JSON) attached as an attestation; `cosign` signature (keyless with GitHub OIDC; key in GitLab protected variable or Vault for the mirror); SLSA provenance via BuildKit | — (runs on main and tags only) |
+| **chart** | `helm lint`, `helm template` with `values-k3s.yaml` and `values-k8s.yaml` piped to `kubeconform -strict`, `kube-score` and `kubescape` (NSA/CIS frameworks) on rendered manifests, `helm package` | lint/schema errors; kubescape score under threshold |
+| **e2e** | Compose stack with fake LLM, fake tools and fake GitLab OIDC; `tests/e2e/` scenarios of BUILD phase C; smoke install on **kind** (Kubernetes) and **k3d** (k3s) | any failure |
+| **dast** | OWASP ZAP baseline scan against the running compose UI and API (authenticated with a test session) | high alerts |
+| **deploy** (GitLab only) | `helm upgrade --install --atomic --wait` to the k3s `staging` namespace on `main`; to `production` on a signed tag, **manual job in a protected environment** with required approval; image signatures verified before deploy (cosign verify, or Kyverno/sigstore policy-controller in the cluster) | — |
+| **release** | Changelog from conventional commits, GitHub/GitLab release with images digests, chart, SBOMs | — |
+
+## 2. Rules
+- Every merge to `main` through a PR/MR with: green pipeline, one review (two for `docs/07-security.md`, `docs/12-*`, `contracts/`, `deploy/helm/`), CODEOWNERS on those paths.
+- Branch protection: no force-push on `main`, signed commits recommended, linear history.
+- Actions and images pinned by digest/SHA, updated by Renovate; workflows use least-privilege `permissions:` (default `contents: read`).
+- CI never has production secrets. Deploy credentials live only in the protected GitLab environment (GitLab agent for Kubernetes preferred over a kubeconfig variable).
+- Test data is synthetic; no real tickets, findings or mails in fixtures.
+- Security exceptions are files in the repo (`security/exceptions.yaml`: id, reason, owner, expiry), reviewed like code; expired exceptions fail the pipeline.
+
+## 3. Supply chain lessons (March 2026)
+In March 2026 a credential-stealing campaign overwrote `aquasecurity/trivy-action` and `setup-trivy` tags, shipped malicious Trivy 0.69.4–0.69.6, then published backdoored **LiteLLM 1.82.7 and 1.82.8** on PyPI (sources: Datadog Security Labs, Snyk, Kaspersky). Z uses both, so the pipeline is built to survive the next one:
+- **No third-party action by tag.** Every `uses:` is pinned to a commit SHA (Renovate `helpers:pinGitHubActionDigests`), `zizmor` fails on unpinned or over-privileged workflows. Scanners are installed as binaries with pinned versions and verified checksums/signatures, not through wrapper actions.
+- **Minimal CI secrets.** Default `permissions: contents: read`; `persist-credentials: false`; publishing only from `main`/tags; OIDC (keyless) instead of long-lived tokens where possible. A compromised scanner in a PR job finds nothing worth stealing.
+- **Release age gate.** Renovate waits 7 days before proposing a new version (14 for LiteLLM), and dependency installs go through the internal PyPI/npm mirror.
+- **LiteLLM**: run the official proxy image **pinned by digest**, never `pip install litellm` at runtime; versions 1.82.7 and 1.82.8 are blocked in `security/blocked-versions.yaml`, checked in CI.
+- **Image signatures verified at deploy** (cosign verify in the deploy job, and optionally Kyverno or sigstore policy-controller in the cluster).
+
+## 4. Files
+| File | Purpose |
+|---|---|
+| `ci/github/ci.yml` | lint, test, security on PRs and pushes |
+| `ci/github/images.yml` | build, scan, SBOM, sign, push to GHCR on main and tags |
+| `ci/github/chart.yml` | chart lint, render, policy checks |
+| `ci/github/e2e.yml` | compose e2e, ZAP baseline, kind and k3d smoke |
+| `ci/gitlab/.gitlab-ci.yml` | all stages for the internal mirror, plus deploy to k3s |
+| `ci/CODEOWNERS.example`, `ci/renovate.json`, `ci/security-exceptions.example.yaml` | repo hygiene |
+| `ci/blocked-versions.example.yaml` | versions CI refuses (LiteLLM 1.82.7/1.82.8, Trivy 0.69.4–0.69.6…) |
+| `ci/scripts/versions.lock.example` | pinned scanner versions and checksums (B8 writes `install-scanners.sh`, `verify-signatures.sh`, `check_exceptions.py`) |
+
+BUILD phase A copies the GitHub templates into `.github/workflows/` with only the jobs whose code exists enabled; B8 completes and enables the rest.

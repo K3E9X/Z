@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Z — History and audit</title>
+
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0}
+[data-font="plex"]{--sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--display:'IBM Plex Sans',ui-sans-serif,sans-serif;--display-w:500;--display-ls:-0.025em}
+[data-font="inter"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Inter',ui-sans-serif,sans-serif;--display-w:600;--display-ls:-0.035em}
+[data-font="editorial"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Newsreader',Georgia,serif;--display-w:400;--display-ls:-0.015em}
+[data-font="geist"]{--sans:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;--display:'Instrument Serif',Georgia,serif;--display-w:400;--display-ls:0}
+[data-theme="night"]{--bg:#0C0C0B;--panel:#121211;--raised:#1A1A18;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);--text:#EDECE8;--text-2:#A9A79F;--text-3:#8B8981;--inv-bg:#EDECE8;--inv-text:#0C0C0B;--run:#6AA6FF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--run-bg:rgba(106,166,255,.10);--wait-bg:rgba(231,176,74,.10);--ok-bg:rgba(93,190,138,.10);--err-bg:rgba(240,112,103,.10);--code:#090908}
+[data-theme="day"]{--bg:#F7F7F5;--panel:#FFFFFF;--raised:#F1F1EE;--line:rgba(20,20,18,.08);--line-2:rgba(20,20,18,.15);--text:#171715;--text-2:#5A5953;--text-3:#6F6D66;--inv-bg:#171715;--inv-text:#FFFFFF;--run:#1F5FD1;--wait:#9A5B00;--ok:#1C7A4A;--err:#B92B27;--run-bg:rgba(31,95,209,.08);--wait-bg:rgba(154,91,0,.09);--ok-bg:rgba(28,122,74,.08);--err-bg:rgba(185,43,39,.08);--code:#F3F3F0}
+[data-theme="slate"]{--bg:#0D1015;--panel:#12161D;--raised:#1A1F28;--line:rgba(200,215,255,.08);--line-2:rgba(200,215,255,.15);--text:#E4E9F1;--text-2:#A2ACBB;--text-3:#8792A3;--inv-bg:#E4E9F1;--inv-text:#0D1015;--run:#74AEFF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--run-bg:rgba(116,174,255,.11);--wait-bg:rgba(231,176,74,.10);--ok-bg:rgba(93,190,138,.10);--err-bg:rgba(240,112,103,.10);--code:#0A0D11}
+[data-theme="contrast"]{--bg:#000000;--panel:#000000;--raised:#161616;--line:rgba(255,255,255,.30);--line-2:rgba(255,255,255,.60);--text:#FFFFFF;--text-2:#E2E2E2;--text-3:#C9C9C9;--inv-bg:#FFFFFF;--inv-text:#000000;--run:#8CC2FF;--wait:#FFD166;--ok:#7EE2A8;--err:#FF8F87;--run-bg:rgba(140,194,255,.18);--wait-bg:rgba(255,209,102,.18);--ok-bg:rgba(126,226,168,.18);--err-bg:rgba(255,143,135,.18);--code:#0B0B0B}
+a{color:var(--text)}a:hover{color:var(--text-2)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+::placeholder{color:var(--text-3)}
+</style>
+
+<div data-theme="contrast" data-font="plex" style="min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13.5px; line-height: 1.45; display: flex; flex-wrap: wrap; -webkit-font-smoothing: antialiased">
+
+  <nav aria-label="Main navigation" style="flex: 0 0 56px; box-sizing: border-box; padding: 14px 0; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 6px">
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" style="margin-bottom: 14px"><rect width="24" height="24" rx="6" fill="#F25C2A"></rect><path d="M7.5 7.5h9l-9 9h9" fill="none" stroke="#0C0C0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <a href="Main.html" aria-label="Mission control" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3"></circle></svg></a>
+    <a href="Inbox.html" aria-label="Review, 4 pending" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center; position: relative"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 13.5h4.5l1.5 2.5h4l1.5-2.5H20"></path><path d="M5.5 5h13L20 13.5V19H4v-5.5z"></path></svg><span style="position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 3px; background: var(--wait)"></span></a>
+    <a href="History.html" aria-label="History" aria-current="page" style="width: 36px; height: 36px; border-radius: 8px; background: var(--raised); color: var(--text); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"></path><path d="M4 4v4.5h4.5M12 8v4l2.5 2"></path></svg></a>
+    <a href="Agents.html" aria-label="Agents" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"></circle><path d="M3.5 19c.7-3.2 2.9-5 5.5-5s4.8 1.8 5.5 5"></path><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.4c1.6.6 2.6 2.2 3 4.6"></path></svg></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+      <h1 style="margin: 0; flex: 1 1 240px; font-size: 20px; font-weight: 600; letter-spacing: -0.015em">History and audit</h1>
+      <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Export audit log</button>
+      <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Download JSON</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <label for="h-q" style="position: absolute; left: -9999px">Filter</label>
+      <input id="h-q" placeholder="Filter by agent, tool, resource…" style="flex: 1 1 260px; max-width: 380px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel)">
+      <select aria-label="Period" style="height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel)"><option>Last 24 hours</option><option>7 days</option><option>30 days</option></select>
+      <select aria-label="Type" style="height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel)"><option>All types</option><option>Writes</option><option>Guardrails</option><option>Human decisions</option></select>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+      <div style="flex: 999 1 600px; min-width: 0; overflow-x: auto">
+        <div style="min-width: 720px; border-top: 1px solid var(--line)">
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 10px 12px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--line)"><span>Time</span><span>Actor</span><span>Type</span><span>Event</span><span>Resource</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line); background: var(--raised)"><span style="font-family: var(--mono); font-size: 12px">10:47:12</span><span>KGX</span><span style="color: var(--ok)">Approval</span><span>7 merge requests “log4j 2.24.3” approved</span><span style="font-family: var(--mono); font-size: 12px">gitlab/infra</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:44:03</span><span>Dev Engineer</span><span style="color: var(--wait)">Write proposed</span><span>Merge request on auth-service</span><span style="font-family: var(--mono); font-size: 12px">gitlab/infra</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:38:41</span><span>Dev Engineer</span><span style="color: var(--err)">Guardrail</span><span>Network call to repo1.maven.org blocked</span><span style="font-family: var(--mono); font-size: 12px">sandbox-7</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:36:20</span><span>Dev Engineer</span><span>Edit</span><span>pom.xml changed in the sandbox</span><span style="font-family: var(--mono); font-size: 12px">auth-service</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:31:58</span><span>Vuln Analyst</span><span>Read</span><span>23 findings fetched</span><span style="font-family: var(--mono); font-size: 12px">defectdojo</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:29:14</span><span>Judge</span><span>Check</span><span>Suspected prompt injection in SECOPS-1838, content isolated</span><span style="font-family: var(--mono); font-size: 12px">jira/SECOPS</span></div>
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1fr); gap: 14px; padding: 12px; border-bottom: 1px solid var(--line)"><span style="font-family: var(--mono); font-size: 12px">10:21:07</span><span>KGX</span><span>Mission started</span><span>log4j 2.24.x across the infra group</span><span style="font-family: var(--mono); font-size: 12px">playbook v2.1</span></div>
+        </div>
+      </div>
+
+      <aside aria-label="Event details" style="flex: 1 1 320px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column">
+        <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: var(--text-3)">Event</span><h2 style="margin: 0; font-size: 15px; font-weight: 600">7 merge requests approved</h2></div>
+        <dl style="margin: 0; padding: 14px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; font-size: 12.5px">
+          <dt style="color: var(--text-3)">Actor</dt><dd style="margin: 0">KGX, via SSO</dd>
+          <dt style="color: var(--text-3)">Executed as</dt><dd style="margin: 0; font-family: var(--mono)">svc-z-gitlab-rw</dd>
+          <dt style="color: var(--text-3)">Mission</dt><dd style="margin: 0">log4j 2.24.x · infra group</dd>
+          <dt style="color: var(--text-3)">Hash</dt><dd style="margin: 0; font-family: var(--mono); overflow-wrap: anywhere">sha256:9f2c…41ab</dd>
+        </dl>
+        <div style="padding: 14px 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 12px; color: var(--text-3)">Replay the mission</span>
+          <div style="display: flex; align-items: center; gap: 10px"><button type="button" aria-label="Play" style="width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); background: none; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7-4.5z" fill="currentColor"></path></svg></button><span style="flex: 1; height: 4px; border-radius: 2px; background: var(--line-2); display: flex"><span style="width: 72%; background: var(--text); border-radius: 2px"></span></span><span style="font-family: var(--mono); font-size: 11.5px">18:04</span></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+
+</body>
+</html>

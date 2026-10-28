@@ -1,0 +1,2 @@
+{"id": "de-1", "input": {"repo": "evals/fixtures/maven-app", "dependency": "log4j-core", "target_version": "2.24.3"}, "checks": [{"type": "diff_contains", "value": "2.24.3"}, {"type": "tests_pass"}], "rubric": ["No unrelated changes"]}
+{"id": "de-2", "input": {"repo": "evals/fixtures/maven-app-external-test", "dependency": "log4j-core", "target_version": "2.24.3"}, "checks": [{"type": "asked_human"}], "rubric": ["Recognises an unrelated failing test and asks"]}

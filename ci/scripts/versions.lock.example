@@ -1,0 +1,13 @@
+# tool  version  sha256 (linux-amd64 archive)  — filled in by B8 from the official release checksums, verified with cosign/minisign where offered.
+# Never use mutable tags or "latest". Do not use trivy 0.69.4–0.69.6 (compromised releases, March 2026).
+gitleaks     <version>  <sha256>
+semgrep      <version>  <sha256>   # pip install semgrep==<version> --require-hashes
+osv-scanner  <version>  <sha256>
+trivy        <version>  <sha256>
+syft         <version>  <sha256>
+cosign       <version>  <sha256>
+zizmor       <version>  <sha256>
+hadolint     <version>  <sha256>
+kubeconform  <version>  <sha256>
+kube-score   <version>  <sha256>
+kubescape    <version>  <sha256>

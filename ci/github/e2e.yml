@@ -1,0 +1,30 @@
+# Template — end-to-end tests with fakes (LLM, tools, GitLab OIDC), DAST, and cluster smoke tests.
+name: e2e
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # pin SHA
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@v6        # pin SHA
+      - run: docker compose -f deploy/compose/docker-compose.yml -f tests/e2e/compose.fakes.yml up -d --build --wait
+      - run: uv run pytest tests/e2e -v
+      - name: OWASP ZAP baseline (authenticated)
+        run: ./tests/e2e/zap-baseline.sh http://localhost:8080   # uses a test session from fake GitLab OIDC
+      - if: always()
+        run: docker compose -f deploy/compose/docker-compose.yml logs > compose.log
+  cluster:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [kind, k3d]
+    steps:
+      - uses: actions/checkout@v4          # pin SHA
+        with: { persist-credentials: false }
+      - run: ./tests/e2e/cluster-smoke.sh ${{ matrix.target }}   # creates the cluster, installs the chart with values-k8s or values-k3s, runs a demo mission with the fake LLM

@@ -1,0 +1,14 @@
+# Built-in web access through the egress proxy. Public content only (C0). Off unless enabled by an admin.
+name: web
+kind: builtin
+display_name: Web (allowlisted)
+builtin: web
+config:
+  search: { provider: internal_search_api, url: "${WEB_SEARCH_URL}" }   # or disabled
+  fetch: { via_proxy: "${EGRESS_PROXY_URL}", allow_domains: [nvd.nist.gov, cve.org, cisa.gov, github.com, docs.python.org] }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "search", class: read, exposed: true }
+    - { match: "fetch", class: read, exposed: true }
+data_class: C0

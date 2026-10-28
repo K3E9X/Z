@@ -1,0 +1,1 @@
+Fixtures to complete in BUILD B7: `maven-app/` (small Maven project using log4j-core 2.14.1 with passing tests) and `maven-app-external-test/` (same, plus an integration test that needs an unreachable external service).

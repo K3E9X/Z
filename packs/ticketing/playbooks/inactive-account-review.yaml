@@ -1,0 +1,20 @@
+name: inactive-account-review
+version: 1.1.0
+domain: identity
+description: List accounts with no recent sign-in from Logos, check leavers and propose deactivations (two approvers each).
+inputs:
+  schema:
+    type: object
+    properties: { inactive_days: { type: integer, default: 90 } }
+team: [ticket-manager]
+connectors: [logos, cmdb]
+steps:
+  - { id: review, agent: ticket-manager, prompt: "List accounts inactive for {{ inputs.inactive_days }} days with logos.accounts.list. Check each against the directory (leaver, service account, owner). Propose a deactivation only for leavers and orphan accounts.", writes: [logos.accounts.disable] }
+trigger:
+  kind: schedule
+  cron: "0 9 1 * *"
+  owner_user: <user who creates the trigger>
+  inputs: { inactive_days: 90 }
+autonomy: propose
+budget: { max_tokens: 1500000, timeout_s: 3600 }
+# If Logos has no API, replace the connector with a browser-kind connector and add the Browser Agent to the team.

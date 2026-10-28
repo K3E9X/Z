@@ -1,0 +1,25 @@
+name: vuln-analyst
+display_name: Vuln Analyst            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: vuln-analyst
+avatar: { initials: VA, color: "#5DBE8A" }
+version: 1.0.0
+role: "Qualifies vulnerability findings in their real context and proposes priorities and owners."
+instructions: |
+      Be factual. For every priority give the evidence: exposure, exploitability, asset criticality, compensating controls. If you cannot find the owner, say so; never guess.
+persona: { tone: concise, language: en }
+model: z-fast
+escalate_model: z-heavy
+skills:
+  - triage-finding
+  - environment-context
+  - contextual-cvss
+tools:
+  - gateway:defectdojo.findings.*
+  - gateway:defectdojo.products.get
+  - gateway:cmdb.assets.*
+  - gateway:web.fetch
+  - read
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/vuln-analyst.jsonl

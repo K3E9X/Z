@@ -1,0 +1,157 @@
+# Template for the internal GitLab mirror — copy to the repo root. Same checks as GitHub, plus deploy to k3s.
+# Runners: use unprivileged runners; images are built rootless (Buildah). Pin every image by digest (Renovate).
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+
+stages: [lint, test, security, build, scan, chart, e2e, dast, deploy, release]
+
+variables:
+  REGISTRY_IMAGE: $CI_REGISTRY_IMAGE
+  UV_CACHE_DIR: .cache/uv
+  PIP_INDEX_URL: $INTERNAL_PYPI_MIRROR          # internal mirror with quarantine for fresh releases
+  npm_config_registry: $INTERNAL_NPM_MIRROR
+
+.python: &python
+  image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim   # pin digest
+  cache: { key: uv, paths: [.cache/uv] }
+  before_script: [uv sync --frozen --all-packages]
+
+.node: &node
+  image: node:22-bookworm-slim                            # pin digest
+  before_script: [corepack enable, cd ui, pnpm install --frozen-lockfile]
+
+lint:python:
+  <<: *python
+  stage: lint
+  script:
+    - uv run ruff check . && uv run ruff format --check .
+    - uv run mypy server runner cli packages
+
+lint:ui:
+  <<: *node
+  stage: lint
+  script: [pnpm lint, pnpm typecheck]
+
+test:python:
+  <<: *python
+  stage: test
+  script:
+    - uv run pytest --cov=server --cov=runner --cov-fail-under=80 --junitxml=report.xml
+    - uv run python -m z_common.contracts.validate_examples
+    - uv run python -m z_common.packs.lint packs/
+  artifacts: { reports: { junit: report.xml } }
+
+test:ui:
+  <<: *node
+  stage: test
+  script: [pnpm test -- --run, pnpm build]
+
+security:scan:
+  stage: security
+  image: debian:bookworm-slim                             # pin digest
+  script:
+    - ./ci/scripts/install-scanners.sh
+    - gitleaks detect --redact --no-banner
+    - semgrep scan --error --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes --config p/secrets
+    - osv-scanner scan --lockfile uv.lock --lockfile ui/pnpm-lock.yaml
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignorefile security/trivyignore .
+    - trivy config --exit-code 1 --severity HIGH,CRITICAL deploy/
+    - hadolint deploy/images/*/Dockerfile
+# GitLab Ultimate users can also include the built-in templates:
+# include: [{ template: Jobs/SAST.gitlab-ci.yml }, { template: Jobs/Secret-Detection.gitlab-ci.yml }, { template: Jobs/Dependency-Scanning.gitlab-ci.yml }, { template: Jobs/Container-Scanning.gitlab-ci.yml }]
+
+build:image:
+  stage: build
+  image: quay.io/buildah/stable                           # pin digest; rootless
+  parallel:
+    matrix:
+      - IMAGE: [z-server, z-runner, z-browser, z-ui]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - buildah login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - buildah build --layers --platform linux/amd64,linux/arm64 --manifest "$IMAGE" -f "deploy/images/$IMAGE/Dockerfile" .
+    - buildah manifest push --all --digestfile digest.txt "$IMAGE" "docker://$REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA"
+    - echo "DIGEST_$IMAGE=$(cat digest.txt)" >> build.env
+  artifacts: { reports: { dotenv: build.env } }
+
+scan:image:
+  stage: scan
+  image: debian:bookworm-slim                             # pin digest
+  needs: [build:image]
+  parallel:
+    matrix:
+      - IMAGE: [z-server, z-runner, z-browser, z-ui]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - ./ci/scripts/install-scanners.sh
+    - trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed "$REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA"
+    - syft "$REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA" -o spdx-json > "sbom-$IMAGE.spdx.json"
+    - cosign sign --yes --key "$COSIGN_KEY" "$REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA"     # COSIGN_KEY: protected, masked file variable or Vault
+    - cosign attest --yes --key "$COSIGN_KEY" --type spdxjson --predicate "sbom-$IMAGE.spdx.json" "$REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA"
+  artifacts: { paths: ["sbom-*.spdx.json"] }
+
+chart:check:
+  stage: chart
+  image: alpine/helm:3                                    # pin digest
+  script:
+    - ./ci/scripts/install-scanners.sh
+    - |
+      for v in k3s k8s; do
+        helm lint deploy/helm/z -f deploy/helm/z/values-$v.yaml
+        helm template z deploy/helm/z -n z -f deploy/helm/z/values-$v.yaml > rendered-$v.yaml
+        kubeconform -strict -summary -ignore-missing-schemas rendered-$v.yaml
+        kubescape scan framework nsa,cis-v1.10.0 rendered-$v.yaml --compliance-threshold 85
+      done
+
+e2e:compose:
+  stage: e2e
+  image: docker:27                                        # pin digest; needs a runner allowed to run compose (dedicated, isolated)
+  services: [docker:27-dind]                              # only on the dedicated e2e runner; never on shared runners
+  tags: [z-e2e]
+  script:
+    - docker compose -f deploy/compose/docker-compose.yml -f tests/e2e/compose.fakes.yml up -d --build --wait
+    - docker compose run --rm e2e pytest tests/e2e -v
+    - ./tests/e2e/zap-baseline.sh http://localhost:8080
+
+deploy:staging:
+  stage: deploy
+  image: alpine/helm:3                                    # pin digest
+  environment: { name: staging, url: "https://z-staging.example.internal" }
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - ./ci/scripts/verify-signatures.sh "$REGISTRY_IMAGE" "sha-$CI_COMMIT_SHORT_SHA"
+    - helm upgrade --install z deploy/helm/z -n z-staging --create-namespace --atomic --wait --timeout 10m
+        -f deploy/helm/z/values-k3s.yaml -f "$VALUES_STAGING"
+        --set image.tag=sha-$CI_COMMIT_SHORT_SHA
+  # Kubernetes access through the GitLab agent for Kubernetes (preferred) or a protected KUBECONFIG file variable.
+
+deploy:production:
+  stage: deploy
+  image: alpine/helm:3                                    # pin digest
+  environment: { name: production, url: "https://z.example.internal" }   # protected environment, required approvals
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+      when: manual
+  script:
+    - ./ci/scripts/verify-signatures.sh "$REGISTRY_IMAGE" "$CI_COMMIT_TAG"
+    - helm upgrade --install z deploy/helm/z -n z --atomic --wait --timeout 15m
+        -f deploy/helm/z/values-k3s.yaml -f "$VALUES_PRODUCTION"
+        --set image.tag=$CI_COMMIT_TAG
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest   # pin digest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script: [echo "Release $CI_COMMIT_TAG"]
+  release:
+    tag_name: $CI_COMMIT_TAG
+    description: CHANGELOG.md

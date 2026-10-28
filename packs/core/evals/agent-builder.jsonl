@@ -1,0 +1,1 @@
+{"id": "ab-1", "input": {"description": "an agent that keeps our Jira SECOPS backlog clean"}, "checks": [{"type": "json_schema", "schema": "contracts/agent.schema.json"}, {"type": "no_write_tools"}], "rubric": ["Reuses backlog-grooming and jira-dedup", "Proposes a measurable objective"]}

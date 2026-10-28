@@ -1,0 +1,6 @@
+name: ticketing
+version: 1.0.0
+description: Ticket creation, deduplication and backlog hygiene
+owner: cyber-ops
+requires_connectors: [jira, cmdb]
+optional_connectors: [logos]

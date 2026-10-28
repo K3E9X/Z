@@ -1,0 +1,20 @@
+name: jira-backlog-grooming
+version: 1.0.0
+domain: ticketing
+description: Find duplicate and stale tickets, fill missing owners and deadlines, propose merges and closures.
+inputs:
+  schema:
+    type: object
+    required: [project]
+    properties: { project: { type: string }, stale_days: { type: integer, default: 60 } }
+team: [ticket-manager]
+connectors: [jira, cmdb]
+steps:
+  - { id: groom, agent: ticket-manager, prompt: "Apply backlog-grooming to project {{ inputs.project }} with stale_days={{ inputs.stale_days }}.", writes: [jira.issues.update, jira.comments.create] }
+trigger:
+  kind: schedule
+  cron: "0 16 * * 5"
+  owner_user: <user who creates the trigger>
+  inputs: { project: SECOPS }
+autonomy: propose
+budget: { max_tokens: 2000000, timeout_s: 3600 }

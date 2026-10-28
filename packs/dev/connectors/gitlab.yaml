@@ -1,0 +1,34 @@
+name: gitlab
+kind: mcp                       # or openapi with the GitLab REST spec
+display_name: GitLab
+mcp: { transport: stdio, command: "<gitlab-mcp-server command>" }   # or { transport: http, url: ... }
+operation_map:                  # MCP tool name -> canonical operation id (03 §4)
+  list_projects: projects.list
+  get_project: projects.get
+  get_file_contents: files.get
+  list_merge_requests: merge_requests.list
+  get_merge_request: merge_requests.get
+  get_merge_request_diffs: merge_requests.diff
+  create_merge_request: merge_requests.create
+  create_issue: issues.create
+  create_note: notes.create
+  merge_merge_request: merge_requests.merge
+  delete_branch: branches.delete
+auth:
+  read:  { type: bearer, secret: env:GITLAB_TOKEN_RO }
+  write: { type: bearer, secret: env:GITLAB_TOKEN_RW }   # executor only, also used by the git push helper
+operations:
+  default_exposed: false        # pack rules are proposals; an admin confirms them at install
+  rules:                        # explicit ids only for writes; globs allowed only for read
+    - { match: "projects.list", class: read, exposed: true }
+    - { match: "projects.get", class: read, exposed: true }
+    - { match: "files.get", class: read, exposed: true }
+    - { match: "merge_requests.list", class: read, exposed: true }
+    - { match: "merge_requests.get", class: read, exposed: true }
+    - { match: "merge_requests.diff", class: read, exposed: true }
+    - { match: "merge_requests.create", class: write, exposed: true }
+    - { match: "issues.create", class: write, exposed: true }
+    - { match: "notes.create", class: write, exposed: true }
+    - { match: "merge_requests.merge", class: destructive, exposed: false }
+    - { match: "branches.delete", class: destructive, exposed: false }
+data_class: C2

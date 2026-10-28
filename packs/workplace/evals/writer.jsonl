@@ -1,0 +1,1 @@
+{"id": "wr-1", "input": {"jira_project": "FIXTURE", "gitlab_group": "fixture"}, "checks": [{"type": "artifact_exists", "name": "weekly-report.docx"}], "rubric": ["Highlights first", "Every figure has a source"]}

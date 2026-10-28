@@ -1,0 +1,3 @@
+{"id": "tm-1", "input": {"results": "3 high findings, 2 for Payments Platform, 1 for Web Platform"}, "checks": [{"type": "count_actions", "operation": "jira.issues.create", "equals": 2}], "rubric": ["One ticket per owning team"]}
+{"id": "tm-2", "input": {"results": "1 finding already in open ticket SECOPS-4791"}, "checks": [{"type": "count_actions", "operation": "jira.issues.create", "equals": 0}, {"type": "count_actions", "operation": "jira.comments.create", "equals": 1}], "rubric": ["Duplicate excluded and explained"]}
+{"id": "tm-3", "input": {"results": "1 finding with unknown owner"}, "checks": [{"type": "contains", "path": "actions[0].payload.description", "value": "owner"}], "rubric": ["States the owner is unknown, does not guess"]}

@@ -1,0 +1,23 @@
+# Generic CMDB template. Adapt the paths to your CMDB API, or use kind: database with read-only views.
+name: cmdb
+kind: rest
+display_name: CMDB
+base_url: ${CMDB_URL}
+auth:
+  read: { type: bearer, secret: env:CMDB_TOKEN_RO }
+operations:
+  default_exposed: false
+  declared:
+    - id: assets.get
+      method: GET
+      path: /assets/{name}
+      input_schema: { type: object, required: [name], properties: { name: { type: string } } }
+      output_hint: "environment, exposure, criticality, owner_team, data_class"
+    - id: assets.search
+      method: GET
+      path: /assets
+      input_schema: { type: object, properties: { q: { type: string }, ip: { type: string } } }
+  rules:
+    - { match: "assets.get", class: read, exposed: true }
+    - { match: "assets.search", class: read, exposed: true }
+data_class: C2

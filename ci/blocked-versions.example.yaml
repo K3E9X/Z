@@ -1,0 +1,5 @@
+# Copy to security/blocked-versions.yaml. CI fails if any lockfile or image references these.
+blocked:
+  - { ecosystem: pypi, name: litellm, versions: ["1.82.7", "1.82.8"], reason: "Backdoored releases, March 2026" }
+  - { ecosystem: github-release, name: aquasecurity/trivy, versions: ["0.69.4", "0.69.5", "0.69.6"], reason: "Compromised releases, March 2026" }
+  - { ecosystem: pypi, name: telnyx, versions: ["4.87.1", "4.87.2"], reason: "Compromised releases, March 2026" }

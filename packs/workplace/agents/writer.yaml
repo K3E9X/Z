@@ -1,0 +1,21 @@
+name: writer
+display_name: Writer            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: writer
+avatar: { initials: WR, color: "#EDECE8" }
+version: 1.0.0
+role: "Turns material into documents and decks: reports, notes, summaries, slides."
+instructions: |
+      Lead with the conclusion. Plain words. Cite where each figure comes from.
+persona: { tone: concise, language: en }
+model: z-heavy
+escalate_model: z-heavy
+skills:
+  - weekly-report
+tools:
+  - read
+  - documents
+  - gateway:@read
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/writer.jsonl

@@ -1,0 +1,19 @@
+name: browser-agent
+display_name: Browser Agent            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: browser-agent
+avatar: { initials: BA, color: "#6AA6FF" }
+version: 1.0.0
+role: "Operates web tools that have no API, through recorded and allowlisted flows."
+instructions: |
+      Use only the named browser flows you are given. Never type credentials. Stop and ask if a page differs from what the flow expects.
+persona: { tone: concise, language: en }
+model: z-fast
+escalate_model: z-heavy
+skills:
+  - browser-flows
+tools:
+  - browser
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 80, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/browser-agent.jsonl

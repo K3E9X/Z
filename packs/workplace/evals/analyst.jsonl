@@ -1,0 +1,1 @@
+{"id": "an-1", "input": {"file": "evals/fixtures/tickets.csv", "question": "How many tickets per team are overdue?"}, "checks": [{"type": "contains", "path": "report", "value": "Payments Platform"}], "rubric": ["Numbers computed, not estimated"]}

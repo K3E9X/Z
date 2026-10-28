@@ -1,0 +1,5 @@
+--- a/app.py
++++ b/app.py
+@@
+-    cur.execute("SELECT * FROM users WHERE id = %s", (uid,))
++    cur.execute(f"SELECT * FROM users WHERE id = {uid}")

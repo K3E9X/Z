@@ -1,0 +1,15 @@
+/* Z design tokens: themes ([data-theme]) and typefaces ([data-font]). Source of truth for ui/ and the CLI palette. */
+[data-font="plex"]{--sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--display:'IBM Plex Sans',ui-sans-serif,sans-serif;--display-w:500;--display-ls:-0.025em}
+[data-font="inter"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Inter',ui-sans-serif,sans-serif;--display-w:600;--display-ls:-0.035em}
+[data-font="editorial"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Newsreader',Georgia,serif;--display-w:400;--display-ls:-0.015em}
+[data-font="geist"]{--sans:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;--display:'Instrument Serif',Georgia,serif;--display-w:400;--display-ls:0}
+[data-theme="night"]{--bg:#0C0C0B;--panel:#121211;--raised:#1A1A18;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);--text:#EDECE8;--text-2:#A9A79F;--text-3:#8B8981;--inv-bg:#EDECE8;--inv-text:#0C0C0B;--run:#6AA6FF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="day"]{--bg:#F7F7F5;--panel:#FFFFFF;--raised:#F1F1EE;--line:rgba(20,20,18,.08);--line-2:rgba(20,20,18,.15);--text:#171715;--text-2:#5A5953;--text-3:#6F6D66;--inv-bg:#171715;--inv-text:#FFFFFF;--run:#1F5FD1;--wait:#9A5B00;--ok:#1C7A4A;--err:#B92B27;--wait-bg:rgba(154,91,0,.08);--err-bg:rgba(185,43,39,.08)}
+[data-theme="slate"]{--bg:#0D1015;--panel:#12161D;--raised:#1A1F28;--line:rgba(200,215,255,.08);--line-2:rgba(200,215,255,.15);--text:#E4E9F1;--text-2:#A2ACBB;--text-3:#8792A3;--inv-bg:#E4E9F1;--inv-text:#0D1015;--run:#74AEFF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="contrast"]{--bg:#000000;--panel:#000000;--raised:#161616;--line:rgba(255,255,255,.30);--line-2:rgba(255,255,255,.60);--text:#FFFFFF;--text-2:#E2E2E2;--text-3:#C9C9C9;--inv-bg:#FFFFFF;--inv-text:#000000;--run:#8CC2FF;--wait:#FFD166;--ok:#7EE2A8;--err:#FF8F87;--wait-bg:rgba(255,209,102,.14);--err-bg:rgba(255,143,135,.14)}
+a{color:var(--text)}a:hover{color:var(--text-2)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+th{font-weight:500;text-align:left}
+[data-theme="night"],[data-theme="slate"],[data-theme="contrast"]{--s1:#3987e5;--s2:#d95926;--s3:#199e70}
+[data-theme="day"]{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a}

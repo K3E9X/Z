@@ -1,0 +1,18 @@
+name: remediate-dependency
+version: 1.0.0
+domain: vulnerabilities
+description: Fix a dependency finding in one repository, review it, then propose a merge request.
+inputs:
+  schema:
+    type: object
+    required: [finding_id, repo]
+    properties: { finding_id: { type: string }, repo: { type: string } }
+team: [vuln-analyst, dev-engineer, reviewer]
+connectors: [defectdojo, cmdb, gitlab]
+steps:
+  - { id: qualify, agent: vuln-analyst, prompt: "Apply triage-finding to {{ inputs.finding_id }}.", output: { schema: schemas/triage-result.json } }
+  - { id: fix, agent: dev-engineer, depends_on: [qualify], workspace: git_clone, repo: "{{ inputs.repo }}", prompt: "Apply dependency-upgrade in {{ inputs.repo }} using the fix from the triage result. Do not propose yet.", output: { schema: ../dev/schemas/change-result.json } }
+  - { id: review, agent: reviewer, depends_on: [fix], inputs_from: steps.fix.outputs, prompt: "Apply security-review to the patch.", output: { schema: ../dev/schemas/review-result.json } }
+  - { id: propose, agent: dev-engineer, depends_on: [review], when: "steps.review.output.verdict == 'approve'", inputs_from: steps.fix.outputs, prompt: "Apply commit-and-mr to propose the merge request.", writes: [gitlab.merge_requests.create] }
+autonomy: propose
+budget: { max_tokens: 3000000, timeout_s: 3600 }

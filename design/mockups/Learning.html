@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Z — Learning</title>
+
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0}
+[data-font="plex"]{--sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--display:'IBM Plex Sans',ui-sans-serif,sans-serif;--display-w:500;--display-ls:-0.025em}
+[data-font="inter"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Inter',ui-sans-serif,sans-serif;--display-w:600;--display-ls:-0.035em}
+[data-font="editorial"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Newsreader',Georgia,serif;--display-w:400;--display-ls:-0.015em}
+[data-font="geist"]{--sans:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;--display:'Instrument Serif',Georgia,serif;--display-w:400;--display-ls:0}
+[data-theme="night"]{--bg:#0C0C0B;--panel:#121211;--raised:#1A1A18;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);--text:#EDECE8;--text-2:#A9A79F;--text-3:#8B8981;--inv-bg:#EDECE8;--inv-text:#0C0C0B;--run:#6AA6FF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--ok-bg:rgba(93,190,138,.10);--err-bg:rgba(240,112,103,.10);--code:#090908}
+[data-theme="day"]{--bg:#F7F7F5;--panel:#FFFFFF;--raised:#F1F1EE;--line:rgba(20,20,18,.08);--line-2:rgba(20,20,18,.15);--text:#171715;--text-2:#5A5953;--text-3:#6F6D66;--inv-bg:#171715;--inv-text:#FFFFFF;--run:#1F5FD1;--wait:#9A5B00;--ok:#1C7A4A;--err:#B92B27;--ok-bg:rgba(28,122,74,.08);--err-bg:rgba(185,43,39,.08);--code:#F3F3F0}
+[data-theme="slate"]{--bg:#0D1015;--panel:#12161D;--raised:#1A1F28;--line:rgba(200,215,255,.08);--line-2:rgba(200,215,255,.15);--text:#E4E9F1;--text-2:#A2ACBB;--text-3:#8792A3;--inv-bg:#E4E9F1;--inv-text:#0D1015;--run:#74AEFF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--ok-bg:rgba(93,190,138,.10);--err-bg:rgba(240,112,103,.10);--code:#0A0D11}
+[data-theme="contrast"]{--bg:#000000;--panel:#000000;--raised:#161616;--line:rgba(255,255,255,.30);--line-2:rgba(255,255,255,.60);--text:#FFFFFF;--text-2:#E2E2E2;--text-3:#C9C9C9;--inv-bg:#FFFFFF;--inv-text:#000000;--run:#8CC2FF;--wait:#FFD166;--ok:#7EE2A8;--err:#FF8F87;--ok-bg:rgba(126,226,168,.14);--err-bg:rgba(255,143,135,.14);--code:#0B0B0B}
+a{color:var(--text)}a:hover{color:var(--text-2)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+</style>
+
+<div data-theme="slate" data-font="plex" style="min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13.5px; line-height: 1.45; display: flex; flex-wrap: wrap; -webkit-font-smoothing: antialiased">
+
+  <nav aria-label="Main navigation" style="flex: 0 0 56px; box-sizing: border-box; padding: 14px 0; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 6px">
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" style="margin-bottom: 14px"><rect width="24" height="24" rx="6" fill="#F25C2A"></rect><path d="M7.5 7.5h9l-9 9h9" fill="none" stroke="#0C0C0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <a href="Main.html" aria-label="Mission control" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3"></circle></svg></a>
+    <a href="Inbox.html" aria-label="Review, 4 pending" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center; position: relative"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 13.5h4.5l1.5 2.5h4l1.5-2.5H20"></path><path d="M5.5 5h13L20 13.5V19H4v-5.5z"></path></svg><span style="position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 3px; background: var(--wait)"></span></a>
+    <a href="Playbooks.html" aria-label="Playbooks" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"></path><path d="M5 16.5a3 3 0 0 1 3-3h10.5"></path></svg></a>
+    <a href="Agents.html" aria-label="Agents and skills" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"></circle><path d="M3.5 19c.7-3.2 2.9-5 5.5-5s4.8 1.8 5.5 5"></path><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.4c1.6.6 2.6 2.2 3 4.6"></path></svg></a>
+    <a href="Learning.html" aria-label="Learning" aria-current="page" style="width: 36px; height: 36px; border-radius: 8px; background: var(--raised); color: var(--text); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 17l5-5 4 4 7-7"></path><path d="M15 9h5v5"></path></svg></a>
+    <a href="Connectors.html" aria-label="Connectors" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 4v4M15 4v4M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"></path><path d="M12 17v3.5"></path></svg></a>
+    <a href="Inference.html" aria-label="Inference and usage" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><rect x="9.5" y="9.5" width="5" height="5" rx="1"></rect><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"></path></svg></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 44px 40px 64px; display: flex; justify-content: center">
+    <div style="width: 100%; max-width: 1240px; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h1 style="margin: 0; font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-ls); font-size: 44px; line-height: 1.05">Learning</h1>
+        <p style="margin: 0; font-size: 15px; color: var(--text-2); max-width: 66ch">Z learns from every decision, edit and failure. It proposes improvements to skills, memory and routing, tests them against the eval suite, and applies nothing without your approval.</p>
+      </div>
+
+      <ol aria-label="Learning loop" style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden">
+        <li style="background: var(--bg); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px"><span style="font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">01 · Observe</span><span style="font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums">47 <span style="font-size: 13px; color: var(--text-2); font-weight: 400">signals this week</span></span><span style="font-size: 12.5px; color: var(--text-2)">Rejections, edits, retries, guardrail hits</span></li>
+        <li style="background: var(--bg); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px"><span style="font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">02 · Propose</span><span style="font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums">3 <span style="font-size: 13px; color: var(--text-2); font-weight: 400">proposals</span></span><span style="font-size: 12.5px; color: var(--text-2)">Skill edits, memory facts, routing rules</span></li>
+        <li style="background: var(--bg); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px"><span style="font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">03 · Evaluate</span><span style="font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums">1 <span style="font-size: 13px; color: var(--text-2); font-weight: 400">discarded</span></span><span style="font-size: 12.5px; color: var(--text-2)">Replayed on evals; any regression is rejected</span></li>
+        <li style="background: var(--bg); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px"><span style="font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">04 · Validate</span><span style="font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--wait)">2 <span style="font-size: 13px; color: var(--text-2); font-weight: 400">waiting for you</span></span><span style="font-size: 12.5px; color: var(--text-2)">A human applies, versioned and reversible</span></li>
+      </ol>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+        <section aria-labelledby="p1" style="flex: 999 1 560px; min-width: 0; border: 1px solid var(--line-2); border-radius: 14px; background: var(--panel); overflow: hidden">
+          <header style="padding: 20px 22px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3)"><span style="padding: 2px 8px; border-radius: 5px; background: var(--raised); color: var(--text-2)">Skill improvement</span><span>Vuln Analyst</span><span aria-hidden="true">·</span><span style="font-family: var(--mono)">ticket-writing v2.0 → v2.1</span></div>
+            <h2 id="p1" style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Always name the affected asset owner and add the fix deadline from policy</h2>
+            <p style="margin: 0; color: var(--text-2)">Based on 6 tickets you edited by hand in the last 10 days: in each one you added the owning team and the remediation deadline.</p>
+          </header>
+
+          <div style="padding: 18px 22px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3)"><span style="font-family: var(--mono)">skills/ticket-writing/SKILL.md</span><span style="margin-left: auto">+3 −1</span></div>
+            <pre style="margin: 0; padding: 14px 0; border-radius: 10px; background: var(--code); border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; line-height: 1.7; overflow-x: auto"><span style="display: block; padding: 0 14px; color: var(--text-3)">  ## Ticket body</span><span style="display: block; padding: 0 14px; color: var(--text-3)">  - Summary of the finding in one sentence</span><span style="display: block; padding: 0 14px; background: var(--err-bg); color: var(--err)">- - Affected hosts</span><span style="display: block; padding: 0 14px; background: var(--ok-bg); color: var(--ok)">+ - Affected hosts, with the owning team from the CMDB</span><span style="display: block; padding: 0 14px; background: var(--ok-bg); color: var(--ok)">+ - Fix deadline from the remediation policy (critical: 7 days)</span><span style="display: block; padding: 0 14px; background: var(--ok-bg); color: var(--ok)">+ - If no owner is found, say so; never guess one</span><span style="display: block; padding: 0 14px; color: var(--text-3)">  - Evidence and references</span></pre>
+          </div>
+
+          <dl style="margin: 0; padding: 4px 22px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px">
+            <div><dt style="font-size: 12px; color: var(--text-3)">Evals before</dt><dd style="margin: 2px 0 0; font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums">9 / 12</dd></div>
+            <div><dt style="font-size: 12px; color: var(--text-3)">Evals after</dt><dd style="margin: 2px 0 0; font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ok)">12 / 12</dd></div>
+            <div><dt style="font-size: 12px; color: var(--text-3)">Regressions</dt><dd style="margin: 2px 0 0; font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums">0</dd></div>
+            <div><dt style="font-size: 12px; color: var(--text-3)">Token cost</dt><dd style="margin: 2px 0 0; font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums">+4%</dd></div>
+          </dl>
+
+          <footer style="padding: 14px 22px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+            <span style="flex: 1 1 220px; font-size: 12.5px; color: var(--text-3)">Applying creates v2.1. You can roll back at any time.</span>
+            <button type="button" style="height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Reject</button>
+            <button type="button" style="height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Try on one mission</button>
+            <button type="button" style="height: 32px; padding: 0 14px; border-radius: 8px; border: none; background: var(--inv-bg); color: var(--inv-text); font-weight: 500">Apply</button>
+          </footer>
+        </section>
+
+        <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 26px">
+          <section aria-labelledby="other" style="display: flex; flex-direction: column">
+            <h2 id="other" style="margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-2)">Other proposals</h2>
+            <article style="padding: 14px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3)"><span>Memory</span><span aria-hidden="true">·</span><span>Dev Engineer</span><span style="margin-left: auto; color: var(--wait)">Waiting</span></div>
+              <span style="font-weight: 500">Builds use the internal Maven mirror, not Maven Central</span>
+              <span style="font-size: 12.5px; color: var(--text-2)">Learned from 3 failed builds. Evals 8/8, no regression.</span>
+            </article>
+            <article style="padding: 14px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3)"><span>Routing</span><span aria-hidden="true">·</span><span>Orchestrator</span><span style="margin-left: auto">Evaluating</span></div>
+              <span style="font-weight: 500">Send dependency findings to Dev Engineer instead of Vuln Analyst</span>
+              <span style="font-size: 12.5px; color: var(--text-2)">5 of 7 recent dependency findings were reassigned by hand.</span>
+            </article>
+            <article style="padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3)"><span>Skill</span><span aria-hidden="true">·</span><span>Reviewer</span><span style="margin-left: auto; color: var(--err)">Discarded</span></div>
+              <span style="font-weight: 500; color: var(--text-2)">Shorter review comments</span>
+              <span style="font-size: 12.5px; color: var(--text-2)">Regressed on 2 evals: missed an injection finding.</span>
+            </article>
+          </section>
+
+          <section aria-labelledby="signals" style="display: flex; flex-direction: column">
+            <h2 id="signals" style="margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-2)">Recent signals</h2>
+            <ul style="list-style: none; margin: 0; padding: 0; font-size: 12.5px">
+              <li style="padding: 9px 0; border-top: 1px solid var(--line); display: flex; gap: 10px"><span style="font-family: var(--mono); color: var(--text-3); flex: 0 0 44px">21:58</span><span style="flex: 1; min-width: 0; color: var(--text-2)"><span style="color: var(--text)">Ticket edited</span> before approval · SECOPS-4821</span></li>
+              <li style="padding: 9px 0; border-top: 1px solid var(--line); display: flex; gap: 10px"><span style="font-family: var(--mono); color: var(--text-3); flex: 0 0 44px">21:40</span><span style="flex: 1; min-width: 0; color: var(--text-2)"><span style="color: var(--text)">Build failed</span> · repository unreachable · infra/billing-api</span></li>
+              <li style="padding: 9px 0; border-top: 1px solid var(--line); display: flex; gap: 10px"><span style="font-family: var(--mono); color: var(--text-3); flex: 0 0 44px">21:12</span><span style="flex: 1; min-width: 0; color: var(--text-2)"><span style="color: var(--text)">Mission reassigned</span> · Vuln Analyst → Dev Engineer</span></li>
+              <li style="padding: 9px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; gap: 10px"><span style="font-family: var(--mono); color: var(--text-3); flex: 0 0 44px">20:47</span><span style="flex: 1; min-width: 0; color: var(--text-2)"><span style="color: var(--text)">Write rejected</span> · duplicate ticket detected by the judge</span></li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+
+</body>
+</html>

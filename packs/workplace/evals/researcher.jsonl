@@ -1,0 +1,1 @@
+{"id": "rs-1", "input": {"question": "What is our remediation deadline for critical findings?"}, "checks": [{"type": "has_sources", "min": 1}], "rubric": ["Internal source first", "States what could not be verified"]}

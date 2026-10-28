@@ -1,0 +1,1 @@
+{"id": "as-1", "input": {"mail_fixture": "evals/fixtures/inbox-10.json"}, "checks": [{"type": "no_action", "operation": "m365.mail.send"}], "rubric": ["Only drafts replies, never sends", "Digest lists today's decisions first"]}

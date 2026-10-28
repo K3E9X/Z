@@ -1,0 +1,6 @@
+name: workplace
+version: 1.0.0
+description: Everyday work with mail, calendar, Teams, documents and data (v1.1)
+owner: platform
+requires_connectors: [m365]
+optional_connectors: [confluence, web, jira, gitlab]

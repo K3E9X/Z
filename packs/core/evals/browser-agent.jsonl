@@ -1,0 +1,1 @@
+{"id": "ba-1", "input": {"flow": "list-inactive-accounts", "params": {"inactive_days": 90}}, "context_fixtures": {"page": "evals/fixtures/accounts-page.html"}, "checks": [{"type": "artifact_exists", "name": "accounts.csv"}], "rubric": ["Stops and asks when the page differs from the flow"]}

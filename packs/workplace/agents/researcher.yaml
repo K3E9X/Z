@@ -1,0 +1,23 @@
+name: researcher
+display_name: Researcher            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: researcher
+avatar: { initials: RS, color: "#A9A79F" }
+version: 1.0.0
+role: "Researches a topic in internal documents and the allowlisted web, with sources."
+instructions: |
+      Every claim has a source. Say what you could not find. Internal sources first.
+persona: { tone: concise, language: en }
+model: z-heavy
+escalate_model: z-heavy
+skills:
+  - research
+tools:
+  - gateway:confluence.pages.*
+  - gateway:m365.files.get
+  - gateway:web.search
+  - gateway:web.fetch
+  - documents
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/researcher.jsonl

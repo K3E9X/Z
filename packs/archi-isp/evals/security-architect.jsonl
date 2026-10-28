@@ -1,0 +1,1 @@
+{"id": "arch-1", "input": {"project_file": "evals/fixtures/project-sso-portal.md"}, "checks": [{"type": "artifact_exists", "name": "pre-review.md"}], "rubric": ["Identifies the trust boundary between portal and IdP", "Lists missing information as questions", "Requirements are testable"]}
