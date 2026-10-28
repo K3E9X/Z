@@ -29,6 +29,8 @@ class Settings:
     internal_url: str = "http://z-server:8000"  # how runners reach z-server (internal API and gateway)
     runner_litellm_url: str = ""  # how runners reach LiteLLM; defaults to litellm_url
     executor: str = "docker"
+    # image the docker and kubernetes executors start; pinned by digest in production
+    runner_image: str = "z-runner:local"
     breakglass: bool = False
     test_account_passwords: str = ""
     oidc_client_secret: str = ""
@@ -54,6 +56,8 @@ class Settings:
                 problems.append("the process executor is refused when Z_ENV=production")
             if self.config.get("auth", {}).get("local_accounts", {}).get("test_accounts"):
                 problems.append("test accounts are refused when Z_ENV=production")
+            if self.executor in {"docker", "kubernetes"} and "@sha256:" not in self.runner_image:
+                problems.append("Z_RUNNER_IMAGE must be pinned by digest (image@sha256:...) when Z_ENV=production")
             if self.secret_key.startswith("change-me"):
                 problems.append("Z_SECRET_KEY still has the example value")
         if problems:
@@ -86,6 +90,7 @@ def from_env(env: dict[str, str] | None = None) -> Settings:
         internal_url=e.get("Z_INTERNAL_URL", "http://z-server:8000").rstrip("/"),
         runner_litellm_url=e.get("Z_RUNNER_LITELLM_URL", "").rstrip("/"),
         executor=e.get("Z_EXECUTOR", str(config.get("executor", {}).get("kind", "docker"))),
+        runner_image=e.get("Z_RUNNER_IMAGE", "z-runner:local"),
         breakglass=e.get("Z_BREAKGLASS", "false").lower() == "true",
         test_account_passwords=e.get("Z_TEST_ACCOUNT_PASSWORDS", ""),
         oidc_client_secret=e.get("OIDC_CLIENT_SECRET", ""),

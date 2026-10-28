@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -39,7 +41,9 @@ def create_app(
     http: httpx.AsyncClient | None = None,
     run_startup: bool = True,
     llm_keys: KeyAdmin | None = None,
+    workers: bool = False,
 ) -> FastAPI:
+    """`workers=True` (z-server all) also runs the scheduler and the identity re-evaluation in this process."""
     settings.check()
 
     @asynccontextmanager
@@ -60,9 +64,23 @@ def create_app(
         await state.hub.start()
         if run_startup:
             await prepare(state)
+        tasks: list[asyncio.Task[None]] = []
+        if workers:
+            from z_server.executors.factory import from_settings
+            from z_server.workers import identity, scheduler
+
+            tasks = [
+                asyncio.create_task(scheduler.run_forever(state, from_settings(settings)), name="scheduler"),
+                asyncio.create_task(identity.run_forever(state), name="identity"),
+            ]
         try:
             yield
         finally:
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
             if http is None:
                 await client.aclose()
             await state.hub.stop()

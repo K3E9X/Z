@@ -21,14 +21,14 @@ def _migrate() -> int:
     return 0
 
 
-def _serve(host: str, port: int) -> int:
+def _serve(host: str, port: int, workers: bool) -> int:
     import uvicorn
 
     from z_server.app import create_app
     from z_server.settings import get_settings
 
     uvicorn.run(
-        create_app(get_settings()),
+        create_app(get_settings(), workers=workers),
         host=host,
         port=port,
         proxy_headers=True,
@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--ttl-hours", type=int, default=24)
     args = parser.parse_args(argv)
     if args.command in {"api", "all"}:
-        return _serve(args.host, args.port)
+        return _serve(args.host, args.port, workers=args.command == "all")
     if args.command == "migrate":
         return _migrate()
     if args.command == "check-config":
