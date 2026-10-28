@@ -35,7 +35,7 @@ jobs:
         with: { version: "0.13.4" }
       - run: uv sync --frozen --all-packages
       - run: uv run ruff check . && uv run ruff format --check .
-      - run: uv run mypy server/src runner/src cli/src packages/z-common/src
+      - run: uv run mypy server/src runner/src cli/src packages/z-common/src deploy/images/z-socket-proxy/socket_proxy.py
       - run: uv run python -m z_common.contracts.validate_examples
       - run: uv run python -m z_common.packs.lint packs/
       - run: uv run pytest --cov=server/src --cov=packages/z-common/src --cov-fail-under=80

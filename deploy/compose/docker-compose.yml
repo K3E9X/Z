@@ -1,5 +1,5 @@
 # Z on Docker Compose (docs/11 §1). Step 1 of the build: postgres, litellm, z-server.
-# The UI, runners, egress proxy, socket proxy and z-browser are added by the next build steps.
+# The UI, egress proxy and z-browser are added by the next build steps.
 #   cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
 #   docker compose -f deploy/compose/docker-compose.yml up -d
 name: z
@@ -70,6 +70,21 @@ services:
     <<: *hardening
     restart: "no"
 
+  docker-socket-proxy:
+    # The only path to the Docker API: runner containers only, hardening checked on every create (invariant 13).
+    build:
+      context: ../..
+      dockerfile: deploy/images/z-socket-proxy/Dockerfile
+    image: z-socket-proxy:local
+    environment:
+      Z_RUNNER_IMAGES: ${Z_RUNNER_IMAGE:-z-runner:local}
+      Z_RUNNER_NETWORK: z_runners
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add: ["${DOCKER_GID:-0}"]   # group owning the Docker socket on the host
+    networks: [core]
+    <<: *hardening
+
   z-server:
     image: z-server:local
     command: ["all", "--port", "8000"]
@@ -78,6 +93,7 @@ services:
       DATABASE_URL: postgresql://z_app:${Z_APP_DB_PASSWORD}@postgres:5432/z   # application role
       LITELLM_URL: http://litellm:4000
       Z_CONFIG: /etc/z/z.yaml
+      Z_RUNNER_IMAGE: ${Z_RUNNER_IMAGE:-z-runner:local}
     volumes:
       - ../../config/z.yaml:/etc/z/z.yaml:ro
       - artifacts:/data/artifacts
@@ -86,6 +102,7 @@ services:
     depends_on:
       z-migrate: { condition: service_completed_successfully }
       litellm: { condition: service_healthy }
+      docker-socket-proxy: { condition: service_healthy }
     networks: [edge, core, runners]
     <<: *hardening
 

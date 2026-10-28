@@ -36,6 +36,13 @@ Building B1 (missions, scheduler, runner protocol, review) required decisions th
 12. **Mission waiting reason**: `question` when a question is open, `approval` when actions are pending, none
     when a job needs attention for another reason (invalid output, judge block).
 
+13. **Docker socket proxy**: Z ships its own `z-socket-proxy` (standard library, one file) instead of a generic
+    proxy. Generic proxies filter by API family but not by body, so a compromised z-server could still create a
+    privileged container mounting the host. Ours allows only create/start/stop/wait/inspect/logs/remove of
+    containers labelled `io.z.job`, and refuses any create that departs from the runner hardening (allowed image,
+    user 10001, runners network, read-only rootfs, all caps dropped, no-new-privileges only, tmpfs on /workspace
+    and /tmp with nosuid,nodev, CPU/memory/pids limits, no mounts, devices, host namespaces or extra runtime).
+
 ## Consequences
 The review inbox, CLI and web follow these rules; B3 implements the clone helper and the executor that applies
 approved actions; B6 adds the model stage of the judge on top of the same verdict shape.
