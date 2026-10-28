@@ -14,9 +14,9 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | CLI: subcommands, headless, interactive session | B4 | todo |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | todo |
 | Judge, routing policy (key allowlists), evals, memory | B6 | todo |
-| Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | todo |
+| Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
 | Inference monitor (inferX health on the Inference screen) | B1 | todo |
-| Named agents (rename, handle, avatar, duplicate) | B1, B5 | todo |
+| Named agents (rename, handle, avatar, duplicate) | B1, B5 | doing (API done; web pending) |
 | GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |
 | RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (action approval rules come with Review) |
 | Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
