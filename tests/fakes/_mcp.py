@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import jsonschema
-import mcp_types as types
-from mcp.server import Server, ServerRequestContext
+import mcp.types as types
+from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
@@ -39,17 +39,17 @@ class McpTool:
 
     def to_mcp(self) -> types.Tool:
         annotations = types.ToolAnnotations(
-            read_only_hint=self.access == "read",
-            destructive_hint=self.access == "destructive" if self.access != "read" else None,
-            idempotent_hint=True if self.access == "read" else None,
+            readOnlyHint=self.access == "read",
+            destructiveHint=self.access == "destructive" if self.access != "read" else None,
+            idempotentHint=True if self.access == "read" else None,
         )
         return types.Tool(
-            name=self.name, description=self.description, input_schema=self.input_schema, annotations=annotations
+            name=self.name, description=self.description, inputSchema=self.input_schema, annotations=annotations
         )
 
 
 def _error(message: str) -> types.CallToolResult:
-    return types.CallToolResult(content=[types.TextContent(text=message)], is_error=True)
+    return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True)
 
 
 class McpEndpoint:
@@ -67,20 +67,19 @@ class McpEndpoint:
         self.authenticate = authenticate
         self.on_denied = on_denied
         self._manager: StreamableHTTPSessionManager | None = None
-        self.server: Server[Any] = Server(
-            name, version="0.1.0", on_list_tools=self._list_tools, on_call_tool=self._call_tool
-        )
+        self.server: Server[Any, Any] = Server(name, version="0.1.0")
+        self.server.list_tools()(self._list_tools)
+        self.server.call_tool(validate_input=False)(self._call_tool)
 
-    async def _list_tools(
-        self, ctx: ServerRequestContext[Any], params: types.PaginatedRequestParams | None
-    ) -> types.ListToolsResult:
-        return types.ListToolsResult(tools=[t.to_mcp() for t in self.tools.values()])
+    async def _list_tools(self) -> list[types.Tool]:
+        return [t.to_mcp() for t in self.tools.values()]
 
-    async def _call_tool(self, ctx: ServerRequestContext[Any], params: types.CallToolRequestParams) -> Any:
-        tool = self.tools.get(params.name)
+    async def _call_tool(self, name: str, arguments: dict[str, Any] | None) -> types.CallToolResult:
+        tool = self.tools.get(name)
         if tool is None:
-            return _error(f"unknown tool: {params.name}")
-        headers = getattr(ctx.request, "headers", None)
+            return _error(f"unknown tool: {name}")
+        request = self.server.request_context.request
+        headers = getattr(request, "headers", None)
         kind = self.authenticate(headers.get("authorization") if headers is not None else None)
         if kind is None:
             return _error("401 Unauthorized: missing or unknown token")
@@ -88,7 +87,7 @@ class McpEndpoint:
             if self.on_denied is not None:
                 self.on_denied(tool.name, "read token used for a write tool")
             return _error(f"403 Forbidden: {tool.name} needs the write token")
-        args = dict(params.arguments or {})
+        args = dict(arguments or {})
         try:
             jsonschema.validate(args, tool.input_schema)
         except jsonschema.ValidationError as exc:
@@ -99,7 +98,7 @@ class McpEndpoint:
             return _error(str(exc))
         structured = result if isinstance(result, dict) else {"result": result}
         return types.CallToolResult(
-            content=[types.TextContent(text=json.dumps(result, default=str))], structured_content=structured
+            content=[types.TextContent(type="text", text=json.dumps(result, default=str))], structuredContent=structured
         )
 
     @asynccontextmanager
