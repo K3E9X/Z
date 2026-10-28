@@ -1,0 +1,1 @@
+{"id": "bad-1", "input": {}, "checks": [{"type": "count_actions", "operation": "jira.issues.create"}]}

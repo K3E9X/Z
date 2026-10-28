@@ -1,0 +1,6 @@
+name: vuln
+version: 1.0.0
+description: Vulnerability triage and remediation
+owner: cyber-ops
+requires_connectors: [defectdojo, cmdb, jira]
+optional_connectors: [web, gitlab]

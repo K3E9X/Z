@@ -1,0 +1,30 @@
+{
+ "agent": "vuln-analyst",
+ "title": "Critical findings triaged within 48 hours",
+ "scope": [
+  {
+   "kind": "product",
+   "ref": "infra-boutiques"
+  }
+ ],
+ "metric": {
+  "source": "z",
+  "query": "untriaged_findings",
+  "params": {
+   "product": "infra-boutiques",
+   "severity": "critical",
+   "older_than_hours": 48
+  },
+  "target": 0,
+  "direction": "down"
+ },
+ "cadence": "0 */4 * * *",
+ "allowed_playbooks": [
+  "weekly-vuln-triage"
+ ],
+ "mode": "suggest",
+ "budget_per_period": {
+  "tokens": 2000000,
+  "period": "day"
+ }
+}

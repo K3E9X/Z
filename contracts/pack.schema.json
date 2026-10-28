@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/pack.schema.json",
+  "title": "Pack",
+  "description": "pack.yaml at the root of a pack. agents, skills, playbooks and connectors are discovered from the pack directories; listing them here is optional.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": { "$ref": "common.schema.json#/$defs/Slug" },
+    "version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "description": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string" },
+    "requires_connectors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "uniqueItems": true },
+    "optional_connectors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "uniqueItems": true },
+    "agents": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" } },
+    "skills": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" } },
+    "playbooks": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" } },
+    "connectors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" } }
+  }
+}

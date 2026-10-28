@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/eval-case.schema.json",
+  "title": "EvalCase",
+  "description": "One line of an eval JSONL file (08 §6). Paths in checks use dotted keys with [n] indexes (actions[0].payload.description) over the job result: {output, report, actions[], questions[], artifacts[], tool_calls[], diff}. Fixture paths are relative to the pack.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "input", "checks"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+    "description": { "type": "string" },
+    "input": { "type": "object" },
+    "context_fixtures": {
+      "type": "object",
+      "description": "Name -> fixture. A string that is an existing path relative to the pack is loaded as a file; any other string is literal context.",
+      "additionalProperties": { "type": ["string", "object", "array"] }
+    },
+    "expected": { "type": "object" },
+    "rubric": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "checks": { "type": "array", "items": { "$ref": "#/$defs/Check" } },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "skill": { "$ref": "common.schema.json#/$defs/Slug", "description": "Skill under test, for skill-level suites." },
+    "timeout_s": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "Check": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["json_schema", "field_equals", "contains", "regex", "artifact_exists", "diff_contains", "tests_pass", "asked_human", "count_actions", "no_action", "no_write_tools", "has_sources", "duplicate_detected"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "json_schema" } } }, "then": { "required": ["schema"], "properties": { "type": true, "schema": { "type": "string" }, "path": { "type": "string" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "field_equals" } } }, "then": { "required": ["path", "value"], "properties": { "type": true, "path": { "type": "string" }, "value": true }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "contains" } } }, "then": { "required": ["path", "value"], "properties": { "type": true, "path": { "type": "string" }, "value": { "type": "string" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "regex" } } }, "then": { "required": ["path", "pattern"], "properties": { "type": true, "path": { "type": "string" }, "pattern": { "type": "string" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "artifact_exists" } } }, "then": { "required": ["name"], "properties": { "type": true, "name": { "type": "string" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "diff_contains" } } }, "then": { "required": ["value"], "properties": { "type": true, "value": { "type": "string" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "enum": ["tests_pass", "asked_human", "no_write_tools", "duplicate_detected"] } } }, "then": { "properties": { "type": true }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "count_actions" } } }, "then": { "required": ["operation", "equals"], "properties": { "type": true, "operation": { "$ref": "common.schema.json#/$defs/WriteOperationId" }, "equals": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "no_action" } } }, "then": { "required": ["operation"], "properties": { "type": true, "operation": { "$ref": "common.schema.json#/$defs/WriteOperationId" } }, "additionalProperties": false } },
+        { "if": { "properties": { "type": { "const": "has_sources" } } }, "then": { "required": ["min"], "properties": { "type": true, "min": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } }
+      ]
+    }
+  }
+}

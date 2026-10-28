@@ -1,0 +1,4 @@
+{"goal": "Bump log4j to 2.24.x in every repo of infra/", "playbook": "bulk-dependency-upgrade",
+ "steps": [{"id": "s1", "title": "Find repos declaring log4j", "agent": "orchestrator", "fanout": null, "depends_on": []},
+           {"id": "s2", "title": "Upgrade each repo", "agent": "dev-engineer", "fanout": {"over": "steps.s1.output.repos", "concurrency": 6}, "depends_on": ["s1"], "workspace": "git_clone", "repo": "{{ item.repo }}"}],
+ "writes": ["gitlab.merge_requests.create"], "size": "medium"}

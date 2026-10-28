@@ -1,0 +1,1 @@
+{"mission_id": "m_01", "job_id": "j_02", "seq": 4, "ts": "2026-10-28T09:01:05Z", "type": "data_class", "payload": {"from": "C1", "to": "C2", "cause": "tool_result", "detail": "jira.issues.get"}}

@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/config.schema.json",
+  "title": "Z platform configuration",
+  "description": "config/z.yaml, validated AFTER ${VAR} / ${VAR:-default} substitution from the environment. Unknown keys are refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workspace", "auth", "executor", "inference", "routing_policy", "guardrails"],
+  "properties": {
+    "workspace": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": { "name": { "type": "string", "minLength": 1 }, "environment": { "type": "string" } }
+    },
+    "auth": { "$ref": "#/$defs/Auth" },
+    "audit": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "retention_days": { "type": "integer", "minimum": 90 },
+        "checkpoint_minutes": { "type": "integer", "minimum": 1 },
+        "forward": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "syslog": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string" }, "format": { "enum": ["rfc5424"] } } },
+            "https": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "executor": {
+      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["docker", "process", "kubernetes"] },
+        "docker": { "type": "object", "additionalProperties": false, "properties": { "socket_proxy_url": { "type": "string" }, "network": { "type": "string" }, "image": { "type": "string" } } },
+        "kubernetes": { "type": "object", "additionalProperties": false, "properties": { "namespace": { "type": "string" }, "runtime_class": { "type": "string" }, "job_ttl_s": { "type": "integer", "minimum": 0 }, "image": { "type": "string" } } },
+        "default_concurrency": { "type": "integer", "minimum": 1 },
+        "max_concurrency": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "inference": {
+      "type": "object", "additionalProperties": false, "required": ["gateway_url", "aliases"],
+      "properties": {
+        "gateway_url": { "type": "string" },
+        "aliases": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/ModelAlias" }, "minItems": 1 },
+        "internal_cost_per_mtok": {
+          "type": "object",
+          "additionalProperties": { "type": "object", "additionalProperties": false, "properties": { "input": { "type": "number", "minimum": 0 }, "output": { "type": "number", "minimum": 0 } } }
+        },
+        "prometheus": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "url": { "type": "string" }, "queries": { "type": "object", "additionalProperties": { "type": "string" } } }
+        },
+        "probes": { "type": "object", "additionalProperties": false, "properties": { "models_poll_s": { "type": "integer", "minimum": 10 }, "tool_call_probe_s": { "type": "integer", "minimum": 60 } } }
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["name", "kind", "enabled", "aliases", "data_classes"],
+        "properties": {
+          "name": { "type": "string" }, "kind": { "enum": ["internal", "external"] }, "enabled": { "type": "boolean" },
+          "aliases": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/ModelAlias" } },
+          "data_classes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/DataClass" } }
+        }
+      }
+    },
+    "routing_policy": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "data_classes": { "type": "object", "propertyNames": { "$ref": "common.schema.json#/$defs/DataClass" }, "additionalProperties": { "type": "string" } },
+        "default_mission_class": { "$ref": "common.schema.json#/$defs/DataClass" },
+        "external_fallback_when_degraded": { "type": "boolean" },
+        "never_external": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/DataClass" } },
+        "never_in_memory": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/DataClass" } }
+      }
+    },
+    "budgets": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "org_monthly_tokens": { "type": "integer", "minimum": 1 }, "default_mission_tokens": { "type": "integer", "minimum": 1 }, "alert_at": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 } }
+    },
+    "guardrails": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "human_approval_for_writes": { "$ref": "#/$defs/LockedBool" },
+        "two_approvers_for_destructive": { "$ref": "#/$defs/LockedBool" },
+        "sandbox_network": { "type": "object", "additionalProperties": false, "required": ["value"], "properties": { "value": { "const": "deny" }, "locked": { "type": "boolean" } } },
+        "judge_injection_scan": { "$ref": "#/$defs/LockedBool" },
+        "learning_requires_approval": { "$ref": "#/$defs/LockedBool" },
+        "max_steps_per_job": { "type": "integer", "minimum": 1 },
+        "max_job_minutes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "egress": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "proxy_url": { "type": "string" }, "mirrors": { "type": "array", "items": { "type": "string" } }, "browser_targets": { "type": "array", "items": { "type": "string" } } }
+    },
+    "secrets": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "backend": { "enum": ["env", "file", "vault", "kubernetes"] },
+        "file": { "type": "object", "additionalProperties": false, "properties": { "dir": { "type": "string" } } },
+        "vault": { "type": "object", "additionalProperties": false, "properties": { "address": { "type": "string" }, "mount": { "type": "string" }, "path_prefix": { "type": "string" } } }
+      }
+    },
+    "memory": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "embedding_dim": { "type": "integer", "minimum": 8, "maximum": 4096 }, "top_k_max": { "type": "integer", "minimum": 1 } }
+    },
+    "channels": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "teams": { "$ref": "#/$defs/Channel" }, "mattermost": { "$ref": "#/$defs/Channel" },
+        "slack": { "$ref": "#/$defs/Channel" }, "email": { "$ref": "#/$defs/Channel" }
+      }
+    },
+    "notifications": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "mattermost_webhook": { "type": "string" }, "slack_webhook": { "type": "string" }, "smtp_url": { "type": "string" },
+        "digest": { "type": "object", "additionalProperties": false, "properties": { "daily_decisions": { "type": "string" }, "weekly_report": { "type": "string" } } }
+      }
+    },
+    "retention": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "events_days": { "type": "integer", "minimum": 1 }, "artifacts_days": { "type": "integer", "minimum": 1 }, "c3_artifacts_days": { "type": "integer", "minimum": 1 } }
+    },
+    "learning": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "schedule": { "type": "string" }, "shadow_replay_missions": { "type": "integer", "minimum": 0 }, "max_token_cost_increase": { "type": "number", "minimum": 0 } }
+    },
+    "packs": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "paths": { "type": "array", "items": { "type": "string" } }, "enabled": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" } } }
+    },
+    "ui": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "default_theme": { "enum": ["night", "day", "slate", "contrast"] }, "default_font": { "enum": ["plex", "inter", "editorial", "geist"] }, "origin": { "type": "string", "description": "Allowed browser origin for CORS (empty = same origin only)." } }
+    }
+  },
+  "$defs": {
+    "LockedBool": {
+      "type": "object", "additionalProperties": false, "required": ["value"],
+      "properties": { "value": { "type": "boolean" }, "locked": { "type": "boolean" } }
+    },
+    "Channel": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" }, "app_id": { "type": "string" }, "address": { "type": "string" }, "default_agent": { "$ref": "common.schema.json#/$defs/Slug" } }
+    },
+    "Auth": {
+      "type": "object", "additionalProperties": false, "required": ["mode"],
+      "properties": {
+        "provider": { "const": "gitlab" },
+        "mode": { "enum": ["oidc", "dev"], "description": "dev = single local user, refused when Z_ENV=production." },
+        "issuer_url": { "type": "string" },
+        "client_id": { "type": "string" },
+        "client_secret": { "type": "string" },
+        "cli_client_id": { "type": "string", "description": "Public OAuth client for the CLI device flow; defaults to client_id." },
+        "scopes": { "type": "array", "items": { "type": "string" } },
+        "groups_claim": { "type": "string" },
+        "allowed_groups": { "type": "array", "items": { "type": "string" } },
+        "no_match": { "enum": ["viewer", "deny"] },
+        "group_mapping": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["group", "role", "scope"],
+            "properties": { "group": { "type": "string" }, "role": { "$ref": "common.schema.json#/$defs/RoleName" }, "scope": { "enum": ["org", "team"] } }
+          }
+        },
+        "team_mapping": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["group", "team"], "properties": { "group": { "type": "string" }, "team": { "type": "string" } } }
+        },
+        "reevaluate_groups_minutes": { "type": "integer", "minimum": 5 },
+        "session": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "idle_minutes": { "type": "integer", "minimum": 1 }, "absolute_hours": { "type": "integer", "minimum": 1 }, "cli_token_days": { "type": "integer", "minimum": 1, "maximum": 90 } }
+        },
+        "step_up_max_age_s": { "type": "integer", "minimum": 30 },
+        "api_tokens": { "type": "object", "additionalProperties": false, "properties": { "max_days": { "type": "integer", "minimum": 1, "maximum": 90 } } },
+        "cli": { "type": "object", "additionalProperties": false, "properties": { "device_flow": { "type": "boolean" }, "loopback_redirect": { "type": "string" } } },
+        "local_accounts": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "bootstrap": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "ttl_hours": { "type": "integer", "minimum": 1, "maximum": 24 } } },
+            "test_accounts": {
+              "type": "array",
+              "items": {
+                "type": "object", "additionalProperties": false, "required": ["name", "role"],
+                "properties": { "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,31}$" }, "role": { "enum": ["viewer", "operator", "approver"] }, "team": { "type": "string" }, "expires_days": { "type": "integer", "minimum": 1, "maximum": 90 } }
+              }
+            },
+            "password_policy": { "type": "object", "additionalProperties": false, "properties": { "min_length": { "type": "integer", "minimum": 12 }, "lockout_after": { "type": "integer", "minimum": 1 }, "lockout_minutes": { "type": "integer", "minimum": 1 } } }
+          }
+        },
+        "breakglass": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+        "dev_user": { "type": "object", "additionalProperties": false, "properties": { "username": { "type": "string" }, "role": { "$ref": "common.schema.json#/$defs/RoleName" } } }
+      }
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/events.schema.json",
+  "title": "Event",
+  "description": "Everything that happens in a mission (03 §3). seq is assigned by z-server per mission and is the SSE id. Payloads never contain secrets: tool arguments and outputs are redacted before storage. Large content goes to artifacts and is referenced by *_ref (artifact id).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mission_id", "job_id", "seq", "ts", "type", "payload"],
+  "properties": {
+    "mission_id": { "$ref": "common.schema.json#/$defs/Id" },
+    "job_id": { "oneOf": [{ "$ref": "common.schema.json#/$defs/Id" }, { "type": "null" }], "description": "null for mission-level events." },
+    "seq": { "type": "integer", "minimum": 0 },
+    "ts": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "type": { "$ref": "#/$defs/EventType" },
+    "agent": { "type": ["string", "null"], "description": "Agent slug." },
+    "step_id": { "type": ["string", "null"] },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "status" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/StatusPayload" } } } },
+    { "if": { "properties": { "type": { "const": "plan" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/PlanPayload" } } } },
+    { "if": { "properties": { "type": { "const": "message" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/MessagePayload" } } } },
+    { "if": { "properties": { "type": { "const": "thought" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ThoughtPayload" } } } },
+    { "if": { "properties": { "type": { "const": "tool_call" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ToolCallPayload" } } } },
+    { "if": { "properties": { "type": { "const": "tool_result" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ToolResultPayload" } } } },
+    { "if": { "properties": { "type": { "const": "terminal" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/TerminalPayload" } } } },
+    { "if": { "properties": { "type": { "const": "file_edit" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/FileEditPayload" } } } },
+    { "if": { "properties": { "type": { "const": "browser" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/BrowserPayload" } } } },
+    { "if": { "properties": { "type": { "const": "denied" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/DeniedPayload" } } } },
+    { "if": { "properties": { "type": { "const": "validation_error" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ValidationErrorPayload" } } } },
+    { "if": { "properties": { "type": { "const": "usage" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/UsagePayload" } } } },
+    { "if": { "properties": { "type": { "const": "artifact" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ArtifactPayload" } } } },
+    { "if": { "properties": { "type": { "const": "question" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/QuestionPayload" } } } },
+    { "if": { "properties": { "type": { "const": "question_answered" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/QuestionAnsweredPayload" } } } },
+    { "if": { "properties": { "type": { "const": "action_proposed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ActionProposedPayload" } } } },
+    { "if": { "properties": { "type": { "const": "action_status" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ActionStatusPayload" } } } },
+    { "if": { "properties": { "type": { "const": "subagent" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/SubagentPayload" } } } },
+    { "if": { "properties": { "type": { "const": "checkpoint" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/CheckpointPayload" } } } },
+    { "if": { "properties": { "type": { "const": "data_class" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/DataClassPayload" } } } },
+    { "if": { "properties": { "type": { "const": "judge" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/JudgePayload" } } } },
+    { "if": { "properties": { "type": { "const": "learning_signal" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/LearningSignalPayload" } } } },
+    { "if": { "properties": { "type": { "const": "objective_update" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ObjectiveUpdatePayload" } } } }
+  ],
+  "$defs": {
+    "EventType": {
+      "type": "string",
+      "enum": ["status", "plan", "message", "thought", "tool_call", "tool_result", "terminal", "file_edit", "browser", "denied", "validation_error", "usage", "artifact", "question", "question_answered", "action_proposed", "action_status", "subagent", "checkpoint", "data_class", "judge", "learning_signal", "objective_update"]
+    },
+    "EventIn": {
+      "description": "What a runner posts to /internal/jobs/{id}/events: the envelope without mission_id, job_id and seq (z-server sets them from the job token).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ts", "type", "payload"],
+      "properties": {
+        "ts": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "type": { "$ref": "#/$defs/EventType" },
+        "step_id": { "type": ["string", "null"] },
+        "payload": { "type": "object" }
+      }
+    },
+    "StatusPayload": {
+      "type": "object", "additionalProperties": false, "required": ["entity", "from", "to"],
+      "properties": {
+        "entity": { "type": "string", "enum": ["mission", "job", "step"] },
+        "id": { "type": "string", "description": "Step id when entity is step." },
+        "from": { "type": ["string", "null"] }, "to": { "type": "string" },
+        "reason": { "type": ["string", "null"], "description": "needs_attention reason, waiting reason, error class or free text." }
+      }
+    },
+    "PlanPayload": {
+      "type": "object", "additionalProperties": false, "required": ["steps"],
+      "properties": { "steps": { "type": "array", "items": { "$ref": "mission-plan.schema.json#/$defs/PlanStep" } }, "writes": { "type": "array", "items": { "type": "string" } } }
+    },
+    "MessagePayload": {
+      "type": "object", "additionalProperties": false, "required": ["role", "text"],
+      "properties": { "role": { "type": "string", "enum": ["user", "agent", "system"] }, "text": { "type": "string" }, "by": { "type": ["string", "null"], "description": "Username for user messages (Guide the agent)." } }
+    },
+    "ThoughtPayload": { "type": "object", "additionalProperties": false, "required": ["text"], "properties": { "text": { "type": "string" } } },
+    "ToolCallPayload": {
+      "type": "object", "additionalProperties": false, "required": ["call_id", "tool", "args"],
+      "properties": {
+        "call_id": { "type": "string" },
+        "tool": { "type": "string", "description": "Neutral tool name (read, edit, terminal, code, documents, browser, gateway, propose_action, ask_human, spawn_subagent, search_memory, report_objective)." },
+        "operation": { "type": ["string", "null"], "description": "Full operation id for gateway and propose_action calls." },
+        "args": { "type": "object", "description": "Redacted." }
+      }
+    },
+    "ToolResultPayload": {
+      "type": "object", "additionalProperties": false, "required": ["call_id", "ok", "summary", "duration_ms", "judge"],
+      "properties": {
+        "call_id": { "type": "string" }, "ok": { "type": "boolean" }, "summary": { "type": "string" },
+        "artifact_ref": { "type": ["string", "null"] }, "duration_ms": { "type": "integer", "minimum": 0 },
+        "judge": { "$ref": "common.schema.json#/$defs/JudgeVerdict" }
+      }
+    },
+    "TerminalPayload": {
+      "type": "object", "additionalProperties": false, "required": ["command"],
+      "properties": { "command": { "type": "string" }, "exit_code": { "type": ["integer", "null"] }, "output_ref": { "type": ["string", "null"] }, "output_tail": { "type": "string", "description": "Last lines, redacted, at most 4 KB." } }
+    },
+    "FileEditPayload": {
+      "type": "object", "additionalProperties": false, "required": ["path", "added", "removed"],
+      "properties": { "path": { "type": "string" }, "diff_ref": { "type": ["string", "null"] }, "added": { "type": "integer", "minimum": 0 }, "removed": { "type": "integer", "minimum": 0 } }
+    },
+    "BrowserPayload": {
+      "type": "object", "additionalProperties": false, "required": ["url", "action"],
+      "properties": { "url": { "type": "string" }, "action": { "type": "string" }, "screenshot_ref": { "type": ["string", "null"] } }
+    },
+    "DeniedPayload": {
+      "type": "object", "additionalProperties": false, "required": ["what", "rule"],
+      "properties": { "what": { "type": "string" }, "rule": { "type": "string", "description": "Guardrail id, e.g. sandbox_network, workspace_jail, write_requires_proposal, not_in_allowlist, budget, step_writes." }, "detail": { "type": "string" } }
+    },
+    "ValidationErrorPayload": {
+      "type": "object", "additionalProperties": false, "required": ["where", "errors"],
+      "properties": { "where": { "type": "string", "enum": ["tool_args", "output"] }, "errors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/FieldError" } }, "attempt": { "type": "integer", "minimum": 0 } }
+    },
+    "UsagePayload": {
+      "type": "object", "additionalProperties": false, "required": ["model", "tokens_in", "tokens_out"],
+      "properties": { "model": { "type": "string" }, "tokens_in": { "type": "integer", "minimum": 0 }, "tokens_out": { "type": "integer", "minimum": 0 }, "cached_tokens": { "type": "integer", "minimum": 0 }, "latency_ms": { "type": "integer", "minimum": 0 } }
+    },
+    "ArtifactPayload": {
+      "type": "object", "additionalProperties": false, "required": ["artifact_id", "kind", "name"],
+      "properties": { "artifact_id": { "type": "string" }, "kind": { "$ref": "common.schema.json#/$defs/ArtifactKind" }, "name": { "type": "string" } }
+    },
+    "QuestionPayload": {
+      "type": "object", "additionalProperties": false, "required": ["question_id", "text"],
+      "properties": { "question_id": { "type": "string" }, "text": { "type": "string" }, "options": { "type": "array", "items": { "type": "string" } } }
+    },
+    "QuestionAnsweredPayload": {
+      "type": "object", "additionalProperties": false, "required": ["question_id", "answer", "answered_by"],
+      "properties": { "question_id": { "type": "string" }, "answer": { "type": "string" }, "answered_by": { "type": "string" } }
+    },
+    "ActionProposedPayload": {
+      "type": "object", "additionalProperties": false, "required": ["action_id", "connector", "operation", "class", "summary"],
+      "properties": { "action_id": { "type": "string" }, "connector": { "type": "string" }, "operation": { "type": "string" }, "class": { "type": "string", "enum": ["write", "destructive"] }, "summary": { "type": "string" } }
+    },
+    "ActionStatusPayload": {
+      "type": "object", "additionalProperties": false, "required": ["action_id", "from", "to"],
+      "properties": { "action_id": { "type": "string" }, "from": { "$ref": "common.schema.json#/$defs/ActionStatus" }, "to": { "$ref": "common.schema.json#/$defs/ActionStatus" }, "by": { "type": ["string", "null"] }, "result": { "type": ["object", "null"] } }
+    },
+    "SubagentPayload": {
+      "type": "object", "additionalProperties": false, "required": ["child_job_id", "agent", "input_summary"],
+      "properties": { "child_job_id": { "type": "string" }, "agent": { "type": "string" }, "input_summary": { "type": "string" } }
+    },
+    "CheckpointPayload": {
+      "type": "object", "additionalProperties": false, "required": ["step", "size"],
+      "properties": { "step": { "type": "integer", "minimum": 0 }, "size": { "type": "integer", "minimum": 0 } }
+    },
+    "DataClassPayload": {
+      "type": "object", "additionalProperties": false, "required": ["from", "to", "cause"],
+      "properties": { "from": { "$ref": "common.schema.json#/$defs/DataClass" }, "to": { "$ref": "common.schema.json#/$defs/DataClass" }, "cause": { "type": "string", "enum": ["tool_result", "input", "judge", "user", "playbook"] }, "detail": { "type": "string" } }
+    },
+    "JudgePayload": {
+      "type": "object", "additionalProperties": false, "required": ["subject", "verdict"],
+      "description": "Judge verdict on content that is not a tool result shown inline: staged workspace inputs, proposed actions, mission prompts.",
+      "properties": {
+        "subject": { "type": "string", "enum": ["tool_result", "staged_input", "proposed_action", "mission_prompt", "channel_message"] },
+        "ref": { "type": ["string", "null"], "description": "call_id, workspace path, action id." },
+        "verdict": { "$ref": "common.schema.json#/$defs/JudgeVerdict" },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "reason": { "type": "string" }
+      }
+    },
+    "LearningSignalPayload": {
+      "type": "object", "additionalProperties": false, "required": ["signal_id", "kind"],
+      "properties": { "signal_id": { "type": "string" }, "kind": { "$ref": "common.schema.json#/$defs/SignalKind" } }
+    },
+    "ObjectiveUpdatePayload": {
+      "type": "object", "additionalProperties": false, "required": ["objective_id", "value", "target", "status"],
+      "properties": { "objective_id": { "type": "string" }, "value": { "type": "number" }, "target": { "type": "number" }, "status": { "$ref": "common.schema.json#/$defs/ObjectiveStatus" } }
+    }
+  }
+}

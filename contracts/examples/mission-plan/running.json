@@ -1,0 +1,3 @@
+{"steps": [{"id": "pull", "agent": "vuln-analyst", "prompt": "List open findings.", "status": "succeeded", "jobs": {"total": 1, "succeeded": 1}},
+           {"id": "qualify", "agent": "vuln-analyst", "prompt": "Triage {{ item.id }}.", "depends_on": ["pull"], "fanout": {"over": "steps.pull.output.findings", "concurrency": 8}, "status": "running", "jobs": {"total": 50, "queued": 30, "running": 8, "succeeded": 12}}],
+ "writes": ["jira.issues.create"]}

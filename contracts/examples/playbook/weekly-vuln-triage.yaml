@@ -1,0 +1,37 @@
+name: weekly-vuln-triage
+version: 1.6.0
+domain: vulnerabilities
+description: Qualify every critical finding and draft one ticket per owning team.
+inputs:
+  schema:
+    type: object
+    required: [product]
+    properties:
+      product: { type: string }
+      min_severity: { type: string, enum: [high, critical], default: critical }
+team: [vuln-analyst, ticket-manager]
+connectors: [defectdojo, cmdb, jira]
+steps:
+  - id: pull
+    agent: vuln-analyst
+    prompt: List open findings for {{ inputs.product }} with severity >= {{ inputs.min_severity }}.
+    output: { schema: schemas/finding-list.json }
+  - id: qualify
+    agent: vuln-analyst
+    depends_on: [pull]
+    fanout: { over: steps.pull.output.findings, concurrency: 8 }
+    prompt: Apply triage-finding to finding {{ item.id }}.
+    output: { schema: schemas/triage-result.json, max_repair_attempts: 2 }
+  - id: tickets
+    agent: ticket-manager
+    depends_on: [qualify]
+    inputs_from: steps.qualify.outputs          # fan-in: list of all TriageResult objects
+    prompt: Group the triage results by owning team, deduplicate against open SECOPS tickets with jira-dedup, and propose one ticket per team with ticket-writing.
+    writes: [jira.issues.create, jira.comments.create]
+trigger:
+  kind: schedule
+  cron: "0 8 * * 1"
+  owner_user: <user who creates the trigger>
+  inputs: { product: infra-boutiques, min_severity: critical }
+autonomy: propose
+budget: { max_tokens: 6000000, timeout_s: 7200 }

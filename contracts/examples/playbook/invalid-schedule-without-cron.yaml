@@ -1,0 +1,6 @@
+name: bad-trigger
+version: 1.0.0
+description: invalid, schedule trigger without cron
+team: [orchestrator]
+steps: [{ id: s1, agent: orchestrator, prompt: Do it. }]
+trigger: { kind: schedule }

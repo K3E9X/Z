@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/mission-plan.schema.json",
+  "title": "MissionPlan",
+  "description": "Plan of a mission: a copy of the playbook steps (with status) or the plan drafted by the Orchestrator for a free-form mission. Also the output format of the mission-planning skill.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["steps"],
+  "properties": {
+    "goal": { "type": "string" },
+    "playbook": { "type": ["string", "null"], "description": "Name of the matching playbook, or null." },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/PlanStep" }, "minItems": 1 },
+    "writes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/WriteOperationId" }, "uniqueItems": true, "description": "Union of the writes of all steps." },
+    "size": { "type": "string", "enum": ["small", "medium", "large"], "description": "small < 1M tokens, medium 1–5M, large > 5M." },
+    "estimated_tokens": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "PlanStep": {
+      "$ref": "playbook.schema.json#/$defs/StepCore",
+      "required": ["id", "agent"],
+      "properties": {
+        "status": { "$ref": "common.schema.json#/$defs/StepStatus" },
+        "jobs": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Job counts for this step (fan-out progress).",
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "queued": { "type": "integer", "minimum": 0 },
+            "running": { "type": "integer", "minimum": 0 },
+            "succeeded": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 },
+            "needs_attention": { "type": "integer", "minimum": 0 }
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

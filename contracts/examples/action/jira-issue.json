@@ -1,0 +1,4 @@
+{"connector": "jira", "operation": "jira.issues.create", "summary": "[Critical] log4j-core RCE on bo-pay-03",
+ "payload": {"project": "SECOPS", "summary": "[Critical] log4j-core RCE on bo-pay-03", "description": "1. Upgrade log4j-core to 2.24.3", "issue_type": "Task", "priority": "Highest", "due_date": "2026-11-01"},
+ "preview": {"kind": "issue", "tracker": "jira", "project": "SECOPS", "title": "[Critical] log4j-core RCE on bo-pay-03", "priority": "Highest", "due_date": "2026-11-01"},
+ "class": "write", "reversible": true, "runs_as": {"scope": "service", "identity": "z-jira-bot"}, "idempotency_key": "3f1c0a"}

@@ -12,3 +12,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0008 — Textual for the interactive CLI and `z top`](0008-textual-cli.md)
 - [0009 — The learning loop proposes; humans apply](0009-learning-needs-approval.md)
 - [0010 — GitLab as the identity provider (OIDC), roles from GitLab groups](0010-gitlab-oidc-identity.md)
+- [0011 — Details fixed while writing contracts v1](0011-contract-v1-details.md)

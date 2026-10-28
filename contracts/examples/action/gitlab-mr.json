@@ -1,0 +1,4 @@
+{"connector": "gitlab", "operation": "gitlab.merge_requests.create", "summary": "Bump log4j-core to 2.24.3 in infra/billing-api",
+ "payload": {"project": "infra/billing-api", "source_branch": "z/m-42/log4j", "target_branch": "main", "title": "fix(deps): bump log4j-core to 2.24.3", "patch_artifact": "art_123"},
+ "preview": {"kind": "diff", "project": "infra/billing-api", "source_branch": "z/m-42/log4j", "target_branch": "main", "title": "fix(deps): bump log4j-core to 2.24.3", "patch_artifact": "art_123", "files": [{"path": "pom.xml", "added": 1, "removed": 1}]},
+ "class": "write", "reversible": true}
