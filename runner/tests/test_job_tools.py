@@ -8,6 +8,7 @@ import json
 import shutil
 import subprocess
 import tarfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -236,3 +237,19 @@ def test_sigterm_stops_after_the_step_without_completing(harness: Harness, tmp_p
     assert job.completion is None
     assert [c["step"] for c in job.checkpoints] == [1]
     harness.server.assert_clean()
+
+
+def test_events_stream_live_during_a_long_step(harness: Harness) -> None:
+    harness.llm.add_rules({"responses": [tool_call("terminal", {"command": "sleep 2; echo slow"}), finish()]})
+    spec = harness.spec(output=None, tools=ALL_LOCAL)
+    job = harness.add(spec)
+    received: dict[str, float] = {}
+
+    def stamp(job_: FakeJob, events: list[dict]) -> None:
+        for event in events:
+            received.setdefault(event["type"], time.monotonic())
+
+    job.on_events = stamp
+    run = harness.run(spec, job, flush_interval_s=0.2)
+    assert run.completion["status"] == "succeeded"
+    assert received["terminal"] - received["tool_call"] >= 1.5  # the call was visible while the command ran

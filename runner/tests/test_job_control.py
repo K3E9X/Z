@@ -287,3 +287,25 @@ def test_harness_confirmation_needs_attention(harness: Harness) -> None:
     denied = run.events("denied")
     assert denied and denied[0]["rule"] == "guardrail_confirm" and denied[0]["what"] == "terminal"
     assert not run.events("terminal")  # never executed
+
+
+def test_action_status_changes_reach_the_agent(harness: Harness) -> None:
+    harness.llm.add_rules(
+        {"responses": [tool_call("read", {"path": "notes.md"}), tool_call("read", {"path": "."}), finish()]}
+    )
+    spec = harness.spec(output=None)
+    job = harness.add(spec)
+
+    def approve(job_: FakeJob, record: dict[str, Any]) -> None:
+        if record["step"] == 1:
+            job_.action_states = [
+                {"action_id": "act-1", "status": "pending"},
+                {"action_id": "act-2", "status": "applied"},
+            ]
+
+    job.on_checkpoint = approve
+    run = harness.run(spec, job)
+    assert run.completion["status"] == "succeeded"
+    second = json.dumps(bodies(harness)[1]["messages"])
+    assert "act-2 is applied" in second and "act-1" not in second
+    assert json.dumps(bodies(harness)[2]["messages"]).count("act-2 is applied") == 1

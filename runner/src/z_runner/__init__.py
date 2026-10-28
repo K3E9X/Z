@@ -20,6 +20,7 @@ _FORCED = {
     "DEBUG": "false",
     "DEBUG_LLM": "false",
     "LOG_TO_FILE": "false",
+    "LOG_AUTO_CONFIG": "false",  # SDK logs propagate to the runner handler, which redacts
     "LITELLM_LOG": os.environ.get("LITELLM_LOG", "ERROR"),
 }
 _OBSERVABILITY = (

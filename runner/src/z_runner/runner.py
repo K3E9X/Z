@@ -12,6 +12,7 @@ import posixpath
 import shutil
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -76,6 +77,7 @@ class RunnerConfig:
     archive_limits: ArchiveLimits = field(default_factory=ArchiveLimits)
     max_archive_bytes: int = 1024**3
     strict_events: bool = False
+    flush_interval_s: float = 2.0
     http_transport: httpx.BaseTransport | None = None
 
 
@@ -241,6 +243,24 @@ class Runner:
         return self._loop(backend), backend
 
     def _loop(self, backend: AgentBackend) -> Outcome:
+        """Run steps until an outcome. Events are also flushed in the background every few seconds so a long
+        step (a slow command, a long model call) stays visible live; control is still applied between steps."""
+        stop = threading.Event()
+
+        def flush_periodically() -> None:
+            while not stop.wait(self.config.flush_interval_s):
+                if self.sink.pending:
+                    self._safe_flush()
+
+        flusher = threading.Thread(target=flush_periodically, name="z-event-flush", daemon=True)
+        flusher.start()
+        try:
+            return self._steps(backend)
+        finally:
+            stop.set()
+            flusher.join(timeout=5)
+
+    def _steps(self, backend: AgentBackend) -> Outcome:
         while True:
             if self.control.cancelled:
                 return Outcome("cancelled")
