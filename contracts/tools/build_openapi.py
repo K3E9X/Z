@@ -1889,6 +1889,21 @@ op(
 )
 op(
     "post",
+    "/missions/{id}/files",
+    "uploadMissionFile",
+    "missions:start",
+    "B1",
+    "Upload an input file before start (workspace files)",
+    "missions",
+    params=["id"],
+    resp=ref("Artifact"),
+    status=201,
+    content={"multipart/form-data": {"schema": obj({"file": {"type": "string", "format": "binary"}, "name": S}, ["file"])}},
+    req={},
+    desc="Only while the mission is draft or planned. Files land in the job workspace (mode files) as /workspace/<name>, after the judge scan of staged inputs.",
+)
+op(
+    "post",
     "/missions/{id}/save-as-playbook",
     "saveMissionAsPlaybook",
     "playbooks:write",

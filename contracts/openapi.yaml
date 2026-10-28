@@ -799,6 +799,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /missions/{id}/files:
+    post:
+      operationId: uploadMissionFile
+      tags:
+      - missions
+      summary: Upload an input file before start (workspace files)
+      x-permission: missions:start
+      x-owner: B1
+      x-audit: true
+      description: Only while the mission is draft or planned. Files land in the job workspace (mode files) as /workspace/<name>, after the judge scan of staged inputs.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                name: *id001
+              required:
+              - file
+              additionalProperties: false
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /missions/{id}/save-as-playbook:
     post:
       operationId: saveMissionAsPlaybook
