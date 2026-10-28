@@ -1,0 +1,2 @@
+# Accepted security findings: id, scope, reason, owner, expires (YYYY-MM-DD). Expired entries fail CI.
+exceptions: []

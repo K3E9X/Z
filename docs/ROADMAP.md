@@ -2,10 +2,12 @@
 
 Status values: `todo`, `doing`, `done`. Claude Code updates this file at the end of each workstream.
 
+Build order (decided with the user): base first, then one verified slice at a time, each run against the real systems.
+
 ## v1.0 — operational (BUILD P0)
 | Item | Workstream | Status |
 |---|---|---|
-| Contracts frozen (`contracts-v1`) | A | todo |
+| Contracts frozen (`contracts-v1`) | A | done |
 | Missions, plans, fan-out, scheduler, resume | B1 | todo |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | todo |
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | todo |
@@ -15,12 +17,12 @@ Status values: `todo`, `doing`, `done`. Claude Code updates this file at the end
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | todo |
 | Inference monitor (inferX health on the Inference screen) | B1 | todo |
 | Named agents (rename, handle, avatar, duplicate) | B1, B5 | todo |
-| GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | todo |
-| RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | todo |
-| Admin area (web + `z admin`) | B1, B4, B5 | todo |
-| Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | todo |
-| CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | todo |
-| Compose, Helm (k3s + Kubernetes), images | B8 | todo |
+| GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |
+| RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (action approval rules come with Review) |
+| Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
+| Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | doing (forwarding and the hourly checkpoint worker pending) |
+| CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | doing (python job, supply-chain checks) |
+| Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose base + z-server image) |
 | E2E and acceptance | C | todo |
 
 ## v1.1 — complete (BUILD P1)

@@ -1,0 +1,106 @@
+# Z on Docker Compose (docs/11 §1). Step 1 of the build: postgres, litellm, z-server.
+# The UI, runners, egress proxy, socket proxy and z-browser are added by the next build steps.
+#   cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
+#   docker compose -f deploy/compose/docker-compose.yml up -d
+name: z
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16@sha256:${PGVECTOR_DIGEST:-7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a}
+    environment:
+      POSTGRES_USER: z
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      Z_APP_DB_PASSWORD: ${Z_APP_DB_PASSWORD:?set Z_APP_DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/10-z.sh:ro
+    networks: [core]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U z -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  litellm:
+    # Official proxy image pinned by digest. Never LiteLLM 1.82.7 / 1.82.8 (security/blocked-versions.yaml).
+    image: litellm/litellm:v1.105.0@sha256:60947db020b57e204823d3fbc8bb295c85be890d7c9adcc77fb4f5fc2fe410b2
+    command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      LITELLM_DATABASE_URL: postgresql://z:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      DATABASE_URL: postgresql://z:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      INFERENCE_API_BASE: ${INFERENCE_API_BASE:-}
+      INFERENCE_API_KEY: ${INFERENCE_API_KEY:-}
+      STORE_MODEL_IN_DB: "False"
+    volumes:
+      - ../../config/litellm.yaml:/etc/litellm/config.yaml:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [core, runners]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  z-migrate:
+    build:
+      context: ../..
+      dockerfile: deploy/images/z-server/Dockerfile
+      secrets: [extra_ca]
+    image: z-server:local
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgresql://z:${POSTGRES_PASSWORD}@postgres:5432/z   # owner role: migrations only
+      Z_EMBEDDING_DIM: ${Z_EMBEDDING_DIM:-1024}
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [core]
+    <<: *hardening
+    restart: "no"
+
+  z-server:
+    image: z-server:local
+    command: ["all", "--port", "8000"]
+    env_file: [../../.env]
+    environment:
+      DATABASE_URL: postgresql://z_app:${Z_APP_DB_PASSWORD}@postgres:5432/z   # application role
+      LITELLM_URL: http://litellm:4000
+      Z_CONFIG: /etc/z/z.yaml
+    volumes:
+      - ../../config/z.yaml:/etc/z/z.yaml:ro
+      - artifacts:/data/artifacts
+    tmpfs: ["/tmp:size=64m"]
+    ports: ["127.0.0.1:${Z_PORT:-8080}:8000"]
+    depends_on:
+      z-migrate: { condition: service_completed_successfully }
+      litellm: { condition: service_healthy }
+    networks: [edge, core, runners]
+    <<: *hardening
+
+secrets:
+  extra_ca:
+    file: ${Z_EXTRA_CA:-/dev/null}   # CA bundle of a TLS-intercepting proxy, if any (build time only)
+
+volumes:
+  pgdata: {}
+  artifacts: {}
+
+networks:
+  edge: {}
+  core: {}
+  runners:
+    name: z_runners
+    internal: true
+  egress: {}

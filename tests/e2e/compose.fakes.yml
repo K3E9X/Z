@@ -1,0 +1,22 @@
+# TEST ONLY overlay: replaces the inference cluster by the fake LLM so the stack can be verified without inferX.
+#   docker compose -f deploy/compose/docker-compose.yml -f tests/e2e/compose.fakes.yml up -d --build --wait
+services:
+  fake-llm:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/Dockerfile.fakes
+      secrets: [extra_ca]
+    image: z-fakes:local
+    command: ["tests.fakes.fake_llm", "--host", "0.0.0.0", "--port", "8090"]
+    networks: [core]
+  fake-oidc:
+    image: z-fakes:local
+    command: ["tests.fakes.fake_gitlab_oidc", "--host", "0.0.0.0", "--port", "8095", "--issuer", "http://fake-oidc:8095"]
+    networks: [core]
+    ports: ["127.0.0.1:8095:8095"]
+  litellm:
+    environment:
+      INFERENCE_API_BASE: http://fake-llm:8090/v1
+      INFERENCE_API_KEY: fake
+    depends_on:
+      fake-llm: { condition: service_started }

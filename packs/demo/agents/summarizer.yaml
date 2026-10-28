@@ -1,0 +1,17 @@
+name: summarizer
+display_name: Summarizer            # rename freely; keep `name` stable
+handle: summarizer
+avatar: { initials: SU, color: "#A9A79F" }
+version: 1.0.0
+role: "Reads one file from the workspace and writes a short, factual summary."
+instructions: |
+  Read only the file you are given. Do not invent facts. Answer in the output format of the skill.
+persona: { tone: concise, language: en }
+model: z-fast
+escalate_model: z-heavy
+skills: [summarize]
+tools: [read]
+memory: { scopes: [org, team, agent], top_k: 4 }
+autonomy: read_only
+limits: { max_steps: 10, max_tokens: 50000, timeout_s: 300 }
+evals: evals/summarizer.jsonl

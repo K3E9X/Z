@@ -1,0 +1,43 @@
+# CI (docs/13): lint, types, tests on a real Postgres, contracts and pack lint, supply-chain checks.
+# Every action is pinned to a commit SHA (Renovate keeps them current, 7-day release age gate).
+# Jobs for the UI, image builds, chart and e2e are added with the build steps that create that code.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+        env:
+          POSTGRES_USER: z
+          POSTGRES_PASSWORD: z
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U z" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      Z_TEST_DATABASE_URL: postgresql://z:z@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with: { version: "0.13.4" }
+      - run: uv sync --frozen --all-packages
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run mypy server/src runner/src cli/src packages/z-common/src
+      - run: uv run python -m z_common.contracts.validate_examples
+      - run: uv run python -m z_common.packs.lint packs/
+      - run: uv run pytest --cov=server/src --cov=packages/z-common/src --cov-fail-under=80
+      - run: uv run python ci/scripts/check_exceptions.py security/exceptions.yaml
+      - run: uv run python ci/scripts/check_blocked_versions.py
