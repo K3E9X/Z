@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, StringConstraints, model_serializer
 
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")]
 Handle = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_.-]{0,39}$")]
@@ -27,9 +27,23 @@ Timestamp = datetime
 
 
 class ZModel(BaseModel):
-    """Strict by default: unknown keys are refused, like the contracts."""
+    """Strict by default: unknown keys are refused, like the contracts.
+
+    Serialization drops optional fields whose value is None: in the contracts an optional field is
+    absent rather than null unless it is declared nullable AND required (those keep null).
+    """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True, use_enum_values=False)
+
+    @model_serializer(mode="wrap")
+    def _drop_optional_none(self, handler: SerializerFunctionWrapHandler) -> Any:
+        data = handler(self)
+        if isinstance(data, dict):
+            for name, field in type(self).model_fields.items():
+                key = field.serialization_alias or field.alias or name
+                if key in data and data[key] is None and not field.is_required():
+                    del data[key]
+        return data
 
     def dump(self) -> dict[str, Any]:
         """JSON-compatible dict with contract key names, without unset optional keys."""

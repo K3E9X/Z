@@ -101,6 +101,46 @@ def validate(name: str, document: Any, pointer: str = "") -> None:
 
 
 @functools.cache
+def api_registry() -> Registry[Any]:
+    """Registry with the OpenAPI document too, so response schemas can be validated with their $refs."""
+    combined: Registry[Any] = registry().with_resource(
+        BASE_URI + "openapi.yaml", Resource.from_contents(openapi(), DRAFT202012)
+    )
+    return combined
+
+
+def response_errors(operation_id: str, status: int, body: Any) -> list[str] | None:
+    """Validation errors of a JSON response against the contract, or None when the contract has no JSON
+    schema for that operation and status (binary, SSE, problem details checked separately)."""
+    for path, item in openapi()["paths"].items():
+        for method, op in item.items():
+            if op["operationId"] != operation_id:
+                continue
+            response = op["responses"].get(str(status))
+            schema = ((response or {}).get("content") or {}).get("application/json", {}).get("schema")
+            if schema is None:
+                return None
+            pointer = "/".join(
+                [
+                    "paths",
+                    path.replace("~", "~0").replace("/", "~1"),
+                    method,
+                    "responses",
+                    str(status),
+                    "content",
+                    "application~1json",
+                    "schema",
+                ]
+            )
+            validator = Draft202012Validator({"$ref": f"{BASE_URI}openapi.yaml#/{pointer}"}, registry=api_registry())
+            return [
+                f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: {e.message}"
+                for e in validator.iter_errors(body)
+            ]
+    raise KeyError(operation_id)
+
+
+@functools.cache
 def openapi() -> dict[str, Any]:
     data: dict[str, Any] = yaml.safe_load((contracts_dir() / "openapi.yaml").read_text(encoding="utf-8"))
     return data

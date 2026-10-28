@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from z_common.contracts import contracts_dir
 from z_common.models.enums import OperationClass
 from z_common.packs import Pack, discover
 from z_common.packs.classify import ORDER, classify, glob_match, is_glob, raise_only
@@ -196,7 +198,16 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
         for doc in pack.playbooks:
             if doc.problems or not isinstance(doc.data, dict):
                 continue
-            _lint_playbook(doc.data, pack, _rel(doc.path, repo_root), agents, connectors, operations, repo_root, report)
+            root = pack.root
+            lint_playbook(
+                doc.data,
+                _rel(doc.path, repo_root),
+                agents,
+                connectors,
+                operations,
+                lambda path, root=root: (root / path).resolve().is_file(),  # type: ignore[misc]
+                report,
+            )
 
     # 4. objectives
     for pack in packs:
@@ -219,7 +230,11 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
                 for check in case.get("checks", []) if isinstance(case, dict) else []:
                     if check.get("type") == "json_schema":
                         schema = str(check.get("schema", ""))
-                        target = repo_root / schema if schema.startswith("contracts/") else pack.root / schema
+                        target = (
+                            contracts_dir() / schema.removeprefix("contracts/")
+                            if schema.startswith("contracts/")
+                            else pack.root / schema
+                        )
                         if not target.is_file():
                             report.error(f"{where}:{number}", f"json_schema {schema} not found")
                 for fixture in (case.get("context_fixtures") or {}).values() if isinstance(case, dict) else []:
@@ -251,16 +266,16 @@ def _lint_connector_rules(manifest: dict[str, Any], pack: Pack, where: str, repo
         report.error(where, "read and write credentials must differ")
 
 
-def _lint_playbook(
+def lint_playbook(
     playbook: dict[str, Any],
-    pack: Pack,
     where: str,
-    agents: dict[str, tuple[Pack, dict[str, Any]]],
-    connectors: dict[str, tuple[Pack, dict[str, Any]]],
-    operations: dict[str, KnownOperation],
-    repo_root: Path,
+    agents: Collection[str],
+    connectors: Collection[str],
+    operations: Mapping[str, KnownOperation],
+    schema_exists: Callable[[str], bool],
     report: Report,
 ) -> None:
+    """Cross-reference rules for one playbook. Used by pack lint and by the API on create/edit."""
     team = set(playbook.get("team", []))
     for member in team:
         if member not in agents:
@@ -286,7 +301,7 @@ def _lint_playbook(
         if isinstance(fanout, dict):
             _check_step_ref(fanout["over"], seen, swhere, "fanout.over", report, need_list=True)
         output = step.get("output")
-        if isinstance(output, dict) and not (pack.root / output["schema"]).resolve().is_file():
+        if isinstance(output, dict) and not schema_exists(output["schema"]):
             report.error(swhere, f"output schema {output['schema']} not found")
         if step.get("workspace") == "git_clone" and not step.get("repo"):
             report.error(swhere, "workspace git_clone needs repo")
