@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import os
 import posixpath
 import shutil
 import subprocess
@@ -34,7 +35,6 @@ from z_runner.redaction import Redactor
 from z_runner.tools import OUTPUT_FILE, build_toolset
 from z_runner.tools.base import ToolContext
 from z_runner.tools.gateway import GatewayClient
-from z_runner.tools.shell import sandbox_env
 from z_runner.workspace import (
     PRIVATE_DIR,
     ArchiveError,
@@ -137,6 +137,8 @@ class Runner:
         self.redactor.add_secret(bootstrap_token)
         self._terminate = False
         self._current_llm_key: str | None = None
+        self._staged_archive: Path | None = None
+        self._state_dir = Path(tempfile.gettempdir())
         self.state = RunnerState()
         self.loop = LoopDetector(self.config.loop_repeat_limit, self.config.no_progress_limit)
 
@@ -200,6 +202,8 @@ class Runner:
     # ------------------------------------------------------------------ job
     def _run_job(self) -> tuple[Outcome, AgentBackend | None]:
         spec = self.spec
+        self._state_dir = self.config.state_dir or Path(tempfile.mkdtemp(prefix="z-runner-state-"))
+        self._state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         workspace = Workspace(self.config.workspace_dir)
         staged = self._stage(workspace)
         self._materialize_skills(workspace)
@@ -221,8 +225,7 @@ class Runner:
         tools = build_toolset(spec, GatewayClient(spec.gateway_url, lambda: spec.session_token))
         tools.context = context
         self.context = context
-        state_dir = self.config.state_dir or Path(tempfile.mkdtemp(prefix="z-runner-state-"))
-        backend = self._backend_factory(state_dir / "conversation")
+        backend = self._backend_factory(self._state_dir / "conversation")
         if checkpoint is not None:
             backend.restore(checkpoint.backend)
         backend.start(spec, self.sink, tools)
@@ -396,10 +399,13 @@ class Runner:
         spec = self.spec
         if spec.workspace.mode == WorkspaceMode.none or not spec.workspace.archive_url:
             return StagedInputs(files=[], flagged=[], blocked=[])
-        with tempfile.NamedTemporaryFile(prefix="z-workspace-", suffix=".tar.gz") as archive:
-            self.client.download_workspace(Path(archive.name), self.config.max_archive_bytes)
-            with open(archive.name, "rb") as fh:
-                extract_tar(fh, workspace.root, self.config.archive_limits)
+        # The runner always downloads from its own internal API (never from another origin with the token);
+        # `archive_url` only says that an archive exists. The archive is kept for the patch at completion.
+        archive = self._state_dir / "staged-workspace.tar.gz"
+        self.client.download_workspace(archive, self.config.max_archive_bytes)
+        with archive.open("rb") as fh:
+            extract_tar(fh, workspace.root, self.config.archive_limits)
+        self._staged_archive = archive
         manifest = self.client.get_manifest()
         return check_manifest(workspace, manifest)
 
@@ -465,54 +471,74 @@ class Runner:
             report_id = self.artifacts.try_upload(
                 ArtifactKind.report, REPORT_FILE, report_path.read_bytes(), "text/markdown"
             )
-        if self.spec.workspace.mode == WorkspaceMode.git_clone and (workspace.root / ".git").is_dir():
-            patch = self._git_patch(workspace)
+        if self.spec.workspace.mode == WorkspaceMode.git_clone:
+            patch = self._workspace_patch(workspace)
             if patch:
                 self.artifacts.try_upload(ArtifactKind.patch, PATCH_NAME, patch, "text/x-diff")
         return report_id
 
-    @staticmethod
-    def _git_patch(workspace: Workspace) -> bytes | None:
-        excludes = [
-            f":(exclude){PRIVATE_DIR}",
-            f":(exclude){OUTPUT_FILE}",
-            f":(exclude){REPORT_FILE}",
-            ":(exclude)documents",
-        ]
+    def _workspace_patch(self, workspace: Workspace) -> bytes | None:
+        """`git apply`-compatible patch of the workspace against the staged archive.
+
+        The repository is untrusted: running git *inside* it would honour its `.git/config` (fsmonitor,
+        filters, hooks paths) and `.gitattributes`. Instead both trees are copied side by side (without `.git`)
+        and compared with `git diff --no-index` outside any repository, with no system or global config.
+        """
         vcs = shutil.which("git")
-        if vcs is None:
+        archive = self._staged_archive
+        if vcs is None or archive is None or not archive.is_file():
             return None
-        env = sandbox_env()
-        try:
-            subprocess.run(  # noqa: S603
-                [vcs, "-C", str(workspace.root), "add", "--intent-to-add", "--", ".", *excludes],
-                env=env,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-            diff = subprocess.run(  # noqa: S603
-                [
-                    vcs,
-                    "-C",
-                    str(workspace.root),
-                    "-c",
-                    "core.quotepath=off",
-                    "diff",
-                    "--binary",
-                    "HEAD",
-                    "--",
-                    ".",
-                    *excludes,
-                ],
-                env=env,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            ).stdout
-        except (subprocess.SubprocessError, OSError) as exc:
-            log.warning("could not compute the patch: %s", exc)
+        excluded = {".git", PRIVATE_DIR, OUTPUT_FILE, REPORT_FILE, "documents"}
+
+        def ignore(directory: str, names: list[str]) -> set[str]:
+            return excluded & set(names) if Path(directory) == workspace.root else set()
+
+        with tempfile.TemporaryDirectory(prefix="z-patch-", dir=self._state_dir) as tmp:
+            before, after = Path(tmp) / "a", Path(tmp) / "b"
+            before.mkdir()
+            with archive.open("rb") as fh:
+                extract_tar(fh, before, self.config.archive_limits)
+            for name in excluded:
+                target = before / name
+                if target.is_dir() and not target.is_symlink():
+                    shutil.rmtree(target)
+                elif target.exists() or target.is_symlink():
+                    target.unlink()
+            shutil.copytree(workspace.root, after, symlinks=True, ignore=ignore)
+            env = {
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "HOME": tmp,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CEILING_DIRECTORIES": str(Path(tmp).parent),
+            }
+            try:
+                proc = subprocess.run(  # noqa: S603 (fixed argv, no shell)
+                    [
+                        vcs,
+                        "-c",
+                        "core.quotepath=off",
+                        "diff",
+                        "--no-index",
+                        "--binary",
+                        "--no-prefix",
+                        "--no-ext-diff",
+                        "--no-textconv",
+                        "a",
+                        "b",
+                    ],
+                    cwd=tmp,
+                    env=env,
+                    capture_output=True,
+                    timeout=120,
+                )
+            except (subprocess.SubprocessError, OSError) as exc:
+                log.warning("could not compute the patch: %s", exc)
+                return None
+        if proc.returncode not in (0, 1):
+            log.warning("git diff failed: %s", self.redactor.text(proc.stderr.decode("utf-8", "replace"))[:500])
             return None
+        diff = proc.stdout
         if not diff.strip() or len(diff) > MAX_PATCH:
             return None
         return diff

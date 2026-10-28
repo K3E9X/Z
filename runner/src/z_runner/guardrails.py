@@ -78,6 +78,9 @@ _PIP_INDEX_FLAGS = (
     "--index",
     "--default-index",
 )
+_GIT_OPTIONS_WITH_VALUE = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+)
 _GIT_REMOTE_VERBS = frozenset({"clone", "fetch", "pull", "push", "ls-remote"})
 _GIT_REMOTE_SUBVERBS = frozenset(
     {("remote", "update"), ("submodule", "update"), ("submodule", "add"), ("submodule", "sync")}
@@ -150,7 +153,12 @@ def _check_words(words: list[str], depth: int) -> Denial | None:
     if cmd == "openssl" and "s_client" in words[1:]:
         return Denial("openssl s_client", SANDBOX_NETWORK, "`openssl s_client` opens network connections")
     if cmd == "git" and len(words) > 1:
-        verbs = [w for w in words[1:] if not w.startswith("-")]
+        rest = list(words[1:])
+        while rest and rest[0].startswith("-"):  # global options, some with a separate value
+            option = rest.pop(0)
+            if option in _GIT_OPTIONS_WITH_VALUE and rest:
+                rest.pop(0)
+        verbs = [w for w in rest if not w.startswith("-")]
         verb = verbs[0] if verbs else ""
         sub = verbs[1] if len(verbs) > 1 else ""
         if verb in _GIT_REMOTE_VERBS or (verb, sub) in _GIT_REMOTE_SUBVERBS:
