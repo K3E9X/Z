@@ -163,3 +163,12 @@ def test_litellm_example_has_every_alias(repo: Path) -> None:
 def test_schemas_are_pretty_json(repo: Path) -> None:
     for name in contracts.SCHEMA_FILES:
         json.loads((repo / "contracts" / name).read_text())
+
+
+def test_openapi_is_generated_from_its_source(repo: Path, tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    out = tmp_path / "openapi.yaml"
+    subprocess.run([sys.executable, str(repo / "contracts/tools/build_openapi.py"), str(out)], check=True, capture_output=True)
+    assert out.read_text() == (repo / "contracts/openapi.yaml").read_text(), "regenerate contracts/openapi.yaml"

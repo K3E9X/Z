@@ -126,7 +126,7 @@ paths:
       x-permission: authenticated
       x-owner: B1
       x-audit: true
-      description: OIDC prompt=login + max_age; local break-glass uses TOTP in the body.
+      description: 'GitLab users: returns the OIDC URL (prompt=login + max_age). Local accounts: password (and TOTP for break-glass) in the body, step-up is immediate.'
       requestBody:
         required: true
         content:
@@ -136,6 +136,12 @@ paths:
               properties:
                 return_to: &id001
                   type: string
+                password:
+                  type: string
+                  description: 'Local accounts: re-enter the password.'
+                totp:
+                  type: string
+                  description: 'Break-glass: current TOTP code.'
               additionalProperties: false
       responses:
         '200':
@@ -5840,6 +5846,11 @@ components:
           - dev
         issuer_url: *id001
         client_id: *id001
+        client_secret:
+          type: string
+          writeOnly: true
+          description: Write-only, never returned; stored sealed.
+        cli_client_id: *id001
         scopes:
           type: array
           items: *id001

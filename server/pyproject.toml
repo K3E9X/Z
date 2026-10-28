@@ -7,12 +7,19 @@ dependencies = [
   "z-common",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
-  "sqlalchemy>=2.0.36",
+  "sqlalchemy[asyncio]>=2.0.36",
   "alembic>=1.14",
   "psycopg[binary]>=3.2",
   "pgvector>=0.3",
   "httpx>=0.27",
   "pyyaml>=6.0",
+  "argon2-cffi>=23.1",
+  "cryptography>=43",
+  "pyjwt[crypto]>=2.9",
+  "sse-starlette>=2.1",
+  "prometheus-client>=0.21",
+  "jinja2>=3.1",
+  "pyotp>=2.9",
 ]
 
 [project.scripts]

@@ -5,7 +5,8 @@ made by the main session; every consumer follows. Tests: `uv run pytest packages
 
 | File | What |
 |---|---|
-| `openapi.yaml` | Public and internal REST + SSE API (OpenAPI 3.1). Every operation has `x-permission`, `x-owner`, and `x-audit` / `x-step-up` where they apply |
+| `openapi.yaml` | Generated from `tools/build_openapi.py` (edit the script, regenerate; a test checks they match). |
+| (content) | Public and internal REST + SSE API (OpenAPI 3.1). Every operation has `x-permission`, `x-owner`, and `x-audit` / `x-step-up` where they apply |
 | `permissions.yaml` | Permission catalog and built-in roles (docs/12 §2) |
 | `common.schema.json` | Shared enums and shapes (statuses, data classes, ids, budgets, problem details) |
 | `agent.schema.json`, `playbook.schema.json`, `connector.schema.json`, `pack.schema.json`, `skill-frontmatter.schema.json`, `objective.schema.json`, `eval-case.schema.json`, `mission-plan.schema.json` | Pack manifests (docs/03 §4) |

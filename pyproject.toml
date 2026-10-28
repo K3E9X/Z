@@ -45,7 +45,7 @@ z-cli = { workspace = true }
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["ui", "design", "poc", "**/alembic/versions"]
+extend-exclude = ["ui", "design", "poc", "docs", "*.md", "**/alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "C4", "SIM", "RUF"]
@@ -54,6 +54,7 @@ ignore = ["S101", "RUF012", "E501"]  # E501: the formatter owns line length
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S", "B011"]
 "tests/**" = ["S", "B011"]
+"contracts/tools/**" = ["B007", "E731", "C408", "RUF005", "SIM", "B023", "E741"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -72,7 +73,8 @@ ignore_missing_imports = true
 testpaths = ["packages/z-common/tests", "server/tests", "runner/tests", "cli/tests", "tests/unit"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers --import-mode=importlib"
+pythonpath = ["."]
 markers = [
   "db: needs a Postgres database (DATABASE_URL or testcontainers)",
   "e2e: end-to-end against a running compose stack",
@@ -80,4 +82,5 @@ markers = [
 
 [tool.coverage.run]
 branch = true
+concurrency = ["greenlet", "thread"]
 omit = ["*/alembic/versions/*", "*/tests/*"]

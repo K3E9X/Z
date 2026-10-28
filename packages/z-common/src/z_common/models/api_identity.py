@@ -250,6 +250,8 @@ class AuthSettings(ZModel):
     mode: Literal["oidc", "dev"]
     issuer_url: str
     client_id: str
+    client_secret: str | None = None  # write-only
+    cli_client_id: str | None = None
     scopes: list[str]
     groups_claim: str
     session: SessionLifetimes | None = None
@@ -290,6 +292,12 @@ class CliToken(ZModel):
 class LocalLoginRequest(ZModel):
     username: str
     password: str
+    totp: str | None = None
+
+
+class StepUpRequest(ZModel):
+    return_to: str | None = None
+    password: str | None = None
     totp: str | None = None
 
 
@@ -347,6 +355,26 @@ class AuditSettings(ZModel):
     retention_days: Annotated[int, Field(ge=90)]
     checkpoint_minutes: int
     forward: dict[str, Any]
+
+
+class PersonalConnectionInfo(ZModel):
+    """openapi PersonalConnection."""
+
+    id: Id
+    connector: str
+    status: Literal["active", "expired", "revoked", "disabled"]
+    read_scopes: list[str]
+    write_scopes: list[str]
+    last_used_at: datetime | None = None
+    created_at: datetime
+
+
+class UserDetail(User):
+    bindings: list[RoleBinding]
+    sessions: list[AuthSession]
+    tokens: list[ApiToken]
+    connections: list[PersonalConnectionInfo]
+    recent_activity: list[AuditEvent]
 
 
 class Guardrail(ZModel):
