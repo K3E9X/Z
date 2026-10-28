@@ -12,7 +12,7 @@ import threading
 from collections.abc import Callable
 from typing import Any, Literal
 
-from z_common.models.api_internal import Answer, GuideMessage, JobControl
+from z_common.models.api_internal import Answer, ControlMessage, JobControl
 
 State = Literal["run", "pause", "cancel"]
 
@@ -24,7 +24,7 @@ class ControlHub:
         self._lock = threading.Lock()
         self.state: State = "run"
         self.reason: str | None = None
-        self._messages: list[GuideMessage] = []
+        self._messages: list[ControlMessage] = []
         self._answers: dict[str, Answer] = {}
         self._action_status: dict[str, str] = {}
         self._action_updates: list[tuple[str, str]] = []
@@ -67,7 +67,7 @@ class ControlHub:
     def paused(self) -> bool:
         return self.state == "pause"
 
-    def take_messages(self) -> list[GuideMessage]:
+    def take_messages(self) -> list[ControlMessage]:
         with self._lock:
             messages, self._messages = self._messages, []
             self.seen_messages.update(m.id for m in messages)
