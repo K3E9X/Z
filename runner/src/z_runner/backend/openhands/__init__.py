@@ -19,6 +19,7 @@ How the SDK is used (verified against the installed sources):
 
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
 import tarfile
@@ -48,6 +49,7 @@ from z_runner.backend.openhands.sdk_tools import ValidationRecorder, ZSdkTool
 from z_runner.backend.openhands.translate import EventTranslator
 from z_runner.events import EventSink
 from z_runner.prompt import system_prompt
+from z_runner.redaction import Redactor
 from z_runner.tools.base import ToolContext, ToolSet
 from z_runner.workspace import ArchiveLimits, extract_tar
 
@@ -104,6 +106,7 @@ class OpenHandsBackend:
         self._sink: EventSink | None = None
         self._model: str = ""
         self._api_key: str = ""
+        self._redactor: Redactor | None = None
         self.resumed = False
 
     # ------------------------------------------------------------------ AgentBackend
@@ -117,6 +120,7 @@ class OpenHandsBackend:
             raise ValueError("the toolset has no ToolContext")
         self._spec = spec
         self._sink = sink
+        self._redactor = tools.context.redactor
         root = self._persistence_root or Path(tempfile.mkdtemp(prefix="z-conversation-"))
         root.mkdir(parents=True, exist_ok=True)
         self._persistence_root = root
@@ -154,6 +158,9 @@ class OpenHandsBackend:
         )
         conversation.set_confirmation_policy(ConfirmRisky(threshold=SecurityRisk.HIGH, confirm_unknown=False))
         if self.resumed:
+            # base_state.json keeps the directory of the pod that wrote it; point the state at this one.
+            with conversation.state:
+                conversation.state.persistence_dir = str(root / conversation.id.hex)
             self._seen_responses = {u.response_id for u in conversation.agent.llm.metrics.token_usages}
             if conversation.state.execution_status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION:
                 # A resumed job never executes an action that waited for confirmation: no decision is carried by
@@ -202,12 +209,28 @@ class OpenHandsBackend:
         return result
 
     def checkpoint(self) -> bytes:
+        """tar.gz of the conversation persistence directory, every text file redacted (the blob leaves the
+        runner: a secret the model itself typed must not be stored by z-server)."""
         conversation = self._require()
-        assert self._persistence_root is not None
-        conv_dir = Path(conversation.state.persistence_dir or "")
+        assert self._persistence_root is not None and self._redactor is not None
+        conv_dir = self._persistence_root / conversation.id.hex
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-            tar.add(conv_dir, arcname=conv_dir.relative_to(self._persistence_root).as_posix())
+            for path in sorted(conv_dir.rglob("*")):
+                if path.is_symlink() or not (path.is_file() or path.is_dir()):
+                    continue
+                arcname = path.relative_to(self._persistence_root).as_posix()
+                if path.is_dir():
+                    info = tarfile.TarInfo(arcname)
+                    info.type, info.mode = tarfile.DIRTYPE, 0o700
+                    tar.addfile(info)
+                    continue
+                data = path.read_bytes()
+                with contextlib.suppress(UnicodeDecodeError):
+                    data = self._redactor.text(data.decode("utf-8")).encode("utf-8")
+                info = tarfile.TarInfo(arcname)
+                info.size, info.mode = len(data), 0o600
+                tar.addfile(info, io.BytesIO(data))
         return buf.getvalue()
 
     def inject_message(self, text: str) -> None:
@@ -277,7 +300,9 @@ class OpenHandsBackend:
             tokens_in += usage.prompt_tokens
             tokens_out += usage.completion_tokens
             payload: dict[str, Any] = {
-                "model": alias_of(usage.model) or self._model,
+                # The SDK keeps one metrics object per usage id across switch_llm(), so TokenUsage.model can be
+                # stale after an escalation; the alias in use for this step is authoritative.
+                "model": self._model,
                 "tokens_in": usage.prompt_tokens,
                 "tokens_out": usage.completion_tokens,
                 "cached_tokens": usage.cache_read_tokens,

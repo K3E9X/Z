@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shlex
@@ -201,7 +202,8 @@ class LoopDetector:
     _progress_this_step: bool = False
 
     def record_call(self, tool: str, args: Any) -> None:
-        signature = f"{tool}:{canonical_args(args)}"
+        # Only a digest is kept: arguments may contain secrets and this state is checkpointed.
+        signature = hashlib.sha256(f"{tool}:{canonical_args(args)}".encode()).hexdigest()[:32]
         if signature == self.last_signature:
             self.repeat_count += 1
         else:
