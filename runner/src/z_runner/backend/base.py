@@ -27,6 +27,9 @@ class StepResult:
     validation_errors: int = 0
     progress: bool = False
     error: str | None = None
+    # "llm_unavailable" (transient: rate limit, timeout, unavailable), "llm_budget" (the virtual key budget is
+    # spent), "llm_auth", "context_window" or "agent"
+    error_class: str | None = None
 
 
 class AgentBackend(Protocol):

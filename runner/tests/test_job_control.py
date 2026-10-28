@@ -120,6 +120,31 @@ def test_step_limit(harness: Harness) -> None:
     assert run.completion["error"]["class"] == "steps"
 
 
+def test_virtual_key_budget_spent_is_budget_exceeded(harness: Harness) -> None:
+    budget = {
+        "error": {
+            "status": 400,
+            "message": "Budget has been exceeded! Current cost: 12.0, Max budget: 10.0",
+            "type": "budget_exceeded",
+        }
+    }
+    harness.llm.add_rules({"responses": [tool_call("read", {"path": "notes.md"}), budget]})
+    run = harness.run(harness.spec())
+    assert run.code == 4
+    assert run.completion["status"] == "budget_exceeded"
+    assert run.completion["error"]["class"] == "llm_budget"
+    assert run.completion["steps"] == 2
+
+
+def test_llm_unavailable_fails_with_a_transient_class(harness: Harness) -> None:
+    harness.llm.add_rules({"responses": [{"error": {"status": 503, "message": "no healthy upstream"}}], "repeat": True})
+    run = harness.run(harness.spec())
+    assert run.code == 1
+    assert run.completion["status"] == "failed"
+    assert run.completion["error"]["class"] == "llm_unavailable"
+    assert len(harness.llm.requests()) >= 2  # the SDK retried; LiteLLM retries upstream too
+
+
 def test_deadline_times_out(harness: Harness) -> None:
     harness.llm.add_rules(
         {

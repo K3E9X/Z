@@ -297,10 +297,12 @@ class Runner:
         elif result.tool_successes:
             self.state.failure_streak = 0
         if result.status == "error":
-            return Outcome(
-                "failed",
-                error=JobError(class_="agent", message=self.redactor.text(result.error or "agent error")[:2000]),
+            error = JobError(
+                class_=result.error_class or "agent", message=self.redactor.text(result.error or "agent error")[:2000]
             )
+            if result.error_class == "llm_budget":
+                return Outcome("budget_exceeded", error=error)
+            return Outcome("failed", error=error)
         if result.status == "confirmation_required":
             return Outcome("needs_attention", NeedsAttentionReason.guardrail_confirm)
         if result.status == "stuck" or loop_reason:

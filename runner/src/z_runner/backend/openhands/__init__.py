@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import io
 import logging
+import re
 import tarfile
 import tempfile
 import uuid
@@ -32,6 +33,14 @@ from typing import Any, cast
 from openhands.sdk import LLM, Agent, LocalConversation
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands.sdk.llm.exceptions import (
+    LLMAuthenticationError,
+    LLMContextWindowExceedError,
+    LLMNoResponseError,
+    LLMRateLimitError,
+    LLMServiceUnavailableError,
+    LLMTimeoutError,
+)
 from openhands.sdk.security import (
     ConfirmRisky,
     EnsembleSecurityAnalyzer,
@@ -67,6 +76,22 @@ def litellm_model(alias: str) -> str:
 
 def alias_of(model: str) -> str:
     return model.removeprefix(LITELLM_PROXY_PREFIX)
+
+
+_BUDGET = re.compile(r"(?i)budget.{0,40}(exceed|reached|spent)|exceeded.{0,20}budget")
+
+
+def classify_llm_error(exc: BaseException) -> str:
+    """Error class of a failed step (StepResult.error_class)."""
+    if _BUDGET.search(str(exc)):
+        return "llm_budget"  # LiteLLM refuses calls once the mission's virtual key budget is spent
+    if isinstance(exc, LLMRateLimitError | LLMTimeoutError | LLMServiceUnavailableError | LLMNoResponseError):
+        return "llm_unavailable"
+    if isinstance(exc, LLMAuthenticationError):
+        return "llm_auth"
+    if isinstance(exc, LLMContextWindowExceedError):
+        return "context_window"
+    return "agent"
 
 
 class _OneLineFilter(logging.Filter):
@@ -177,12 +202,14 @@ class OpenHandsBackend:
         assert self._translator is not None
         self._translator.begin_step()
         error: str | None = None
+        error_class: str | None = None
         try:
             # `run` and `send_message` are wrapped by the SDK's `observe` decorator, which erases their types.
             cast(Any, conversation).run()
         except ConversationRunError as exc:
             cause = exc.__cause__ or exc
             error = f"{type(cause).__name__}: {cause}"
+            error_class = classify_llm_error(cause)
         stats = self._translator.begin_step()
         tokens_in, tokens_out = self._emit_usage()
         status = conversation.state.execution_status
@@ -200,6 +227,7 @@ class OpenHandsBackend:
         if error or stats.error:
             result.status = "error"
             result.error = error or stats.error
+            result.error_class = error_class or "agent"
         elif status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION:
             result.status = "confirmation_required"
         elif status == ConversationExecutionStatus.STUCK:
