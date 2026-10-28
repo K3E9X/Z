@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from z_common.redaction import MASK, redact
 
 
@@ -13,7 +12,10 @@ from z_common.redaction import MASK, redact
         ("curl https://bot:s3cr3tP4ss@gitlab.example.test/x.git", "s3cr3tP4ss"),
         ("key sk-proj-1234567890abcdefghij", "sk-proj-1234567890abcdefghij"),
         ("AKIAIOSFODNN7EXAMPLE in env", "AKIAIOSFODNN7EXAMPLE"),
-        ("jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U", "eyJhbGciOiJIUzI1NiJ9"),
+        (
+            "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+            "eyJhbGciOiJIUzI1NiJ9",
+        ),
         ("password = 'hunter2hunter2'", "hunter2hunter2"),
         ("-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----", "MIIEow"),
         ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "ghp_abcdefghijklmnopqrstuvwxyz0123456789"),

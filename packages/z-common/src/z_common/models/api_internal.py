@@ -125,7 +125,7 @@ class EventBatch(ZModel):
     events: list[EventIn]
 
 
-class GuideMessage(ZModel):
+class ControlMessage(ZModel):
     id: str
     text: str
     by: str | None = None
@@ -145,7 +145,7 @@ class ActionState(ZModel):
 class JobControl(ZModel):
     state: Literal["run", "pause", "cancel"]
     reason: str | None = None
-    messages: list[GuideMessage]
+    messages: list[ControlMessage]
     answers: list[Answer]
     actions: list[ActionState]
     llm_api_key: str | None = None

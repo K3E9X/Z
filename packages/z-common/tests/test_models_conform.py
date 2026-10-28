@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 from z_common import contracts
 from z_common.contracts import load_document
-from z_common.models import actions, api_catalog, api_identity, api_internal, common, events, manifests
+from z_common.models import actions, api_catalog, api_identity, api_internal, api_missions, common, events, manifests
 from z_common.models.enums import ENUM_BY_SCHEMA_DEF
 
 
@@ -187,6 +187,37 @@ for _name in [
     "DataClassRaise",
 ]:
     API_MODELS[_name] = getattr(api_internal, _name)
+for _name in [
+    "JobCounts",
+    "Mission",
+    "MissionCreate",
+    "DraftPlanRequest",
+    "DraftPlan",
+    "PlanPatch",
+    "MissionControl",
+    "GuideMessage",
+    "TakeOver",
+    "TakeOverSession",
+    "SaveAsPlaybook",
+    "PlaybookRun",
+    "Job",
+    "Artifact",
+    "Replay",
+    "Approval",
+    "JudgeCheck",
+    "ProposedAction",
+    "Question",
+    "MissionSuggestion",
+    "ReviewItem",
+    "ReviewList",
+    "ApproveRequest",
+    "RejectRequest",
+    "EditRequest",
+    "BatchApprove",
+    "BatchResult",
+    "AnswerRequest",
+]:
+    API_MODELS[_name] = getattr(api_missions, _name)
 
 
 @pytest.mark.parametrize(("file", "pointer", "model"), CASES, ids=[f"{f}{p}" for f, p, _ in CASES])

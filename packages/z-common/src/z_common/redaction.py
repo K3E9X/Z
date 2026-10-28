@@ -24,7 +24,12 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("aws_access_key", re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")),
     ("z_token", re.compile(r"\b(zs|zt|zw|zj|zr)_[A-Za-z0-9_-]{20,}")),
-    ("secret_assignment", re.compile(r"(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)(\s*[:=]\s*)(['\"]?)[^\s'\",;]{6,}\3")),
+    (
+        "secret_assignment",
+        re.compile(
+            r"(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)(\s*[:=]\s*)(['\"]?)[^\s'\",;]{6,}\3"
+        ),
+    ),
 ]
 
 
