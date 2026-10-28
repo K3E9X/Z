@@ -20,7 +20,7 @@ from z_server.app import create_app
 from z_server.settings import Settings
 
 from tests.fakes.fake_gitlab_oidc import FakeGitLabOIDC
-from tests.support.server import REPO, SECRET, base_config
+from tests.support.server import REPO, SECRET, base_config, contract_checker
 
 TEMPLATE = "z_template"
 
@@ -143,7 +143,9 @@ def make_client(database_url: str, oidc: FakeGitLabOIDC) -> Iterator[Callable[..
             config=config or base_config(oidc.issuer),
             **{"oidc_client_secret": "z-web-secret", **settings_kwargs},
         )
-        client = TestClient(create_app(settings), base_url="https://testserver", raise_server_exceptions=False)
+        app = create_app(settings)
+        client = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
+        client.event_hooks["response"].append(contract_checker(app))
         client.__enter__()
         clients.append(client)
         return client

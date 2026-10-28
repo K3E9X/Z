@@ -13,7 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 
 from z_server import __version__, errors
-from z_server.api import routes_admin, routes_audit, routes_auth
+from z_server.api import routes_admin, routes_audit, routes_auth, routes_catalog, routes_connectors
 from z_server.crypto import AuditSigner, Sealer
 from z_server.db.session import make_engine, make_sessionmaker
 from z_server.security import SecurityHeaders
@@ -22,7 +22,13 @@ from z_server.startup import prepare
 from z_server.state import AppState
 
 log = logging.getLogger("z.server")
-ROUTERS = (routes_auth.router, routes_admin.router, routes_audit.router)
+ROUTERS = (
+    routes_auth.router,
+    routes_admin.router,
+    routes_audit.router,
+    routes_catalog.router,
+    routes_connectors.router,
+)
 
 
 def create_app(settings: Settings, *, http: httpx.AsyncClient | None = None, run_startup: bool = True) -> FastAPI:

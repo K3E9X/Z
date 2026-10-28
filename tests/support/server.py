@@ -63,3 +63,60 @@ def use_jar(client: TestClient, jar: dict[str, str]) -> None:
     client.cookies.clear()
     for name, value in jar.items():
         client.cookies.set(name, value)
+
+
+def seed_packs(client: TestClient, packs_root: Path | None = None, only: set[str] | None = None) -> Any:
+    """Run the pack seed inside the app's event loop."""
+    from z_server import audit
+    from z_server.catalog.seed import seed
+
+    state = client.app.state.z  # type: ignore[attr-defined]
+
+    async def run() -> Any:
+        async with state.sessions() as db, db.begin():
+            return await seed(db, packs_root or REPO / "packs", audit.Actor("system:test"), only)
+
+    return client.portal.call(run)  # type: ignore[union-attr]
+
+
+class ContractViolation(AssertionError):
+    pass
+
+
+def contract_checker(app: Any) -> Any:
+    """httpx response hook: every JSON response of a contract route must match openapi.yaml, and every
+    error must be RFC 9457 problem details. Turns any drift between code and contract into a test failure."""
+    from starlette.routing import Match
+    from z_common.contracts import errors as schema_errors
+    from z_common.contracts import response_errors
+
+    def check(response: httpx.Response) -> None:
+        request = response.request
+        scope = {"type": "http", "path": request.url.path, "method": request.method, "root_path": ""}
+        op_id = None
+        for route in app.routes:
+            match, _ = route.matches(scope)
+            if match == Match.FULL:
+                op_id = getattr(route, "operation_id", None)
+                break
+        if op_id is None:
+            return
+        response.read()
+        content_type = response.headers.get("content-type", "")
+        if response.status_code >= 400:
+            assert content_type.startswith("application/problem+json"), (
+                f"{op_id} {response.status_code}: not problem+json"
+            )
+            problems = schema_errors("common.schema.json", response.json(), "/$defs/Problem")
+            if problems:
+                raise ContractViolation(f"{op_id} {response.status_code} problem: {problems}")
+            return
+        if not content_type.startswith("application/json"):
+            return
+        found = response_errors(op_id, response.status_code, response.json())
+        if found is None:
+            raise ContractViolation(f"{op_id}: status {response.status_code} is not declared in the contract")
+        if found:
+            raise ContractViolation(f"{op_id} {response.status_code}: {found[:5]}")
+
+    return check

@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger("z.errors")
@@ -80,6 +81,16 @@ def install(app: FastAPI) -> None:
         ]
         return problem_response(
             Problem("validation", "The request does not match the contract", errors=errors), request
+        )
+
+    @app.exception_handler(ValidationError)
+    async def _model_validation(request: Request, exc: ValidationError) -> JSONResponse:
+        errors = [
+            {"path": "/".join(str(p) for p in err.get("loc", ())), "message": str(err.get("msg"))}
+            for err in exc.errors()
+        ]
+        return problem_response(
+            Problem("validation", "The document does not match the contract", errors=errors), request
         )
 
     @app.exception_handler(StarletteHTTPException)

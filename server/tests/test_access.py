@@ -153,7 +153,7 @@ def test_api_tokens_are_scoped_shown_once_and_revocable(client: TestClient, oidc
     assert created.status_code == 201
     token = created.json()["token"]
     assert token.startswith("zt_")
-    assert all(t["token"] is None for t in client.get("/api/v1/me/tokens").json())
+    assert all(t.get("token") is None for t in client.get("/api/v1/me/tokens").json())
     too_much = client.post(
         "/api/v1/me/tokens", json={"name": "x", "scopes": ["users:manage"], "expires_in_days": 7}, headers=csrf(client)
     )

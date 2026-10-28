@@ -75,6 +75,33 @@ def _bootstrap_reset(ttl_hours: int) -> int:
     return 0
 
 
+def _seed(packs: str, only: list[str] | None) -> int:
+    from z_server import audit
+    from z_server.catalog.seed import SeedError, seed
+    from z_server.db.session import make_engine, make_sessionmaker
+    from z_server.settings import get_settings
+
+    settings = get_settings()
+
+    async def run() -> int:
+        engine = make_engine(settings.database_url, pool_size=1)
+        try:
+            async with make_sessionmaker(engine)() as db, db.begin():
+                report = await seed(db, Path(packs), audit.Actor("system:cli"), set(only) if only else None)
+        except SeedError as exc:
+            for problem in exc.problems:
+                print(f"ERROR {problem}", file=sys.stderr)
+            return 1
+        finally:
+            await engine.dispose()
+        for kind in ("created", "updated", "kept", "warnings"):
+            for line in getattr(report, kind):
+                print(f"{kind:8} {line}")
+        return 0
+
+    return asyncio.run(run())
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=os.environ.get("Z_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s"
@@ -87,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--port", type=int, default=int(os.environ.get("Z_PORT", "8000")))
     sub.add_parser("migrate", help="apply database migrations")
     sub.add_parser("check-config", help="validate environment and config/z.yaml")
+    sd = sub.add_parser("seed", help="load packs into the catalog (idempotent)")
+    sd.add_argument("--packs", default=os.environ.get("Z_PACKS", "packs"))
+    sd.add_argument("--only", nargs="*", help="pack names to load (default: all)")
     b = sub.add_parser("bootstrap", help="manage the bootstrap admin")
     b.add_argument("--reset", action="store_true", required=True)
     b.add_argument("--ttl-hours", type=int, default=24)
@@ -97,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         return _migrate()
     if args.command == "check-config":
         return _check_config()
+    if args.command == "seed":
+        return _seed(args.packs, args.only)
     if args.command == "bootstrap":
         return _bootstrap_reset(args.ttl_hours)
     return 2
