@@ -32,6 +32,8 @@ dev = [
 package = false
 # Release age gate (docs/13 §3): never resolve a release younger than 7 days.
 exclude-newer = "7 days"
+# LiteLLM (pulled in as a library by the OpenHands SDK in the runner) waits 14 days (docs/13 §3).
+exclude-newer-package = { litellm = "14 days" }
 
 [tool.uv.workspace]
 members = ["packages/z-common", "server", "runner", "cli"]
