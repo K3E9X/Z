@@ -1,0 +1,22 @@
+[project]
+name = "z-cli"
+version = "0.1.0"
+description = "z: the Z command line (interactive session, z top, subcommands)"
+requires-python = ">=3.12"
+dependencies = [
+  "z-common",
+  "httpx>=0.27",
+  "typer>=0.13",
+  "rich>=13.9",
+]
+
+[project.scripts]
+z = "z_cli.__main__:main"
+zctl = "z_cli.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/z_cli"]
