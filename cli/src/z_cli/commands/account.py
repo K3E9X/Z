@@ -286,7 +286,7 @@ def connect(
         if no_browser or not webbrowser.open(url):
             output.note(f"Open this link to give Z {p} access to {connector}:\n{url}")
         else:
-            output.note(f"Your browser opened the {p} consent for {connector}.")
+            output.note(f"Your browser opened the {p} consent for {connector} (sign in to Z there first if asked).")
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             rows = [c for c in api.get("/me/connections") if c["connector"] == connector]

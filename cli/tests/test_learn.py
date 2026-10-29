@@ -108,9 +108,30 @@ def test_connect_a_personal_account(z: Z, live: LiveServer, monkeypatch: Any) ->
             == 200
         )
 
+        # the person's browser is signed in to Z (the callback only completes in the starter's own session)
+        assert z.oidc is not None
+        z.oidc.add_client("z-web", "z-web-secret", ["http://127.0.0.1/api/v1/auth/callback"])  # the live public_url
+        z.oidc.set_current_user("bob")
+        jar: dict[str, str] = {}
+
+        def browse(url: str) -> httpx.Response:  # __Host- cookies are Secure: sent by hand over http
+            cookie = "; ".join(f"{k}={v}" for k, v in jar.items())
+            resp = httpx.get(url, headers={"Cookie": cookie} if cookie else {}, follow_redirects=False)
+            jar.update(dict(resp.cookies))
+            return resp
+
+        start = browse(f"{live.url}/api/v1/auth/login")
+        assert start.status_code == 302, (start.status_code, start.text[:300])
+        given = httpx.get(start.headers["location"], follow_redirects=False)
+        assert given.status_code in (302, 303), (given.status_code, given.text[:300])
+        back = urlparse(httpx.get(start.headers["location"], follow_redirects=False).headers["location"])
+        signed_in = browse(f"{live.url}{back.path}?{back.query}")
+        assert not signed_in.headers["location"].startswith("/signin"), signed_in.headers["location"]
+
         def consent(url: str, *args: Any, **kwargs: Any) -> bool:  # what the person does in the browser
             back = urlparse(httpx.get(url, follow_redirects=False).headers["location"])
-            httpx.get(f"{live.url}{back.path}?{back.query}", follow_redirects=False)  # public_url -> test server
+            done = browse(f"{live.url}{back.path}?{back.query}")  # public_url -> test server
+            assert "connected=" in done.headers["location"], done.headers["location"]
             return True
 
         monkeypatch.setattr("webbrowser.open", consent)
