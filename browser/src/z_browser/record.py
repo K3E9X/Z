@@ -71,7 +71,7 @@ TARGET_JS = """([x, y, kind]) => {
     : 'button, a, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [onclick]';
   const found = el.closest(pick);
   if (found || kind === 'table') el = found;
-  if (!el) return null;
+  if (!el || el === document.body || el === document.documentElement) return null;
   window.__zTarget = el;
   return el.tagName.toLowerCase();
 }"""

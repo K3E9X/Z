@@ -275,3 +275,14 @@ async def test_typed_arguments_become_placeholders(browser: Any, base_url: str) 
     await rec.act({"kind": "undo"})
     assert rec.flow()["steps"][-1] == {"action": "fill", "selector": "#user", "value": "{{args.who}}"}
     await recorder.close(rec.id)
+
+
+async def test_clicking_on_nothing_is_refused(browser: Any, base_url: str) -> None:
+    from z_browser.record import Recorder, RecordError
+
+    recorder = Recorder()
+    rec = await recorder.start(browser, base_url, None, "/login", Credentials())
+    with pytest.raises(RecordError, match="nothing to act on"):
+        await rec.act({"kind": "click", "x": 1200, "y": 780})  # empty page area: html, not an element
+    assert rec.flow()["steps"] == []
+    await recorder.close(rec.id)
