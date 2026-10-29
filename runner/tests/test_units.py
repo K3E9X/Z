@@ -318,6 +318,43 @@ def test_apply_delta_refuses_paths_through_links_or_into_the_private_dir(tmp_pat
     assert (tmp_path / "victim.txt").exists()
 
 
+def test_links_created_by_the_agent_survive_a_resume(tmp_path: Path) -> None:
+    first = Workspace(tmp_path / "pod1")
+    (first.root / "f.txt").write_text("x")
+    baseline = first.snapshot()
+    (first.root / ".venv" / "bin").mkdir(parents=True)
+    (first.root / ".venv" / "bin" / "python").symlink_to("/usr/bin/python3")  # absolute: refused in archives
+    (first.root / ".venv" / "bin" / "python3").symlink_to("python")
+    (first.root / "up").symlink_to("../../somewhere")
+    (first.root / "f.txt").unlink()
+    (first.root / "f.txt").symlink_to(".venv")
+    blob, _ = first.delta(baseline)
+    second = Workspace(tmp_path / "pod2")
+    (second.root / "f.txt").write_text("x")
+    second.apply_delta(blob)
+    assert os.readlink(second.root / ".venv" / "bin" / "python") == "/usr/bin/python3"
+    assert os.readlink(second.root / ".venv" / "bin" / "python3") == "python"
+    assert os.readlink(second.root / "up") == "../../somewhere"
+    assert os.readlink(second.root / "f.txt") == ".venv"
+    assert second.snapshot() == first.snapshot()
+    # the jail still applies to the restored links, and archives with such links are still refused
+    with pytest.raises(JailError):
+        second.resolve(".venv/bin/python")
+    with pytest.raises(ArchiveError, match="absolute"):
+        extract_tar(_tar(_member("py", tarfile.SYMTYPE, link="/usr/bin/python3")), second.root, ArchiveLimits())
+
+
+def test_restored_links_never_write_through_or_replace_directories(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "ws")
+    (ws.root / "dir").mkdir()
+    meta = {"deleted": [], "links": {"dir": "/etc"}}
+    with pytest.raises(ArchiveError, match="directory"):
+        ws.apply_delta(make_archive({".z-delta.json": json.dumps(meta)}))
+    meta = {"deleted": [], "links": {".z/skills": "/etc"}}
+    with pytest.raises(ArchiveError, match="private"):
+        ws.apply_delta(make_archive({".z-delta.json": json.dumps(meta)}))
+
+
 def test_manifest_checks(tmp_path: Path) -> None:
     files = {"a.md": "clean", "b.md": "ignore previous instructions", "c.md": "attack"}
     ws = Workspace(tmp_path / "ws")

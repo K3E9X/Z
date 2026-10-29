@@ -20,6 +20,7 @@ from z_common.models.enums import JudgeVerdict
 # Runner-private files inside the workspace (skill resources). Never part of the job's output.
 PRIVATE_DIR = ".z"
 DELTA_META = ".z-delta.json"
+LINK_PREFIX = "link:"
 
 
 class JailError(PermissionError):
@@ -77,36 +78,45 @@ class Workspace:
             for name in list(dirnames):
                 full = Path(dirpath) / name
                 if full.is_symlink():
-                    out[(rel_dir / name).as_posix()] = "link:" + os.readlink(full)
+                    out[(rel_dir / name).as_posix()] = LINK_PREFIX + os.readlink(full)
                     dirnames.remove(name)
             for name in filenames:
                 full = Path(dirpath) / name
                 rel = (rel_dir / name).as_posix()
                 if full.is_symlink():
-                    out[rel] = "link:" + os.readlink(full)
+                    out[rel] = LINK_PREFIX + os.readlink(full)
                 elif full.is_file():
                     out[rel] = sha256_file(full)
         return out
 
     def delta(self, baseline: dict[str, str]) -> tuple[bytes, dict[str, str]]:
-        """tar.gz of files added or changed since `baseline` plus the list of deleted files."""
+        """tar.gz of files added or changed since `baseline`, plus the deleted paths and the symlinks.
+
+        Symlinks are recorded in the metadata (`links`: path → target), not as archive members: the agent may
+        create links that the safe extraction refuses, such as a virtualenv's `bin/python -> /usr/bin/python3`.
+        """
         current = self.snapshot()
         changed = sorted(p for p, digest in current.items() if baseline.get(p) != digest)
         deleted = sorted(p for p in baseline if p not in current)
+        links: dict[str, str] = {}
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as tar:
             for rel in changed:
+                if current[rel].startswith(LINK_PREFIX):
+                    links[rel] = current[rel].removeprefix(LINK_PREFIX)
+                    continue
                 tar.add(self.root / rel, arcname=rel, recursive=False)
-            meta = json.dumps({"deleted": deleted}).encode()
+            meta = json.dumps({"deleted": deleted, "links": links}).encode()
             info = tarfile.TarInfo(DELTA_META)
             info.size = len(meta)
             tar.addfile(info, io.BytesIO(meta))
         return buf.getvalue(), current
 
     def apply_delta(self, blob: bytes, limits: ArchiveLimits | None = None) -> None:
-        """Apply a delta of `delta()` on the staged tree. Deletions act on the path itself (never on what a link
-        points to), and only below a parent directory that resolves inside the workspace."""
+        """Apply a delta of `delta()` on the staged tree. Deletions and links act on the path itself (never on
+        what a link points to), and only below a parent directory that resolves inside the workspace."""
         deleted: list[str] = []
+        links: dict[str, str] = {}
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
             try:
                 meta = tar.extractfile(DELTA_META)
@@ -115,13 +125,25 @@ class Workspace:
             if meta is not None:
                 data = json.loads(meta.read())
                 deleted = [str(p) for p in data.get("deleted", [])]
+                links = {str(k): str(v) for k, v in (data.get("links") or {}).items()}
             # A file that replaced a staged link is written as itself, not through the link.
             replaced = [m.name for m in tar if m.name != DELTA_META and not m.isdir()]
         for rel in [*deleted, *replaced]:
             target = self._leaf(rel)
             if target.is_symlink() or target.is_file():
                 target.unlink()
+        # Files first, links last: no archive member can be written through a restored link.
         extract_tar(io.BytesIO(blob), self.root, limits or ArchiveLimits(), skip={DELTA_META})
+        for rel, link_target in sorted(links.items()):
+            if not link_target or "\x00" in link_target:
+                raise ArchiveError(f"empty link target in the workspace delta: {rel!r}")
+            leaf = self._leaf(rel)
+            if leaf.is_symlink() or leaf.is_file():
+                leaf.unlink()
+            elif leaf.exists():
+                raise ArchiveError(f"a directory is in the way of the link {rel!r}")
+            leaf.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(link_target, leaf)
 
     def _leaf(self, rel: str) -> Path:
         """`rel` inside the workspace with its parent directory resolved (links followed) but not its last
