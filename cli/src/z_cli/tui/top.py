@@ -265,7 +265,9 @@ def edit_with_suspend(app: App[Any], payload: dict[str, Any]) -> dict[str, Any] 
         path = Path(fh.name)
     try:
         with app.suspend():
-            subprocess.run([*shlex.split(editor), str(path)], check=False)  # noqa: S603  # nosemgrep: the local user's own $VISUAL/$EDITOR, argv without a shell
+            # The local user's own $VISUAL/$EDITOR on their own temp file, argv without a shell.
+            # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+            subprocess.run([*shlex.split(editor), str(path)], check=False)  # noqa: S603
         data = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError) as exc:
         app.notify(f"payload not changed: {exc}", severity="error")
