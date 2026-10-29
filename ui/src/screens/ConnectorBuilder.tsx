@@ -55,6 +55,32 @@ const FLOW_TEMPLATE = JSON.stringify(
   2,
 )
 
+/** Starting point for a cli connector (ADR 0025): one read command; arguments never start with '-'. */
+const CLI_TEMPLATE = JSON.stringify(
+  {
+    cli: {
+      image: 'registry.example.internal/tools/glab@sha256:<64 hex digits>',
+      env: { GITLAB_HOST: 'gitlab.example.internal', GITLAB_TOKEN: '{{auth.secret}}' },
+      output: 'json',
+      timeout_s: 30,
+    },
+    declared: [
+      {
+        id: 'merge_requests.list',
+        description: 'Open merge requests of a project',
+        command: ['glab', 'api', 'projects/{{args.project_id}}/merge_requests?state=opened'],
+        input_schema: {
+          type: 'object',
+          required: ['project_id'],
+          properties: { project_id: { type: 'integer', minimum: 1 } },
+        },
+      },
+    ],
+  },
+  null,
+  2,
+)
+
 function Stepper({ step }: { step: Step }) {
   const idx = STEPS.findIndex((s) => s.id === step)
   return (
@@ -96,6 +122,7 @@ export function ConnectorBuilder() {
   const [docs, setDocs] = useState('')
   const [mcpCmd, setMcpCmd] = useState('')
   const [flowsJson, setFlowsJson] = useState(FLOW_TEMPLATE)
+  const [cliJson, setCliJson] = useState(CLI_TEMPLATE)
   const [readUser, setReadUser] = useState('')
   const [writeUser, setWriteUser] = useState('')
   const [dataClass, setDataClass] = useState<DataClass>('C2')
@@ -110,8 +137,8 @@ export function ConnectorBuilder() {
   const [notServed, setNotServed] = useState<string | null>(null)
 
   const source =
-    kind === 'browser'
-      ? 'browser'
+    kind === 'browser' || kind === 'cli'
+      ? kind
       : kind === 'mcp'
         ? 'mcp'
         : kind === 'graphql'
@@ -131,9 +158,20 @@ export function ConnectorBuilder() {
     }
   }
 
+  const cliBody = (): { cli: never; declared: never } | null => {
+    try {
+      const parsed = JSON.parse(cliJson) as { cli?: unknown; declared?: unknown }
+      if (!parsed.cli || !Array.isArray(parsed.declared)) throw new Error('missing')
+      return { cli: parsed.cli as never, declared: parsed.declared as never }
+    } catch {
+      toast.error(new Error('The tool must be JSON with "cli" (an object) and "declared" (a list)'))
+      return null
+    }
+  }
+
   const importDraft = async () => {
-    const flows = kind === 'browser' ? browserBody() : null
-    if (kind === 'browser' && !flows) return
+    const flows = kind === 'browser' ? browserBody() : kind === 'cli' ? cliBody() : null
+    if ((kind === 'browser' || kind === 'cli') && !flows) return
     setBusy(true)
     setNotServed(null)
     try {
@@ -292,21 +330,23 @@ export function ConnectorBuilder() {
               )}
             </Field>
           </div>
-          <Field
-            label={kind === 'browser' ? 'Base URL of the web app' : 'Base URL'}
-            hint="Admin-entered URLs are checked against loopback, link-local and cluster ranges by the server"
-          >
-            {(id, d) => (
-              <Input
-                id={id}
-                aria-describedby={d}
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                className="font-mono text-sm"
-                placeholder="https://logos.example.internal"
-              />
-            )}
-          </Field>
+          {kind !== 'cli' && (
+            <Field
+              label={kind === 'browser' ? 'Base URL of the web app' : 'Base URL'}
+              hint="Admin-entered URLs are checked against loopback, link-local and cluster ranges by the server"
+            >
+              {(id, d) => (
+                <Input
+                  id={id}
+                  aria-describedby={d}
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  className="font-mono text-sm"
+                  placeholder="https://logos.example.internal"
+                />
+              )}
+            </Field>
+          )}
           {(kind === 'openapi' || kind === 'graphql') && (
             <>
               <Field label={kind === 'graphql' ? 'GraphQL endpoint (introspection)' : 'Spec URL'}>
@@ -348,7 +388,7 @@ export function ConnectorBuilder() {
               )}
             </Field>
           )}
-          {(kind === 'cli' || kind === 'database' || kind === 'webhook') && (
+          {(kind === 'database' || kind === 'webhook') && (
             <Field
               label="API documentation or notes"
               hint="The builder agent drafts the declared operations from it; you review every one"
@@ -360,6 +400,24 @@ export function ConnectorBuilder() {
                   rows={6}
                   value={docs}
                   onChange={(e) => setDocs(e.target.value)}
+                />
+              )}
+            </Field>
+          )}
+          {kind === 'cli' && (
+            <Field
+              label="Tool image and commands (JSON)"
+              hint="The image is pinned by digest and allowed in executor.tool_images. Each operation's command is an argv (no shell); {{args.x}} fills a value that can never start with '-'. Credentials only reach the tool through cli.env ({{auth.secret}}, {{auth.username}}, {{auth.password}})."
+            >
+              {(id, d) => (
+                <Textarea
+                  id={id}
+                  aria-describedby={d}
+                  rows={16}
+                  value={cliJson}
+                  onChange={(e) => setCliJson(e.target.value)}
+                  className="font-mono text-[12px]"
+                  spellCheck={false}
                 />
               )}
             </Field>
