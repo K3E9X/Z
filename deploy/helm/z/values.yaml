@@ -232,7 +232,7 @@ litellm:
     pullPolicy: IfNotPresent
   port: 4000
   runAsUser: 65534         # the image defaults to root; its Prisma engines are readable by any uid
-  inferenceApiBase: ""     # INFERENCE_API_BASE: https://<inferx-endpoint>/v1 (key: secrets.inferenceApiKey)
+  inferenceApiBase: ""     # INFERENCE_API_BASE: https://private.inferx.datax.iliad.fr/inference/v1 (key: secrets.inferenceApiKey)
   extraEnv: []
   extraEnvFrom: []
   resources:
@@ -452,17 +452,18 @@ config:
       default_theme: night
       default_font: plex
 
-  # config/litellm.yaml. Replace <...> with the model ids served by inferX. The keys come from the Secret.
+  # config/litellm.yaml (see config/litellm.example.yaml and ADR 0024): inferX catalogue ids, pinned. The keys
+  # come from the Secret. No model here may have an external fallback in inferX (C2/C3 data goes through them).
   litellm:
     model_list:
       - model_name: z-heavy
-        litellm_params: { model: "openai/<GLM_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/glm-5-3-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-fast
-        litellm_params: { model: "openai/<QWEN_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-judge
-        litellm_params: { model: "openai/<SMALL_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-embed
         litellm_params: { model: "openai/<EMBEDDING_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
@@ -470,8 +471,10 @@ config:
     litellm_settings:
       drop_params: true
       request_timeout: 600
+      return_response_headers: true
     router_settings:
       num_retries: 2
+      retry_after: 1
     general_settings:
       master_key: os.environ/LITELLM_MASTER_KEY
       database_url: os.environ/LITELLM_DATABASE_URL
