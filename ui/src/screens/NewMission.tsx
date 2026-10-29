@@ -94,10 +94,12 @@ export function NewMission() {
   const toast = useToast()
   const canStart = useCan('missions:start')
   const canSavePlaybook = useCan('playbooks:write')
+  // POST /triggers needs triggers:write: without it Schedule and Event are not offered.
+  const canTriggers = useCan('triggers:write')
   const agents = useAgents()
   const connectors = useConnectors()
   const playbooks = usePlaybooks()
-  const triggers = useTriggers()
+  const triggers = useTriggers({ enabled: canTriggers })
   const composer = useRef<MentionHandle>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -604,7 +606,7 @@ export function NewMission() {
             value="schedule"
             current={when}
             onChange={setWhen}
-            disabled={!playbook || !triggersServed}
+            disabled={!canTriggers || !playbook || !triggersServed}
             label={
               <span className="flex flex-wrap items-center gap-2">
                 On a schedule{' '}
@@ -624,7 +626,7 @@ export function NewMission() {
             value="event"
             current={when}
             onChange={setWhen}
-            disabled={!playbook || !triggersServed}
+            disabled={!canTriggers || !playbook || !triggersServed}
             label={
               <span className="flex flex-wrap items-center gap-2">
                 On every new event
@@ -643,7 +645,11 @@ export function NewMission() {
               </span>
             }
           />
-          {!playbook ? (
+          {!canTriggers ? (
+            <span className="text-sm text-text-3">
+              Schedules and events need the triggers:write permission.
+            </span>
+          ) : !playbook ? (
             <span className="text-sm text-text-3">Schedules and events need a playbook.</span>
           ) : (
             !triggersServed && (

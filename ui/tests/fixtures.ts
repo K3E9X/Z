@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { Connector, Mission, Operation } from '@/api/types'
+import type { Connector, Mission, Operation, Playbook } from '@/api/types'
 
 export function mission(patch: Partial<Mission> = {}): Mission {
   return {
@@ -52,6 +52,21 @@ export function operation(patch: Partial<Operation> = {}): Operation {
     input_schema: {},
     ...patch,
   }
+}
+
+export function playbook(patch: Partial<Playbook> = {}): Playbook {
+  return {
+    id: 'pbk_1',
+    name: 'weekly-triage',
+    version: '1.0.0',
+    description: 'Triage the week',
+    team: 'secops',
+    steps: [{ id: 'collect', agent: 'vega', prompt: 'Collect the findings' }],
+    usage_count: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...patch,
+  } as Playbook
 }
 
 export const emptyPage = { items: [], next_cursor: null }

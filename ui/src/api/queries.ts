@@ -293,8 +293,12 @@ export function useTasks() {
   })
 }
 
-export function useTriggers() {
-  return useQuery({ queryKey: qk.triggers, queryFn: () => unwrap(api.GET('/triggers')) })
+export function useTriggers(opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.triggers,
+    queryFn: () => unwrap(api.GET('/triggers')),
+    enabled: opts.enabled ?? true,
+  })
 }
 
 // ------------------------------------------------------------------ connectors
