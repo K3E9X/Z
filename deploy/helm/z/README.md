@@ -150,7 +150,7 @@ labelled for the Grafana sidecar (`grafana_dashboard: "1"`, change it in `metric
 
 | Secret | Keys | Source |
 |---|---|---|
-| `<fullname>-secrets` | `Z_SECRET_KEY`, `LITELLM_MASTER_KEY`, `OIDC_CLIENT_SECRET` (optional), `INFERENCE_API_KEY` (optional) | generated once and kept (`helm.sh/resource-policy: keep`), or `secrets.existingSecret`, or an ExternalSecret (`secrets.externalSecret`) |
+| `<fullname>-secrets` | `Z_SECRET_KEY`, `LITELLM_MASTER_KEY`, `LITELLM_SALT_KEY` (encrypts the inferX key set from Z, ADR 0027; never change it), `OIDC_CLIENT_SECRET` (optional), `INFERENCE_API_KEY` (optional: can be set from Z instead) | generated once and kept (`helm.sh/resource-policy: keep`), or `secrets.existingSecret`, or an ExternalSecret (`secrets.externalSecret`) |
 | `<fullname>-db` | embedded: `POSTGRES_PASSWORD`, `Z_APP_DB_PASSWORD`, `LITELLM_DB_PASSWORD` | generated once and kept, or `database.existingSecret` |
 | `database.existingSecret` | external: `DATABASE_URL`, `MIGRATE_DATABASE_URL`, `LITELLM_DATABASE_URL` | yours (or an ExternalSecret you manage) |
 

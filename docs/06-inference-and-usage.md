@@ -41,6 +41,7 @@ External fallback when inferX is degraded is **off** by default and, when on, on
 - Spend logs give tokens per call; the monitor aggregates them into `UsageRecord` buckets (1 min → 1 h → 1 day).
 - Retries and timeouts in LiteLLM router settings; no cross-provider fallback unless the routing policy allows it.
 - Prompt caching: keep system prompts and skills stable at the start of the context so the server's prefix cache works (vLLM automatic prefix caching).
+- The inferX key: LiteLLM's named credential `inferx`, from `INFERENCE_API_KEY` by default; an admin can set or rotate it in Inference → Model providers → inferX key (`PUT /inference/credential`, step-up). It goes to LiteLLM only, encrypted there; Z keeps its fingerprint, who set it and the last check (ADR 0027).
 
 Check LiteLLM's current docs for key generation, metadata, spend endpoints and callbacks before coding.
 

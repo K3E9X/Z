@@ -7,7 +7,7 @@ the egress proxy (runners reach package mirrors only through it) and the z-brows
 ## Docker Compose (local or single host)
 
 ```bash
-cp .env.example .env                                   # fill POSTGRES_PASSWORD, Z_APP_DB_PASSWORD, Z_SECRET_KEY, LITELLM_MASTER_KEY, OIDC_*
+cp .env.example .env                                   # fill POSTGRES_PASSWORD, Z_APP_DB_PASSWORD, Z_SECRET_KEY, LITELLM_MASTER_KEY, LITELLM_SALT_KEY, OIDC_*
 cp config/litellm.example.yaml config/litellm.yaml     # put the real inferX model ids
 cp config/z.example.yaml config/z.yaml
 docker build -f deploy/images/z-server/Dockerfile -t z-server:local .

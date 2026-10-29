@@ -95,6 +95,12 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   whole; planted chat markers skipping a post; streamed fallback answers passing the inference guard (fixed and
   verified in the LiteLLM image); RestartPolicy key case; credential literals in cli.env. Left: Docker tool
   containers have no startup sweep (their env holds the credential until z-server's cleanup runs).
+- inferX key from the web app (ADR 0027, asked by the owner): LiteLLM credentials API checked in the installed source
+  and proven on the litellm 1.105.0 image with Postgres (env default; API key from the next call and after a
+  restart; wrong key reported without echo; value encrypted in LiteLLM's DB). Needs `STORE_MODEL_IN_DB=True` and a
+  kept `LITELLM_SALT_KEY`. Z keeps the fingerprint, who and when, never the key.
+- Trap: `pkill -f <pattern>` with the pattern in the same command line kills the shell (exit 144): kill by PID.
+- Trap: `config/litellm.yaml` is git-ignored (local copy): edit `config/litellm.example.yaml` for the repository.
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).
