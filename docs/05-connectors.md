@@ -9,7 +9,7 @@ Z is tool-agnostic. A connector describes how to reach a tool; the **tool gatewa
 | `openapi` | The tool has a REST API with a spec (e.g. Logos, DefectDojo) | Import the spec; one operation per method+path, id from `operationId` or the path (03 §4) |
 | `rest` | REST without a spec | Operations declared by hand in YAML, or drafted by the connector builder from docs |
 | `graphql` | GraphQL API | Introspection; one operation per allowed query/mutation |
-| `cli` | A command-line tool | Each allowed subcommand becomes an operation with a typed argument schema; runs in a gateway-side sandbox |
+| `cli` | A command-line tool | Each allowed subcommand becomes an operation with a typed argument schema (an argv template, no shell, arguments never become flags); runs in a one-shot tool container of the executor with the credential in its environment (ADR 0025) |
 | `database` | Read-only SQL access | Parameterised, read-only queries declared in YAML; never free SQL from the agent |
 | `browser` | The tool only has a web UI | A recorded, replayable session (Playwright) run by the gateway-side `z-browser` worker; operations are named flows ("export rules", "list inactive accounts") |
 | `builtin` | Platform-provided access (e.g. `web` search/fetch through the egress proxy, C0 only) | Shipped with Z, configured by an admin |

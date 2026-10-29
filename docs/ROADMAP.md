@@ -10,7 +10,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Contracts frozen (`contracts-v1`) | A | done |
 | Missions, plans, fan-out, scheduler, resume | B1 | done (draft-plan with the planner model, sessions, save-as-playbook; take-over as a web editor over the checkpointed workspace with restart from the edited checkpoint, ADR 0019) |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
-| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email, browser connectors with reviewed flows replayed by z-browser and recording by demonstration (ADR 0016), GraphQL and read-only PostgreSQL connectors (ADR 0020) done; cli connectors, GraphQL introspection import, M365 catalog templates later) |
+| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email, browser connectors with reviewed flows replayed by z-browser and recording by demonstration (ADR 0016), GraphQL and read-only PostgreSQL connectors (ADR 0020), cli connectors in tool containers (ADR 0025) done; GraphQL introspection import later) |
 | CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | done (every screen of docs/09, plus admin, take-over, browser recorder, notifications) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | done (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates, shadow replay, apply/try, memory retrieval in job specs) |
@@ -29,7 +29,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Item | Status |
 |---|---|
 | Learning loop: signals, proposals, shadow replay, apply/rollback | done (ADR 0014) |
-| Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | doing (GraphQL, PostgreSQL, browser with recording, connector builder and inbound webhooks done; `cli` connectors need their own sandbox) |
+| Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | done (GraphQL, PostgreSQL, browser with recording, cli tools in one-shot sandbox containers (ADR 0025), connector builder and inbound webhooks) |
 | `z top`, sessions, `z mcp serve`, themes | done (`/mcp` on z-server and `z mcp serve` share one tool table, ADR 0022) |
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | done |
 | Trace replay, Evals, Analytics screens | done |
