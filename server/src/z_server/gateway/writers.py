@@ -368,6 +368,58 @@ class Mattermost:
         )
 
 
+class Slack:
+    """Slack Web API. A message carries metadata `{event_type: z_action, event_payload: {action}}` (the agent cannot
+    set metadata: the operation's body schema has no such field); after a crash the channel, or the thread, is
+    read since the proposal and searched for it. Slack's `ok: false` answers fail through the manifest's
+    `error_body`, so a refused post is never recorded as applied."""
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        if op.local_id != "messages.post":
+            return None
+        body = action.payload.get("body") or {}
+        params: dict[str, Any] = {
+            "channel": body.get("channel"),
+            "oldest": f"{action.created_at.timestamp() - 60:.6f}",  # tolerate clock skew with Slack
+            "include_all_metadata": "true",
+            "limit": 200,
+        }
+        path = "/conversations.history"
+        if body.get("thread_ts"):
+            path, params["ts"] = "/conversations.replies", body["thread_ts"]
+        inv = await gw.send(connector, "GET", path, "write", params=params)
+        _fail(inv, "idempotency lookup")
+        for message in (inv.body or {}).get("messages") or [] if isinstance(inv.body, dict) else []:
+            meta = message.get("metadata") or {} if isinstance(message, dict) else {}
+            if meta.get("event_type") == "z_action" and (meta.get("event_payload") or {}).get("action") == action.id:
+                return {"channel": body.get("channel"), "ts": message.get("ts"), "recovered": True}
+        return None
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        if op.local_id != "messages.post":
+            return await Generic().apply(gw, connector, op, action, files)
+        body = {
+            **(action.payload.get("body") or {}),
+            "metadata": {"event_type": "z_action", "event_payload": {"action": action.id}},
+        }
+        inv = await gw.send(connector, "POST", "/chat.postMessage", "write", json_body=body)
+        _fail(inv, "post")
+        answer = inv.body if isinstance(inv.body, dict) else {}
+        return Applied(
+            inv,
+            {
+                "status": inv.status,
+                "channel": answer.get("channel"),
+                "ts": answer.get("ts"),
+                **({"thread_ts": body["thread_ts"]} if body.get("thread_ts") else {}),
+            },
+        )
+
+
 class Generic:
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -396,6 +448,8 @@ def writer_for(connector: Connector, op: Operation) -> Writer:
         return GitLab()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("mattermost."):
         return Mattermost()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("slack."):
+        return Slack()
     return Generic()
 
 

@@ -82,6 +82,12 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
         iid = payload.get("merge_request_iid")
         target = f"{payload['project']}!{iid}" if iid else f"{payload['project']}#{payload.get('issue_iid')}"
         return CommentPreview(kind="comment", tracker="gitlab", target=target, body=payload["body"]).dump()
+    if operation == "slack.messages.post":
+        body = payload.get("body") or {}
+        target = str(body.get("channel", "")) + (f" (reply to {body['thread_ts']})" if body.get("thread_ts") else "")
+        return ChatMessagePreview(
+            kind="chat_message", platform="slack", target=target, text=str(body.get("text", ""))
+        ).dump()
     if operation == "mattermost.posts.create":
         body = payload.get("body") or {}
         target = str(body.get("channel_id", "")) + (f" (reply to {body['root_id']})" if body.get("root_id") else "")
