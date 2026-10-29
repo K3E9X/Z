@@ -114,7 +114,7 @@ def test_save_a_session_mission_as_playbook(
     assert run.status_code == 201, run.text
 
 
-def test_take_over_says_it_is_not_available(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+def test_take_over_needs_a_job_that_runs(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
     sid = new_session(app)
     mission = say(app, sid, "@vuln-analyst summarise the critical findings")["mission"]
     assert isinstance(mission, dict)
@@ -126,4 +126,4 @@ def test_take_over_says_it_is_not_available(app: TestClient, jars: dict[str, dic
         resp = app.post(
             f"/api/v1/missions/{mission['id']}/take-over", json={"job_id": jobs[0]["id"]}, headers=csrf(app)
         )
-        assert resp.status_code == 503 and "not available yet" in resp.json()["detail"]
+        assert resp.status_code == 409 and "only a running or paused job" in resp.json()["detail"]

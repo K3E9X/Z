@@ -8,6 +8,8 @@
 - Lease: every runner call extends it. An expired lease means the runner died: the job is re-queued with
   attempt+1 and `resume_from_step` = its last checkpoint (backoff), or failed after `max_attempts`.
 - Deadlines: a running job past `deadline_at` ends `timed_out`; a mission past its deadline too.
+- Restart: a job requeued with its runner still referenced (take-over) is not claimed until `reap` has stopped
+  that runner.
 """
 
 from __future__ import annotations
@@ -94,7 +96,10 @@ async def claim(state: AppState, worker: str) -> list[tuple[str, dict[str, str]]
                 select(Job, Mission)
                 .join(Mission, Mission.id == Job.mission_id)
                 .where(
-                    Job.status == JobStatus.queued.value, Job.available_at <= now, Mission.status.in_(ACTIVE_MISSIONS)
+                    Job.status == JobStatus.queued.value,
+                    Job.available_at <= now,
+                    Mission.status.in_(ACTIVE_MISSIONS),
+                    Job.executor_ref.is_(None),  # a runner of an earlier run is stopped first (reap)
                 )
                 .order_by(Job.available_at, Job.created_at)
                 .limit(max(free * 4, 16))
@@ -220,13 +225,13 @@ async def watchdog(state: AppState, executor: Executor) -> TickReport:
 
 
 async def reap(state: AppState, executor: Executor) -> list[str]:
-    """Stop and remove the runner of every ended job (runners exit on their own; this cleans up the rest)."""
+    """Stop and remove the runner of every ended job (runners exit on their own; this cleans up the rest), and
+    the parked runner of a job requeued to restart from its checkpoint (take-over), before it is dispatched."""
+    stale = [s.value for s in JobStatus if s.terminal] + [JobStatus.queued.value]
     async with state.sessions() as db:
         ended = (
             await db.execute(
-                select(Job.id, Job.executor_ref).where(
-                    Job.status.in_([s.value for s in JobStatus if s.terminal]), Job.executor_ref.is_not(None)
-                )
+                select(Job.id, Job.executor_ref).where(Job.status.in_(stale), Job.executor_ref.is_not(None))
             )
         ).all()
     reaped = []

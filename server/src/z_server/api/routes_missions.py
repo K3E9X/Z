@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -23,7 +24,7 @@ from z_server.api.routes_internal import artifact_out, job_out
 from z_server.db.models import Artifact, ChatSession, Job, JobMessage, Mission, ProposedAction, Question, Team, User
 from z_server.errors import Problem
 from z_server.ids import new_id
-from z_server.missions import service
+from z_server.missions import service, takeover
 from z_server.state import AppState
 
 router = ContractRouter()
@@ -591,13 +592,69 @@ async def save_mission_as_playbook(ctx: CtxDep, id: str, body: m.SaveAsPlaybook)
 
 @router.operation("takeOverMission")
 async def take_over_mission(ctx: CtxDep, id: str, body: m.TakeOver) -> m.TakeOverSession:
-    """The web terminal into a paused workspace is P1 (docs/BUILD.md): say so instead of pretending."""
+    """Pause the job and open its workspace in the web app (files; edits in read_write), ADR 0019."""
     mission = await get_mission(ctx, id, control="missions:control")
-    job = await ctx.db.get(Job, body.job_id)
+    job = await ctx.db.get(Job, body.job_id, with_for_update=True)
     if job is None or job.mission_id != mission.id:
         raise Problem("not-found", "no such job in this mission")
-    raise Problem(
-        "unavailable",
-        "taking over a workspace in a terminal is not available yet: pause the mission, guide the agent, "
-        "or download its files from the Files tab",
+    value = await takeover.start(ctx.db, mission, job, ctx.user.username, body.mode)
+    await ctx.audit("mission.taken_over", "job", job.id, after={"mission": mission.id, "mode": body.mode})
+    return m.TakeOverSession(
+        job_id=job.id,
+        terminal_url=f"{ctx.state.settings.public_url}/missions/{mission.id}/take-over/{job.id}",
+        expires_at=datetime.fromisoformat(value["expires_at"]),
+        mode=body.mode,
     )
+
+
+async def _take_over_job(ctx: Ctx, id: str, job_id: str) -> tuple[Mission, Job]:
+    mission = await get_mission(ctx, id, control="missions:control")
+    job = await ctx.db.get(Job, job_id, with_for_update=True)
+    if job is None or job.mission_id != mission.id:
+        raise Problem("not-found", "no such job in this mission")
+    return mission, job
+
+
+@router.operation("getTakeOverWorkspace")
+async def get_take_over_workspace(ctx: CtxDep, id: str, job_id: str) -> m.TakeOverWorkspace:
+    mission, job = await _take_over_job(ctx, id, job_id)
+    _, out = await takeover.view(ctx.db, ctx.state, mission, job, ctx.user.username)
+    return m.TakeOverWorkspace.model_validate(out)
+
+
+@router.operation("getTakeOverFile")
+async def get_take_over_file(ctx: CtxDep, id: str, job_id: str, path: str = "") -> m.TakeOverFileContent:
+    mission, job = await _take_over_job(ctx, id, job_id)
+    return m.TakeOverFileContent.model_validate(
+        await takeover.read(ctx.db, ctx.state, mission, job, ctx.user.username, path)
+    )
+
+
+@router.operation("putTakeOverFile")
+async def put_take_over_file(ctx: CtxDep, id: str, job_id: str, body: m.TakeOverEdit) -> m.TakeOverFile:
+    _, job = await _take_over_job(ctx, id, job_id)
+    size = await takeover.write(ctx.db, job, ctx.user.username, body.path, body.content, body.encoding)
+    path = takeover.clean_path(body.path)
+    await ctx.audit("mission.take_over_edit", "job", job.id, after={"path": path, "size": size})
+    return m.TakeOverFile(path=path, size=size, origin="human", deleted=False)
+
+
+@router.operation("deleteTakeOverFile", status_code=204)
+async def delete_take_over_file(ctx: CtxDep, id: str, job_id: str, path: str = "") -> Response:
+    _, job = await _take_over_job(ctx, id, job_id)
+    await takeover.write(ctx.db, job, ctx.user.username, path, None, "utf-8")
+    await ctx.audit("mission.take_over_edit", "job", job.id, after={"path": takeover.clean_path(path), "deleted": True})
+    return Response(status_code=204)
+
+
+@router.operation("finishTakeOver")
+async def finish_take_over(ctx: CtxDep, id: str, job_id: str, body: m.TakeOverFinish) -> m.TakeOverResult:
+    mission, job = await _take_over_job(ctx, id, job_id)
+    result = await takeover.finish(ctx.db, ctx.state, mission, job, ctx.user.username, body.resume)
+    await ctx.audit(
+        "mission.take_over_finished",
+        "job",
+        job.id,
+        after={"edited": result["edited"], "restarted": result["restarted"], "resumed": result["resumed"]},
+    )
+    return m.TakeOverResult.model_validate(result)
