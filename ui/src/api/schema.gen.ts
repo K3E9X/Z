@@ -186,6 +186,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My notification preferences */
+        get: operations["getMyNotifications"];
+        /** Change my notification preferences */
+        put: operations["putMyNotifications"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/tokens": {
         parameters: {
             query?: never;
@@ -3876,6 +3894,15 @@ export interface components {
             password_ref?: string;
             from: string;
         };
+        /** @description Email about my own missions. address (from the sign-in profile) and available (an SMTP server is configured) are read-only. Content is sent up to C1; above it the email only links to Z. */
+        MyNotifications: {
+            email: {
+                enabled: boolean;
+                events: ("approval_requested" | "question_asked" | "needs_attention" | "mission_succeeded" | "mission_failed")[];
+            };
+            address?: string | null;
+            available?: boolean;
+        };
         NotificationSettings: {
             targets: components["schemas"]["NotificationTarget"][];
             smtp?: components["schemas"]["SmtpSettings"] | null;
@@ -5476,6 +5503,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getMyNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotifications"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    putMyNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyNotifications"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotifications"];
+                };
             };
             /** @description Problem details */
             default: {

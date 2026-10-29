@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, unwrap } from '@/api/client'
@@ -13,7 +13,7 @@ import {
   useMyTokens,
   useRoutingPolicy,
 } from '@/api/queries'
-import type { Guardrail } from '@/api/types'
+import type { Guardrail, MyNotifications } from '@/api/types'
 import { PERMISSIONS, type PermissionName } from '@/api/permissions.gen'
 import { Dialog } from '@/components/Dialog'
 import { Icon } from '@/components/Icon'
@@ -639,17 +639,87 @@ function Access() {
   )
 }
 
-function Notifications() {
+const MY_EVENTS: { id: MyEvent; label: string }[] = [
+  { id: 'question_asked', label: 'An agent asks me a question' },
+  { id: 'needs_attention', label: 'A job of mine needs attention' },
+  { id: 'approval_requested', label: 'An action of my mission waits for approval' },
+  { id: 'mission_succeeded', label: 'My mission succeeded' },
+  { id: 'mission_failed', label: 'My mission ended without succeeding' },
+]
+type MyEvent = MyNotifications['email']['events'][number]
+
+export function NotificationPrefs() {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const q = useQuery({ queryKey: qk.myNotifications, queryFn: () => unwrap(api.GET('/me/notifications')) })
+  const [draft, setDraft] = useState<MyNotifications['email'] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const email = draft ?? q.data?.email
+  const save = async () => {
+    if (!draft) return
+    setBusy(true)
+    try {
+      await unwrap(api.PUT('/me/notifications', { body: { email: draft } }))
+      await qc.invalidateQueries({ queryKey: qk.myNotifications })
+      setDraft(null)
+      toast.ok('Notification preferences saved')
+    } catch (e) {
+      toast.error(e, 'Not saved')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <section aria-labelledby="s-notif" className="flex flex-col gap-3">
       <h2 id="s-notif" className="m-0 text-[17px] font-semibold">
         Notifications
       </h2>
       <p className="m-0 text-text-2">
-        Decisions waiting for you appear in Review and on the bell everywhere in the app. Slack, Mattermost,
-        Teams, email and signed webhook notifications are configured by admins (Admin → Notifications).
-        Personal notification preferences are not in the API yet.
+        Decisions waiting for you appear in Review and on the bell everywhere in the app. You can also get an
+        email about your own missions; summaries are included only for missions up to C1, otherwise the email
+        links to Z. Team channels (Slack, Mattermost, Teams, webhooks) are configured by admins.
       </p>
+      <QueryState query={q} what="Notification preferences" endpoint="GET /me/notifications">
+        {() =>
+          !email ? null : (
+            <div className="flex flex-col gap-3 rounded-panel border border-line px-4 py-3.5">
+              {!q.data?.available && (
+                <span className="text-meta text-wait">
+                  No email server is configured yet (Admin → Notifications): preferences are kept for later.
+                </span>
+              )}
+              <Checkbox
+                checked={email.enabled}
+                onChange={(v) => setDraft({ ...email, enabled: v })}
+                label={`Email me at ${q.data?.address ?? 'my address (none in my profile)'}`}
+              />
+              <div className="grid gap-2 pl-6 sm:grid-cols-2">
+                {MY_EVENTS.map((ev) => (
+                  <Checkbox
+                    key={ev.id}
+                    checked={email.events.includes(ev.id)}
+                    onChange={(v) =>
+                      setDraft({
+                        ...email,
+                        events: v ? [...email.events, ev.id] : email.events.filter((x) => x !== ev.id),
+                      })
+                    }
+                    label={ev.label}
+                  />
+                ))}
+              </div>
+              {draft && (
+                <div className="flex gap-2">
+                  <Button variant="primary" busy={busy} onClick={() => void save()}>
+                    Save
+                  </Button>
+                  <Button onClick={() => setDraft(null)}>Discard</Button>
+                </div>
+              )}
+            </div>
+          )
+        }
+      </QueryState>
     </section>
   )
 }
@@ -689,7 +759,7 @@ export function Settings() {
         {section === 'guardrails' && <Guardrails />}
         {section === 'connections' && <Connections />}
         {section === 'access' && <Access />}
-        {section === 'notifications' && <Notifications />}
+        {section === 'notifications' && <NotificationPrefs />}
       </div>
     </main>
   )

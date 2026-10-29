@@ -25,6 +25,7 @@ export const POLL_MS = 10_000
 
 export const qk = {
   me: ['me'] as const,
+  myNotifications: ['me', 'notifications'] as const,
   missions: (params: Record<string, unknown> = {}) => ['missions', params] as const,
   mission: (id: string) => ['mission', id] as const,
   missionJobs: (id: string) => ['mission', id, 'jobs'] as const,
