@@ -11,11 +11,13 @@ It works three ways:
 
 It deploys the same way on **Docker Compose**, **k3s** and **Kubernetes**.
 
-> Status: specification and build kit. The code is generated with Claude Code by following [`docs/BUILD.md`](docs/BUILD.md).
+> Status: built. The server, runner, CLI, web app, packs, Compose stack, Helm chart and CI exist and are tested;
+> [`docs/ROADMAP.md`](docs/ROADMAP.md) tracks what is done and what is left (acceptance against the real inferX,
+> GitLab and Jira). The code was written with Claude Code following [`docs/BUILD.md`](docs/BUILD.md).
 
 ---
 
-## Start building (with Claude Code)
+## Work on it (with Claude Code)
 
 1. Clone this repo and open Claude Code at its root.
 2. Do the manual prerequisites in [`docs/BUILD.md` §0](docs/BUILD.md#0-prerequisites-manual): `.env`, model IDs, tool-calling check.
@@ -23,7 +25,7 @@ It deploys the same way on **Docker Compose**, **k3s** and **Kubernetes**.
 
 Claude Code reads [`CLAUDE.md`](CLAUDE.md) automatically. Other coding agents read [`AGENTS.md`](AGENTS.md).
 
-## Run it (once built)
+## Run it
 
 ```bash
 # Local, Docker Compose (details, options and the classic Docker image store: deploy/README.md)
@@ -48,7 +50,7 @@ helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f 
 helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml   # Kubernetes
 
 # CLI
-uv tool install ./cli && z login && z
+uv tool install ./cli --with ./packages/z-common && z login && z   # z-common is not on PyPI (cli/README.md)
 ```
 
 ## Repository map
@@ -62,7 +64,11 @@ uv tool install ./cli && z login && z
 | `config/` | Example configuration: model gateway, platform policy |
 | `packs/` | Seed packs: agents, skills, playbooks, connectors, objectives, evals for `core`, `vuln`, `ticketing`, `dev`, `archi-isp` (v1.0) and `workplace` (v1.1) |
 | `poc/` | Scripts to validate the inference cluster before building |
-| `server/`, `runner/`, `cli/`, `ui/`, `contracts/`, `deploy/` | Created during the build |
+| `contracts/` | OpenAPI and JSON Schemas: the source of truth between components |
+| `server/`, `runner/`, `cli/`, `browser/`, `packages/z-common/` | z-server, z-runner, the `z` CLI, the z-browser worker, shared models |
+| `ui/` | The web app (React) |
+| `deploy/` | Compose stack, Helm chart, images, per-environment values |
+| `tests/`, `ci/`, `security/`, `.github/`, `.gitlab-ci.yml` | Fakes and e2e tests, CI scripts, scanner policies and exceptions, pipelines |
 
 ## Reading order
 
