@@ -1,25 +1,34 @@
 # 13 — CI/CD
 
-Two equivalent pipelines run the same stages with the same open-source tools:
+Two pipelines use the same open-source scanners, installed the same pinned and verified way, with the same
+gates (`security/exceptions.yaml`, `ci/scripts/vuln_gate.py`):
 - GitHub Actions in `.github/workflows/` (the repo lives on GitHub): build, scan, sign and publish to GHCR;
-- `.gitlab-ci.yml` at the root for the internal GitLab mirror, which also **deploys to the team's k3s**.
+- `.gitlab-ci.yml` at the root for the internal GitLab mirror, which also **deploys to the team's k3s** and
+  publishes the releases.
 
-Both run the same stages with the same open-source tools, so results match.
+Their job lists are not identical. Only GitHub runs `actionlint`, `zizmor` and `shellcheck`, the chart's refused
+combinations and optional renders (`helm.yml`), the kind smoke install and the ZAP baseline (`e2e.yml`). Only
+GitLab deploys (staging, production) and creates releases. A green GitHub run is therefore the stricter check of a
+change; the GitLab pipeline re-runs the common checks on the mirror before it deploys.
 
 ## 1. Stages
 | Stage | What | Blocks merge when |
 |---|---|---|
-| **lint** | `ruff`, `mypy --strict` (server, runner, cli), `eslint`, `tsc --noEmit`, `prettier --check`, `hadolint` (Dockerfiles), `yamllint`, `actionlint` (GitHub) | any error |
-| **test** | `pytest` with coverage (server, runner, cli), UI unit and component tests, contract tests (examples validate, OpenAPI diff vs `main` must be additive unless labelled `breaking`), pack lint, RBAC matrix and route-permission tests, audit-chain test | any failure; coverage < 80 % on `server/` and `runner/` |
-| **security** | `gitleaks` (secrets), `semgrep` (SAST: Python, TS, Dockerfile, Kubernetes rulesets) and `bandit`, `osv-scanner` + `pip-audit` + `pnpm audit` (dependencies), `trivy fs` and `trivy config` (repo, IaC), license check (allowlist) | any secret; high/critical findings without an accepted exception in `security/exceptions.yaml` (owner + expiry): osv-scanner and trivy fs block on CVSS >= 7 or an unscored finding, pip-audit on any vulnerability with a fix (`ci/scripts/vuln_gate.py`) |
-| **build** | Multi-arch images (amd64, arm64) for `z-server`, `z-runner`, `z-browser`, `z-ui` with BuildKit (GitHub) or rootless Buildah/Kaniko (GitLab, no privileged Docker-in-Docker); reproducible tags `sha-<short>`, `vX.Y.Z` | build failure |
-| **scan** | `trivy image` on each image, `dockle` (image best practices) | critical vulnerability with a fix available |
+| **lint** | `ruff`, `mypy --strict` (server, runner, cli, z-common, the socket proxy, browser, `ci/scripts`), `eslint`, `tsc --noEmit`, `prettier --check`, `hadolint` (Dockerfiles), `yamllint`; on GitHub also `actionlint`, `zizmor` (workflows) and `shellcheck` (CI scripts) | any error |
+| **test** | `pytest` with coverage (server, runner, cli, z-common, browser, `tests/unit`, `ci/tests`), UI unit and component tests, contract checks (contract examples validate; every route is a contract operation with a permission and takes the context that enforces it; the generated UI client matches `contracts/`, `pnpm check:api`), pack lint, RBAC matrix, audit-chain, routing-policy and Compose-hardening tests | any failure; coverage < 80 % on `server/src` and `packages/z-common/src` together |
+| **security** | `gitleaks` (secrets, whole history), `semgrep` (SAST: Python, TS, Dockerfile, Kubernetes rulesets) and `bandit`, `osv-scanner` + `pip-audit` + `pnpm audit` (dependencies), `trivy fs` (dependencies) and `trivy config` (Dockerfiles and the chart through trivy's Helm renderer; trivy does not read Compose files, which `tests/unit/test_compose_hardening.py` checks), license check (allowlist, in the python and ui jobs) | any secret; high/critical findings without an accepted exception in `security/exceptions.yaml` (owner + expiry): osv-scanner and trivy fs block on CVSS >= 7 or an unscored finding, pip-audit on any vulnerability with a fix (`ci/scripts/vuln_gate.py`) |
+| **build** | Images `z-server`, `z-runner`, `z-ui`, `z-browser`, `z-socket-proxy`, `egress-proxy`: on PRs/MRs amd64 only, loaded locally and scanned, never pushed; on `main` and tags multi-arch (amd64, arm64) with BuildKit (GitHub) or rootless Buildah (GitLab, no privileged Docker-in-Docker), tags `sha-<short>` and `vX.Y.Z` | build failure |
+| **scan** | `trivy image` and `dockle` on each platform of each image, from a local archive (the registry credentials are dropped before any scanner runs) | a critical vulnerability with a fix available; a dockle FATAL |
 | **sbom and sign** | `syft` SBOM (SPDX JSON) attached as an attestation; `cosign` signature (keyless with GitHub OIDC; key in GitLab protected variable or Vault for the mirror); SLSA provenance via BuildKit | — (runs on main and tags only) |
-| **chart** | `helm lint`, `helm template` with `values-k3s.yaml` and `values-k8s.yaml` piped to `kubeconform -strict`, `kube-score` (report only) and `kubescape` (NSA/CIS frameworks) on rendered manifests, `helm package` | lint/schema errors; kubescape score under 85 % |
-| **e2e** | Compose stack with fake LLM, fake tools and fake GitLab OIDC; `tests/e2e/` scenarios of BUILD phase C; smoke install on **kind** (Kubernetes) and **k3d** (k3s) | any failure |
-| **dast** | OWASP ZAP baseline scan against the running compose UI and API (authenticated with a test session) | high alerts |
+| **chart** | `helm lint`, `helm template` with `values-k3s.yaml` and `values-k8s.yaml` piped to `kubeconform -strict`, `kube-score` (report only) and `kubescape` (NSA/CIS frameworks) on rendered manifests, `trivy config` on the `helm template` output with the browser and egress proxy enabled (it holds the hook Jobs that trivy's own Helm renderer leaves out), `helm package` (GitLab); on GitHub also renders with the Prometheus Operator and optional resources, and checks that each refused value combination fails with its expected error | lint/schema errors; kubescape score under 85 %; a HIGH or CRITICAL trivy finding |
+| **e2e** | Compose stack with fake LLM, fake tools and fake GitLab OIDC (`tests/e2e/`: a mission through the hardened runner, the inferX key through LiteLLM; they fail, not skip, when the stack is down in CI); the socket proxy tests against the real Docker daemon; on GitHub a smoke install on **kind** (values-k3s, Pod Security `restricted`) | any failure |
+| **dast** (GitHub, in the e2e job) | OWASP ZAP baseline: a passive, unauthenticated scan of the web app served by z-ui | a rule set to `FAIL` in `security/zap-baseline.conf` (security headers, cookie flags) |
 | **deploy** (GitLab only) | `helm upgrade --install --atomic --wait` to the k3s `staging` namespace on `main`; to `production` on a signed tag, **manual job in a protected environment** with required approval; image signatures verified before deploy (cosign verify, or Kyverno/sigstore policy-controller in the cluster) | — |
-| **release** | Changelog from conventional commits, GitHub/GitLab release with images digests, chart, SBOMs | — |
+| **release** (GitLab only) | Release notes from conventional commits since the previous tag (`ci/scripts/changelog.py`), GitLab release pointing at the signed images, the chart and SBOM artifacts | — |
+
+Not automated yet: a diff of `contracts/openapi.yaml` against the merge base that refuses a removed path, operation
+or required field without a `breaking` label. Until it exists, reviewers check that contract changes are additive
+(two reviews on `contracts/`, §2).
 
 ## 2. Rules
 - Every merge to `main` through a PR/MR with: green pipeline, one review (two for `docs/07-security.md`, `docs/12-*`, `contracts/`, `deploy/helm/`), CODEOWNERS on those paths.
@@ -42,8 +51,8 @@ In March 2026 a credential-stealing campaign overwrote `aquasecurity/trivy-actio
 |---|---|
 | `.github/workflows/ci.yml` | guard (blocked versions, expired exceptions), lint, Python, UI and security jobs on PRs, pushes and weekly |
 | `.github/workflows/images.yml` | build and scan on PRs; on main and tags: multi-arch publish to GHCR, scan, cosign keyless signature and SPDX attestation (separate jobs and permissions) |
-| `.github/workflows/helm.yml`, `chart-policy.yml` | chart lint and render with kubeconform; kubescape and kube-score |
-| `.github/workflows/e2e.yml` | compose e2e on PRs touching server, runner, browser, deploy or the lockfile |
+| `.github/workflows/helm.yml`, `chart-policy.yml` | chart lint, render with kubeconform, trivy config on the rendered chart, refused combinations; kubescape and kube-score |
+| `.github/workflows/e2e.yml` | compose e2e, socket proxy on the real daemon, ZAP baseline and the kind smoke install, on PRs touching the code, packs, contracts, deploy, config, UI or the lockfile |
 | `.gitlab-ci.yml` | all stages for the internal mirror (rootless Buildah, cosign key pair), staging deploy on main, production on a signed tag (manual, protected) |
 | `ci/scripts/install-scanners.sh`, `versions.lock`, `requirements/` | scanners from pinned versions with verified checksums or hashes, fail closed |
 | `ci/scripts/check_blocked.py`, `check_exceptions.py`, `vuln_gate.py`, `verify-signatures.sh` | blocked versions, exception expiry, severity gate, signature and SBOM verification before deploy |

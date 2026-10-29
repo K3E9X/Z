@@ -32,8 +32,9 @@ Unfinished work merges behind a switch instead of living in a long branch:
 ## 3. Versions
 - Semantic versions on the whole platform (server, runner, UI, chart share one): `MAJOR` for a breaking change of
   the API, the pack format or an upgrade that needs manual steps; `MINOR` for features; `PATCH` for fixes.
-- `contracts/` changes are additive unless the merge request is labelled `breaking` (the pipeline diffs the
-  OpenAPI file against `main`); a breaking change means a `MAJOR` and a migration note in the release.
+- `contracts/` changes are additive unless the merge request is labelled `breaking`; a breaking change means a
+  `MAJOR` and a migration note in the release. The pipeline does not diff the OpenAPI file yet (`13-ci-cd.md` §1):
+  the two reviewers of `contracts/` check that no path, operation or required field disappears.
 - Images are tagged `sha-<short>` on every build and `vX.Y.Z` on release, and always **deployed by digest**.
 
 ## 4. Database migrations
