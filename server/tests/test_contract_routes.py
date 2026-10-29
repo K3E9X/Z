@@ -65,3 +65,30 @@ def test_every_handler_takes_the_context_that_enforces_its_permission() -> None:
                 assert framework._ctx in calls, route.operation_id
             checked += 1
     assert checked > 100  # the walk reached the routers
+
+
+# POST routes that compute and change nothing (drafts, dry runs, connection tests, chain verification); every other
+# public write is x-audit, and the router refuses to commit an x-audit request that wrote no audit event
+# (framework._ctx raises), so "every mutating call has an audit event" holds by construction (invariant 9).
+NOT_AUDITED_WRITES = {
+    "draftPlan",
+    "draftAgent",
+    "testConnector",
+    "importConnector",
+    "adminDryRunGroupMapping",
+    "adminTestAuthSettings",
+    "adminVerifyAudit",
+}
+
+
+def test_every_public_write_is_audited() -> None:
+    from z_server.api.framework import contract_operations
+
+    unaudited = {
+        o.operation_id
+        for o in contract_operations().values()
+        if o.method in {"POST", "PUT", "PATCH", "DELETE"}
+        and o.permission not in {"job_token", "service"}
+        and not o.audited
+    }
+    assert unaudited == NOT_AUDITED_WRITES
