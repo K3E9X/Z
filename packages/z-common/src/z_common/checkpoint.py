@@ -100,30 +100,41 @@ DELTA_META = ".z-delta.json"
 
 def delta_files(workspace: bytes) -> tuple[dict[str, bytes], list[str]]:
     """Regular files of a workspace delta and its deleted paths (links and other members are skipped)."""
+    files, deleted, _ = delta_parts(workspace)
+    return files, deleted
+
+
+def delta_parts(workspace: bytes) -> tuple[dict[str, bytes], list[str], dict[str, str]]:
+    """Regular files, deleted paths and the symlinks (path -> target, recorded in the metadata) of a delta."""
     files: dict[str, bytes] = {}
     deleted: list[str] = []
+    links: dict[str, str] = {}
     if not workspace:
-        return files, deleted
+        return files, deleted, links
     try:
         with tarfile.open(fileobj=io.BytesIO(workspace), mode="r:gz") as tar:
             for member in tar:
                 if member.name == DELTA_META:
                     fh = tar.extractfile(member)
-                    deleted = list(json.loads(fh.read()).get("deleted", [])) if fh else []
+                    meta = json.loads(fh.read()) if fh else {}
+                    deleted = list(meta.get("deleted", []))
+                    links = {str(k): str(v) for k, v in (meta.get("links") or {}).items()}
                 elif member.isfile() and member.size <= MAX_MEMBER:
                     fh = tar.extractfile(member)
                     if fh is not None:
                         files[posixpath.normpath(member.name)] = fh.read()
     except (tarfile.TarError, OSError, EOFError, ValueError) as exc:
         raise CheckpointError(f"unreadable workspace delta: {exc}") from exc
-    return files, deleted
+    return files, deleted, links
 
 
 def merge_edits(workspace: bytes, edits: dict[str, bytes | None]) -> bytes:
-    """A workspace delta with `edits` applied on top: bytes replace or add a file, None deletes it."""
-    files, deleted = delta_files(workspace)
+    """A workspace delta with `edits` applied on top: bytes replace or add a file, None deletes it. The links
+    the agent created are kept, except where an edit replaced or deleted the path."""
+    files, deleted, links = delta_parts(workspace)
     gone = set(deleted)
     for path, data in edits.items():
+        links.pop(path, None)
         if data is None:
             files.pop(path, None)
             gone.add(path)
@@ -137,7 +148,7 @@ def merge_edits(workspace: bytes, edits: dict[str, bytes | None]) -> bytes:
             info.size = len(files[path])
             info.mode = 0o644
             tar.addfile(info, io.BytesIO(files[path]))
-        meta = json.dumps({"deleted": sorted(gone)}).encode()
+        meta = json.dumps({"deleted": sorted(gone), "links": dict(sorted(links.items()))}).encode()
         info = tarfile.TarInfo(DELTA_META)
         info.size = len(meta)
         tar.addfile(info, io.BytesIO(meta))
