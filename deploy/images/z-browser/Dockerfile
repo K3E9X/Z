@@ -24,8 +24,11 @@ RUN --mount=type=secret,id=extra_ca \
 
 FROM ${PLAYWRIGHT_IMAGE}
 LABEL org.opencontainers.image.title="z-browser" org.opencontainers.image.source="https://github.com/K3E9X/Z"
-# Only Chromium is used: the other engines of the base image are removed from what the worker can launch.
-RUN rm -rf /ms-playwright/firefox-* /ms-playwright/webkit-* \
+# Only Chromium is used: the other engines of the base image are removed from what the worker can launch, and
+# so are pip and its caches (the worker never installs anything; pip vendors its own certifi bundle).
+RUN rm -rf /ms-playwright/firefox-* /ms-playwright/webkit-* /root/.cache \
+       /usr/local/lib/python3.12/dist-packages/pip /usr/local/lib/python3.12/dist-packages/pip-*.dist-info \
+       /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.12 \
     && groupadd --gid 10001 z && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin z
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
