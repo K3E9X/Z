@@ -564,11 +564,13 @@ function StopDialog({ open, onClose, mission }: { open: boolean; onClose: () => 
   )
 }
 
-function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
+/** Mission actions, each gated on the permission of its endpoint (POST /missions/{id}/start: missions:start). */
+export function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
   const can = useCan('missions:control')
+  const canStart = useCan('missions:start')
   const [busy, setBusy] = useState<string | null>(null)
   const st = missionStatus(mission.status)
   const active = !TERMINAL_MISSION.has(mission.status)
@@ -620,7 +622,7 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
           Resume
         </Button>
       )}
-      {can && (mission.status === 'draft' || mission.status === 'planned') && (
+      {canStart && (mission.status === 'draft' || mission.status === 'planned') && (
         <Button
           size="sm"
           variant="primary"
@@ -683,17 +685,19 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
           >
             Replay
           </Button>
-          <Button
-            size="sm"
-            onClick={() =>
-              void navigate({
-                to: '/missions/new',
-                search: { prompt: mission.prompt ?? undefined, playbook: mission.playbook ?? undefined },
-              })
-            }
-          >
-            Run again
-          </Button>
+          {canStart && (
+            <Button
+              size="sm"
+              onClick={() =>
+                void navigate({
+                  to: '/missions/new',
+                  search: { prompt: mission.prompt ?? undefined, playbook: mission.playbook ?? undefined },
+                })
+              }
+            >
+              Run again
+            </Button>
+          )}
         </>
       )}
     </div>
