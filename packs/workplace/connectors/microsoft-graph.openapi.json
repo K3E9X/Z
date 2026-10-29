@@ -418,6 +418,40 @@
           }
         ]
       }
+    },
+    "/me/drive/items/{parent_id}:/{filename}:/content": {
+      "put": {
+        "operationId": "files.upload",
+        "summary": "Create or replace a small text file (up to 4 MB) in a OneDrive or SharePoint folder",
+        "parameters": [
+          {
+            "name": "parent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

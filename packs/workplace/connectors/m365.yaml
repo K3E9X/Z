@@ -31,5 +31,6 @@ operations:
     - { match: "mail.reply", class: write, exposed: true }
     - { match: "calendar.events.create", class: write, exposed: true }
     - { match: "teams.messages.post", class: write, exposed: true }
+    - { match: "files.upload", class: write, exposed: true }
     - { match: "mail.delete", class: destructive, exposed: false }
 data_class: C2
