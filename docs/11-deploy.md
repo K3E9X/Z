@@ -39,8 +39,12 @@ Values files:
 # k3s
 helm upgrade --install z deploy/helm/z -n z --create-namespace \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
-# first connection: user z-bootstrap, one-time password printed once by z-server at first start
-kubectl -n z logs deploy/z-server | grep bootstrap
+# first connection: user z-bootstrap. z-server writes the one-time password to a memory-backed file
+# (Z_BOOTSTRAP_SECRET_FILE=/run/z-secrets/bootstrap), never to the log; the log line names the file and,
+# with --prefix, the pod that wrote it
+kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -c server \
+  --prefix --tail=-1 | grep "password written to"
+kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
 
 # Kubernetes
 helm upgrade --install z deploy/helm/z -n z --create-namespace \

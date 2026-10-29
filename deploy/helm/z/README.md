@@ -48,8 +48,9 @@ config:
 ```bash
 helm upgrade --install z deploy/helm/z -n z --create-namespace \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
-kubectl -n z logs deploy/z-server | grep bootstrap      # one-time password of z-bootstrap (24 h, shown once)
 ```
+
+Then read the one-time password of `z-bootstrap` as described in [First connection](#first-connection).
 
 Traefik and `local-path` come with k3s, and k3s enforces NetworkPolicy with its bundled controller. The
 embedded Postgres gets generated passwords (Secret `z-db`, kept on uninstall like its volume).
@@ -77,7 +78,6 @@ kubectl -n z create secret generic z-db \
   --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg.example.internal:5432/z' \
   --from-literal=LITELLM_DATABASE_URL='postgresql://litellm:...@pg.example.internal:5432/litellm'
 helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
-kubectl -n z logs deploy/z-server | grep bootstrap
 ```
 
 `values-k8s.yaml` runs two z-server replicas (the job queue, action executor and intake claim rows with
@@ -87,10 +87,29 @@ NetworkPolicy needs a CNI that enforces it (Cilium, Calico, ...).
 
 ### First connection
 
-The server prints the one-time password of the bootstrap admin in its log at the first start
-(`kubectl -n z logs deploy/z-server | grep bootstrap`). Sign in at `/signin` as `z-bootstrap`, configure
-GitLab sign-in and the group mapping, then sign in with GitLab as an admin: the bootstrap account is disabled.
-To issue a new one: `kubectl -n z exec deploy/z-server -- z-server bootstrap --reset`.
+At its first start z-server creates the bootstrap admin `z-bootstrap` and writes its one-time password
+(valid 24 h) to `/run/z-secrets/bootstrap` in the server container of the pod that created it: a
+memory-backed `emptyDir` (`medium: Memory`, 1 Mi) mounted only there, set through `Z_BOOTSTRAP_SECRET_FILE`.
+The password never reaches the log (and so never your log stack): the log line only says where it is.
+
+```bash
+# which pod wrote it (--prefix prints [pod/<pod>/server] in front of the line)
+kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -c server \
+  --prefix --tail=-1 | grep "password written to"
+kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
+```
+
+Sign in at `/signin` as `z-bootstrap`, configure GitLab sign-in and the group mapping, then sign in with
+GitLab as an admin: the bootstrap account is disabled. The file goes with the pod; to issue a new password:
+
+```bash
+POD=$(kubectl -n z get pod -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}')
+kubectl -n z exec "$POD" -c server -- z-server bootstrap --reset
+kubectl -n z exec "$POD" -c server -- cat /run/z-secrets/bootstrap
+```
+
+The break-glass account (`Z_BREAKGLASS=true`, docs/12 §1) writes its one-time password and TOTP URI to
+`/run/z-secrets/breakglass` (`Z_BREAKGLASS_SECRET_FILE`) in the same way.
 
 ## Migrations
 

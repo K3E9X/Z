@@ -118,6 +118,12 @@ spec:
               protocol: TCP
           env:
             {{- include "z.serverEnv" . | nindent 12 }}
+            # One-time secrets created at start (bootstrap admin; break-glass with Z_BREAKGLASS=true) are
+            # written to these files, never to the log (docs/12 §1). Read them with kubectl exec.
+            - name: Z_BOOTSTRAP_SECRET_FILE
+              value: {{ printf "%s/bootstrap" (include "z.secretsOutDir" .) | quote }}
+            - name: Z_BREAKGLASS_SECRET_FILE
+              value: {{ printf "%s/breakglass" (include "z.secretsOutDir" .) | quote }}
           {{- with .Values.server.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -148,6 +154,8 @@ spec:
               mountPath: {{ .Values.persistence.artifacts.mountPath }}
             - name: tmp
               mountPath: /tmp
+            - name: one-time-secrets
+              mountPath: {{ include "z.secretsOutDir" . }}
             {{- with .Values.server.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -165,6 +173,13 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.server.tmpSizeLimit }}
+        # tmpfs, mounted only in the server container (never on the node's disk, gone with the pod). Kubernetes
+        # creates emptyDir roots 0777 and offers no mode field: the server writes each file 0600, and only
+        # this container (uid 10001) mounts the volume.
+        - name: one-time-secrets
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
         {{- with .Values.server.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

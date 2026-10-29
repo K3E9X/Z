@@ -1,15 +1,33 @@
+{{- $ns := .Release.Namespace }}
+{{- $dir := include "z.secretsOutDir" . }}
+{{- $sel := printf "app.kubernetes.io/instance=%s,app.kubernetes.io/component=server" .Release.Name -}}
 Z {{ .Chart.AppVersion }} is deployed in namespace {{ .Release.Namespace }} (runners: {{ .Values.runners.namespace }}).
 
 URL: {{ include "z.publicUrl" . }}
 
-First connection (docs/12 §1): the server prints the one-time password of the bootstrap admin at its first
-start (valid 24 h, shown once):
+First connection (docs/12 §1): at its first start z-server creates the bootstrap admin (z-bootstrap) and
+writes its one-time password (valid 24 h) to a memory-backed file of the pod that created it, never to the
+log. The log line only names the file; --prefix shows which pod wrote it:
 
-  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "z.server.fullname" . }} | grep bootstrap
+  kubectl -n {{ $ns }} logs -l {{ $sel }} -c server --prefix --tail=-1 | grep "password written to"
+
+Read the file in the pod named in front of that line ([pod/<pod>/server]):
+
+  kubectl -n {{ $ns }} exec <pod> -c server -- cat {{ $dir }}/bootstrap
 
 Sign in at {{ include "z.publicUrl" . }}/signin as z-bootstrap, configure GitLab sign-in and the group
 mapping, then sign in with GitLab as an admin: the bootstrap account is disabled automatically.
-Lost it? kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "z.server.fullname" . }} -- z-server bootstrap --reset
+Lost it, or the pod was replaced (the file goes with the pod)? Issue a new one; it is written to the same
+file of the pod you exec into:
+
+  POD=$(kubectl -n {{ $ns }} get pod -l {{ $sel }} -o jsonpath='{.items[0].metadata.name}')
+  kubectl -n {{ $ns }} exec "$POD" -c server -- z-server bootstrap --reset
+  kubectl -n {{ $ns }} exec "$POD" -c server -- cat {{ $dir }}/bootstrap
+{{- if dig "auth" "breakglass" "enabled" false .Values.config.z }}
+
+Break-glass (Z_BREAKGLASS=true): its one-time password and TOTP URI are written to {{ $dir }}/breakglass of the
+pod that created them, the same way (grep the log for "written to", then kubectl exec <pod> -c server -- cat).
+{{- end }}
 {{- $missing := list }}
 {{- range $n, $img := dict "server" .Values.server.image "runners" .Values.runners.image "ui" .Values.ui.image "litellm" .Values.litellm.image "postgres" .Values.postgres.image }}
 {{- if not $img.digest }}{{ $missing = append $missing $n }}{{ end }}

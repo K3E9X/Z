@@ -108,6 +108,9 @@ imagePullSecrets:
 {{- end -}}
 {{- end -}}
 
+{{/* Memory-backed directory of the z-server container where one-time secrets are written (not logged) */}}
+{{- define "z.secretsOutDir" -}}/run/z-secrets{{- end -}}
+
 {{/* Secret holding Z_SECRET_KEY, LITELLM_MASTER_KEY, OIDC_CLIENT_SECRET, INFERENCE_API_KEY */}}
 {{- define "z.secretName" -}}
 {{- default (printf "%s-secrets" (include "z.fullname" .)) .Values.secrets.existingSecret -}}
