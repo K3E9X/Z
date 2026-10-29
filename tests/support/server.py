@@ -26,6 +26,7 @@ def base_config(issuer: str, **overrides: Any) -> dict[str, Any]:
     }
     config = load_config(REPO / "config/z.example.yaml", env)
     config["auth"]["cli_client_id"] = "z-cli"
+    config["judge"]["model_stage"] = False  # tests that exercise the judge model turn it on with a fake LLM
     for dotted, value in overrides.items():
         target = config
         *path, last = dotted.split(".")

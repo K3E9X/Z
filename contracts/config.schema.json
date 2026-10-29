@@ -41,6 +41,7 @@
       "properties": {
         "gateway_url": { "type": "string" },
         "aliases": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/ModelAlias" }, "minItems": 1 },
+        "planner_model": { "$ref": "common.schema.json#/$defs/ModelAlias", "description": "Alias that drafts free-form plans (default z-heavy)" },
         "internal_cost_per_mtok": {
           "type": "object",
           "additionalProperties": { "type": "object", "additionalProperties": false, "properties": { "input": { "type": "number", "minimum": 0 }, "output": { "type": "number", "minimum": 0 } } }
@@ -76,6 +77,15 @@
     "budgets": {
       "type": "object", "additionalProperties": false,
       "properties": { "org_monthly_tokens": { "type": "integer", "minimum": 1 }, "default_mission_tokens": { "type": "integer", "minimum": 1 }, "alert_at": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 } }
+    },
+    "judge": {
+      "type": "object", "additionalProperties": false,
+      "description": "docs/04 §6. The pattern scan always runs; the model stage can only raise its verdict.",
+      "properties": {
+        "model": { "$ref": "common.schema.json#/$defs/ModelAlias" },
+        "model_stage": { "type": "boolean" },
+        "timeout_s": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 }
+      }
     },
     "guardrails": {
       "type": "object", "additionalProperties": false,
@@ -125,7 +135,7 @@
     },
     "learning": {
       "type": "object", "additionalProperties": false,
-      "properties": { "schedule": { "type": "string" }, "shadow_replay_missions": { "type": "integer", "minimum": 0 }, "max_token_cost_increase": { "type": "number", "minimum": 0 } }
+      "properties": { "schedule": { "type": "string" }, "shadow_replay_missions": { "type": "integer", "minimum": 0 }, "max_token_cost_increase": { "type": "number", "minimum": 0 }, "min_signals": { "type": "integer", "minimum": 1, "description": "Signals about one agent before the learner drafts a proposal (default 3)" }, "run_as": { "type": "string", "description": "Username whose rights start the eval missions of proposals (needs learning:apply); unset = proposals wait for a human to evaluate them" } }
     },
     "packs": {
       "type": "object", "additionalProperties": false,

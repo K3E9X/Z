@@ -94,6 +94,11 @@ budgets:
   default_mission_tokens: 10000000
   alert_at: 0.8
 
+judge:                          # docs/04 §6; the pattern scan always runs, the model can only raise its verdict
+  model: z-judge
+  model_stage: true             # off also when the judge_injection_scan guardrail is off
+  timeout_s: 8
+
 guardrails:                     # locked values cannot be changed from the UI
   human_approval_for_writes: { value: true, locked: true }
   two_approvers_for_destructive: { value: true, locked: true }
@@ -138,6 +143,8 @@ learning:
   schedule: "0 2 * * *"
   shadow_replay_missions: 10
   max_token_cost_increase: 0.15
+  min_signals: 3
+  # run_as: alice                 # who the eval missions of proposals run as (needs learning:apply)
 
 ui:
   default_theme: night          # night | day | slate | contrast
