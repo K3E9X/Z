@@ -227,6 +227,17 @@ async def probe(
     gateway: Gateway = state.gateway
     started = time.monotonic()
     health = connector.manifest.get("health") or {}
+    if operation is None and health.get("operation"):  # the probe the manifest declares (health.operation)
+        async with state.sessions() as db:
+            operation = await db.get(Operation, f"{connector.name}.{health['operation']}")
+        if operation is None or operation.connector_id != connector.id:
+            return {
+                "ok": False,
+                "latency_ms": 0,
+                "status_code": None,
+                "detail": f"health.operation {health['operation']} is not an operation of the connector",
+                "sample": None,
+            }
     if operation is not None:
         if operation.op_class != OperationClass.read.value:
             raise Problem("validation", "only read operations can be used to test a connector")
