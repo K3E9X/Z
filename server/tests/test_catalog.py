@@ -92,12 +92,15 @@ def test_rename_keeps_name_and_version_and_is_reachable_by_new_handle(admin: Tes
 
 
 def test_profile_change_creates_a_version(admin: TestClient) -> None:
+    seeded = admin.get("/api/v1/agents/vuln-analyst").json()["version"]  # the pack's version
+    major, minor, _ = (int(x) for x in seeded.split("."))
+    bumped = f"{major}.{minor + 1}.0"
     changed = admin.patch(
         "/api/v1/agents/vuln-analyst", json={"model": "z-heavy", "change_note": "more reasoning"}, headers=csrf(admin)
     ).json()
-    assert changed["version"] == "1.1.0" and changed["model"] == "z-heavy"
+    assert changed["version"] == bumped and changed["model"] == "z-heavy"
     versions = admin.get("/api/v1/agents/vuln-analyst/versions").json()
-    assert [v["version"] for v in versions] == ["1.1.0", "1.0.0"] and versions[0]["change_note"] == "more reasoning"
+    assert [v["version"] for v in versions] == [bumped, seeded] and versions[0]["change_note"] == "more reasoning"
 
 
 @pytest.mark.parametrize(
