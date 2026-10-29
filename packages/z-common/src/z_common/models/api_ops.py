@@ -242,6 +242,24 @@ class InferenceCredentialCheck(ZModel):
     checked_at: datetime
 
 
+DocSection = Literal["guide", "specification", "operations", "decision"]
+
+
+class DocSummary(ZModel):
+    slug: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9-]*$")]
+    title: str
+    section: DocSection
+    path: str
+
+
+class Doc(ZModel):
+    slug: str
+    title: str
+    section: DocSection
+    path: str
+    markdown: str
+
+
 class InferenceCredential(ZModel):
     """The inferX key the LiteLLM gateway uses (ADR 0027): its status only, never the key."""
 

@@ -27,6 +27,7 @@ tags:
 - name: learning
 - name: history
 - name: admin
+- name: docs
 - name: live
 - name: internal
 security:
@@ -3530,6 +3531,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
       security: []
+  /docs:
+    get:
+      operationId: listDocs
+      tags:
+      - docs
+      summary: The documentation shipped with this version (guides, specification, operations, decisions)
+      x-permission: authenticated
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocSummary'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /docs/{slug}:
+    get:
+      operationId: getDoc
+      tags:
+      - docs
+      summary: One documentation page as Markdown
+      x-permission: authenticated
+      x-owner: B1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Doc'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /inference/credential:
     get:
       operationId: getInferenceCredential
@@ -8691,6 +8742,53 @@ components:
       - source
       additionalProperties: false
       description: The inferX project key Z's LiteLLM gateway uses (ADR 0027). The key itself is never returned.
+    DocSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]*$
+        title: *id001
+        section:
+          type: string
+          enum:
+          - guide
+          - specification
+          - operations
+          - decision
+        path:
+          type: string
+          description: Where the page lives in the repository, e.g. docs/07-security.md.
+      required:
+      - slug
+      - title
+      - section
+      - path
+      additionalProperties: false
+      description: One page of the documentation shipped with this version of Z.
+    Doc:
+      type: object
+      properties:
+        slug: *id001
+        title: *id001
+        section:
+          type: string
+          enum:
+          - guide
+          - specification
+          - operations
+          - decision
+        path: *id001
+        markdown:
+          type: string
+          description: The page as Markdown; links to other pages are /docs/<slug>.
+      required:
+      - slug
+      - title
+      - section
+      - path
+      - markdown
+      additionalProperties: false
     InferenceCredentialWrite:
       type: object
       properties:

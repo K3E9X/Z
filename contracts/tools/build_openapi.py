@@ -1197,6 +1197,26 @@ schemas = {
         ["source"],
         desc="The inferX project key Z's LiteLLM gateway uses (ADR 0027). The key itself is never returned.",
     ),
+    "DocSummary": obj(
+        {
+            "slug": {**S, "pattern": "^[a-z0-9][a-z0-9-]*$"},
+            "title": S,
+            "section": {"type": "string", "enum": ["guide", "specification", "operations", "decision"]},
+            "path": {**S, "description": "Where the page lives in the repository, e.g. docs/07-security.md."},
+        },
+        ["slug", "title", "section", "path"],
+        desc="One page of the documentation shipped with this version of Z.",
+    ),
+    "Doc": obj(
+        {
+            "slug": S,
+            "title": S,
+            "section": {"type": "string", "enum": ["guide", "specification", "operations", "decision"]},
+            "path": S,
+            "markdown": {**S, "description": "The page as Markdown; links to other pages are /docs/<slug>."},
+        },
+        ["slug", "title", "section", "path", "markdown"],
+    ),
     "InferenceCredentialWrite": obj(
         {
             "api_key": {
@@ -3052,6 +3072,29 @@ for p in ("/channels/slack/events", "/channels/mattermost/hook"):
         "description": "Reply shown in the chat",
         "content": {"application/json": {"schema": ref("ChannelReply")}},
     }
+# ---- documentation
+op(
+    "get",
+    "/docs",
+    "listDocs",
+    "authenticated",
+    "B1",
+    "The documentation shipped with this version (guides, specification, operations, decisions)",
+    "docs",
+    resp={"type": "array", "items": ref("DocSummary")},
+)
+op(
+    "get",
+    "/docs/{slug}",
+    "getDoc",
+    "authenticated",
+    "B1",
+    "One documentation page as Markdown",
+    "docs",
+    resp=ref("Doc"),
+    params=("slug",),
+)
+
 # ---- inference & usage
 op(
     "get",
@@ -3927,6 +3970,7 @@ doc = {
             "learning",
             "history",
             "admin",
+            "docs",
             "live",
             "internal",
         ]

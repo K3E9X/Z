@@ -1614,6 +1614,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The documentation shipped with this version (guides, specification, operations, decisions) */
+        get: operations["listDocs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/docs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One documentation page as Markdown */
+        get: operations["getDoc"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inference/credential": {
         parameters: {
             query?: never;
@@ -3703,6 +3737,24 @@ export interface components {
                 detail: string;
                 checked_at: components["schemas"]["Timestamp"];
             } | null;
+        };
+        /** @description One page of the documentation shipped with this version of Z. */
+        DocSummary: {
+            slug: string;
+            title: string;
+            /** @enum {string} */
+            section: "guide" | "specification" | "operations" | "decision";
+            /** @description Where the page lives in the repository, e.g. docs/07-security.md. */
+            path: string;
+        };
+        Doc: {
+            slug: string;
+            title: string;
+            /** @enum {string} */
+            section: "guide" | "specification" | "operations" | "decision";
+            path: string;
+            /** @description The page as Markdown; links to other pages are /docs/<slug>. */
+            markdown: string;
         };
         InferenceCredentialWrite: {
             /** @description An inferX key (ixk_ + 64 hex). Stored encrypted by LiteLLM; Z keeps its fingerprint. */
@@ -8937,6 +8989,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookAccepted"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listDocs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocSummary"][];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getDoc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Doc"];
                 };
             };
             /** @description Problem details */
