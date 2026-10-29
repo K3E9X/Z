@@ -75,7 +75,27 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   allowlisted page could 302 the browser anywhere; the guard now fetches without following redirects and
   checks each Location. Also fixed: the builder dropped the draft's auth when no secret was typed.
 
+- Chat follow-ups (ADR 0017): `channel_threads` (migration 0003, grant to the app role) with a sealed reply
+  target and an event cursor; the channels worker posts approval cards (Teams Adaptive Card, Slack thread,
+  response URL) that link to Z, questions and outcomes, content capped by `content_up_to`. Fixed: the UI
+  add-channel dialog never sent `config` (every add was a 422).
+- B8 CI merged (ADR 0018): guard, lint, Python, UI, security, images (build/scan/sign/SBOM), chart policy,
+  compose e2e, GitLab mirror with signed k3s deploys. Its first runs found real issues, all fixed: filelock
+  CVEs (filelock 4.2.4, litellm library 1.103.4), python base digest younger than 7 days (3.12.15 pinned),
+  nginx 1.28 end of life (1.30 + apk upgrade for brotli), pip's vendored certifi in the Playwright base
+  (pip removed), kubescape 83.79 % (full CIS 5.7.3 security context; C-0012 excepted for env references),
+  compose bake refusing /dev/null as a secret file.
+- Take-over (ADR 0019): the workspace is rebuilt from staging + checkpoint delta; read_write edits are folded
+  into the checkpoint and the job restarts from it (no attempt used, the agent is told); the scheduler never
+  claims a queued job whose old runner is still referenced (reap first) - this also fixes retried
+  needs_attention jobs getting a second runner while the first was parked. UI page and z top wording.
+
 Lessons / traps:
+- `.gitignore` has `*.pem`: placeholder files must not end in .pem (CI could not find `empty-ca.pem`).
+- This sandbox's proxy blocks deb.debian.org and dl-cdn.alpinelinux.org: apk/apt steps are only proven in CI.
+- Docker Hub rate-limits pulls here (429) for a while; the Hub tag API still gives index digests.
+- kubescape C-0211 (CIS 5.7.3) passes only when every field of its checklist is set (seLinuxOptions,
+  fsGroupChangePolicy, procMount...).
 - Playwright: `page.route`/`context.route` do not see redirect hops; never rely on them alone for egress.
 - The z-browser image is ~3.7 GB (base includes all engines): prune docker before building here.
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
