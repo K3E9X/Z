@@ -15,6 +15,7 @@ from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
 from z_common.packs.classify import ORDER
 
+from z_server import connector_builder
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.auth.identity import now
 from z_server.db.models import Agent, Connector, Credential, Operation, Setting
@@ -489,6 +490,11 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
             "each document selects the scalar fields of its result two levels deep: remove what agents should not "
             "read, and expose only the operations they need"
         )
+    elif body.source == "docs":
+        fields, more = await connector_builder.draft(ctx.db, ctx.state, body.name, body.docs or "", body.base_url)
+        manifest.update({"kind": "rest", **fields})
+        warnings += more
+        specs = admin.operation_specs(manifest, None)
     elif body.source == "cli":
         if body.cli is None or not body.declared:
             raise Problem("validation", "cli import needs cli (the digest-pinned tool image) and the declared commands")
