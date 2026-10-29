@@ -13,11 +13,12 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from sqlalchemy import text
 from starlette.routing import Route
 
 from z_server import __version__, errors
+from z_server import metrics as z_metrics
 from z_server.api import (
     routes_admin,
     routes_audit,
@@ -80,6 +81,9 @@ def create_app(
     settings.check()
     gateway_endpoint = GatewayEndpoint(None)  # type: ignore[arg-type]  # bound to the Gateway in the lifespan
     z_mcp = ZMcpEndpoint()  # bound to the app and its state in the lifespan
+    z_collector = z_metrics.ZCollector()
+    z_registry = CollectorRegistry(auto_describe=False)  # per app: tests build several apps in one process
+    z_registry.register(z_collector)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -174,6 +178,11 @@ def create_app(
         given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
         if (token and not hmac.compare_digest(given, token)) or (not token and settings.production):
             return PlainTextResponse("not found", status_code=404)
-        return PlainTextResponse(generate_latest().decode(), media_type=CONTENT_TYPE_LATEST)
+        try:
+            z_collector.snap = await z_metrics.snapshot(app.state.z)
+        except Exception as exc:  # noqa: BLE001 - process metrics are still served; the Z values stay the last ones
+            log.warning("metrics snapshot failed: %s", type(exc).__name__)
+        body = generate_latest().decode() + generate_latest(z_registry).decode()
+        return PlainTextResponse(body, media_type=CONTENT_TYPE_LATEST)
 
     return app
