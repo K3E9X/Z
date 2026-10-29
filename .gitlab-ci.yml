@@ -414,7 +414,8 @@ e2e:compose:
       [ -s "$values" ] && [ -n "$context" ] || { echo "values file or kube context missing for $CI_ENVIRONMENT_NAME"; exit 1; }
     - ci/scripts/verify-signatures.sh -p "$CI_REGISTRY_IMAGE" -t "$IMAGE_TAG" -o digests.env z-server z-runner z-ui
     - '. ./digests.env && test -n "${z_server:-}" && test -n "${z_runner:-}" && test -n "${z_ui:-}"'
-    - helm upgrade --install z deploy/helm/z --kube-context "$context" -n "$NAMESPACE" --create-namespace
+    # the namespace is created and labelled (Pod Security restricted) once by an admin: deploy/environments/README.md
+    - helm upgrade --install z deploy/helm/z --kube-context "$context" -n "$NAMESPACE"
       --atomic --wait --timeout "$HELM_TIMEOUT" -f deploy/helm/z/values-k3s.yaml -f "$values"
       --set "server.image.repository=$CI_REGISTRY_IMAGE/z-server" --set "server.image.digest=$z_server"
       --set "runners.image.repository=$CI_REGISTRY_IMAGE/z-runner" --set "runners.image.digest=$z_runner"

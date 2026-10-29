@@ -21,6 +21,7 @@ def test_signed_in_users_read_the_documentation(make_client: Callable[..., TestC
         by_slug["07-security"]["section"] == "specification" and by_slug["07-security"]["path"] == "docs/07-security.md"
     )
     assert by_slug["deploy"]["section"] == "operations" and by_slug["cli"]["section"] == "guide"
+    assert by_slug["14-release-and-changes"]["section"] == "operations"
     assert by_slug["adr-0028-google-workspace-connectors"]["section"] == "decision"
     assert not {"WORKLOG", "BUILD"} & {p["title"] for p in pages} and "adr-template" not in by_slug
 

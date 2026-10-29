@@ -1,0 +1,21 @@
+# Site values of the production release, on top of deploy/helm/z/values-k3s.yaml (or values-k8s.yaml).
+# Copy to the VALUES_PRODUCTION protected file variable (or your GitOps repo); no secret and no image digest here.
+env: production                      # every production check: digests, egress pinned, network policies on
+ingress:
+  host: z.example.internal
+  tls: { enabled: true, secretName: z-tls }
+oidc:
+  issuerUrl: https://gitlab.example.internal
+  clientId: <production-gitlab-application-id>
+secrets:
+  existingSecret: z-secrets          # or secrets.externalSecret (Vault, cloud secret manager)
+server:
+  replicas: 1                        # more is safe with migrate.mode=hook (external Postgres) and RWX artifacts storage
+networkPolicy:
+  litellmEgress:                     # the inferX private gateway only (required in production)
+    - to: [{ ipBlock: { cidr: 10.20.0.0/16 } }]
+      ports: [{ port: 443, protocol: TCP }]
+  serverEgress:
+    allow:
+      - to: [{ ipBlock: { cidr: 10.30.0.0/16 } }]
+        ports: [{ port: 443, protocol: TCP }]

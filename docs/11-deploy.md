@@ -108,3 +108,4 @@ See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish
 - Key rotation: `LITELLM_MASTER_KEY`, `Z_SECRET_KEY` (job tokens are short-lived; rotate and restart), connector credentials through the Connectors screen.
 - Upgrades: chart version = app version; read `CHANGELOG.md`.
 - `deploy/README.md` (written during the build) holds the step-by-step for each target.
+- Per-environment site values (staging, production) are templated in `deploy/environments/`; the release process (branches, versions, migrations, rollback, hotfix) is `14-release-and-changes.md`.

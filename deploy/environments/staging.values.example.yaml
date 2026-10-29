@@ -1,0 +1,22 @@
+# Site values of the staging release, on top of deploy/helm/z/values-k3s.yaml (or values-k8s.yaml).
+# Copy to the VALUES_STAGING protected file variable (or your GitOps repo); no secret and no image digest here.
+env: staging                         # production checks on, network policies may be relaxed while debugging
+ingress:
+  host: z-staging.example.internal
+  tls: { enabled: true, secretName: z-staging-tls }
+oidc:
+  issuerUrl: https://gitlab.example.internal
+  clientId: <staging-gitlab-application-id>   # a separate GitLab application: its own redirect URI and secret
+secrets:
+  existingSecret: z-staging-secrets  # Z_SECRET_KEY, LITELLM_MASTER_KEY, LITELLM_SALT_KEY, OIDC_CLIENT_SECRET, ...
+networkPolicy:
+  litellmEgress:                     # the inferX private gateway only
+    - to: [{ ipBlock: { cidr: 10.20.0.0/16 } }]
+      ports: [{ port: 443, protocol: TCP }]
+  serverEgress:
+    allow:                           # GitLab (OIDC and the connector), Jira Cloud, other tool APIs
+      - to: [{ ipBlock: { cidr: 10.30.0.0/16 } }]
+        ports: [{ port: 443, protocol: TCP }]
+config:
+  z:
+    budgets: { default_mission_tokens: 2000000 }   # smaller than production
