@@ -36,7 +36,7 @@
     "data_class": { "$ref": "common.schema.json#/$defs/DataClass" },
     "cli": {
       "type": "object", "additionalProperties": false, "required": ["image"],
-      "description": "cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` is the container command (after the image entrypoint), with {{args.<name>}} placeholders; no shell.",
+      "description": "cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` replaces the image CMD (it follows the ENTRYPOINT when the image has one), with {{args.<name>}} placeholders; no shell.",
       "properties": {
         "image": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$", "description": "Tool image pinned by digest; must also be listed in executor.tool_images." },
         "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Literals, or {{auth.secret}}, {{auth.username}}, {{auth.password}} from the read or write credential." },
