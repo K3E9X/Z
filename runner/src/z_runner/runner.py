@@ -63,6 +63,7 @@ EXIT_COMPLETE_FAILED = 11
 EXIT_INTERRUPTED = 12
 
 PATCH_NAME = "changes.patch"
+DOCUMENTS_DIR = "documents"  # where the documents tool writes (tools/documents.py)
 MAX_PATCH = 20 * 1024 * 1024
 
 
@@ -510,11 +511,6 @@ class Runner:
         archive = self._staged_archive
         if vcs is None or archive is None or not archive.is_file():
             return None
-        excluded = {".git", PRIVATE_DIR, OUTPUT_FILE, REPORT_FILE, "documents"}
-
-        def ignore(directory: str, names: list[str]) -> set[str]:
-            return excluded & set(names) if Path(directory) == workspace.root else set()
-
         with tempfile.TemporaryDirectory(prefix="z-patch-", dir=self._state_dir) as tmp:
             before, after = Path(tmp) / "a", Path(tmp) / "b"
             before.mkdir()
@@ -526,12 +522,23 @@ class Runner:
                 target = Path(os.path.normpath(before / rel))
                 if target.is_relative_to(before) and (target.is_symlink() or target.is_file()):
                     target.unlink()
-            for name in excluded:
+            for name in (".git", PRIVATE_DIR):
                 target = before / name
                 if target.is_dir() and not target.is_symlink():
                     shutil.rmtree(target)
                 elif target.exists() or target.is_symlink():
                     target.unlink()
+            # The runner's own outputs are not changes, unless the staged tree already had them (then they are
+            # files of the repository and an edit is a change).
+            excluded = {".git", PRIVATE_DIR} | {
+                name
+                for name in (OUTPUT_FILE, REPORT_FILE, DOCUMENTS_DIR)
+                if not (before / name).exists() and not (before / name).is_symlink()
+            }
+
+            def ignore(directory: str, names: list[str]) -> set[str]:
+                return excluded & set(names) if Path(directory) == workspace.root else set()
+
             shutil.copytree(workspace.root, after, symlinks=True, ignore=ignore)
             env = {
                 "PATH": os.environ.get("PATH", "/usr/bin:/bin"),

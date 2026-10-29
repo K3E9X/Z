@@ -232,6 +232,26 @@ def test_files_blocked_by_the_judge_are_not_deletions_in_the_patch(harness: Harn
     assert "evil.md" not in text
 
 
+def test_repository_files_named_like_runner_outputs_stay_in_the_patch(harness: Harness) -> None:
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("edit", {"command": "write", "path": "documents/guide.md", "content": "# Guide v2\n"}),
+                tool_call("edit", {"command": "write", "path": "report.md", "content": "# Report\nDone.\n"}),
+                finish(),
+            ]
+        }
+    )
+    files: dict[str, bytes | str] = {"documents/guide.md": "# Guide\n", "notes.md": "n\n"}
+    spec = harness.spec(output=None, tools=ALL_LOCAL)
+    job = harness.server.add_job(spec, archive=make_archive(files), manifest=make_manifest(files))
+    run = harness.run(spec, job)
+    assert run.completion["status"] == "succeeded"
+    text = next(a for a in run.job.artifacts if a["kind"] == "patch")["content"].decode()
+    assert "+# Guide v2" in text  # documents/ belongs to the staged tree: an edit there is a change
+    assert "report.md" not in text  # the runner's report is not part of the staged tree
+
+
 def test_sigterm_stops_after_the_step_without_completing(harness: Harness, tmp_path: Path) -> None:
     harness.llm.add_rules(
         {"responses": [tool_call("read", {"path": "notes.md"}), tool_call("read", {"path": "."})], "repeat": True}
