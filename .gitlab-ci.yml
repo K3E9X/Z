@@ -287,30 +287,35 @@ build:image:
 
 # --- scan: trivy image (CRITICAL with a fix blocks) and dockle (FATAL blocks) ---------------------------
 scan:image:
-  extends: [.scanners, .publish]
+  # Buildah pulls each platform with the registry credentials, then they are dropped from the shell before any
+  # scanner runs (as on GitHub): a compromised scanner never sees the job token.
+  extends: [.buildah, .publish]
   stage: scan
   needs: [guard, build:image]
-  parallel:
-    matrix:
-      - IMAGE: [z-server, z-runner, z-ui, z-browser, z-socket-proxy, egress-proxy]
   variables:
+    SCANNERS_BLOCKED_CHECKED: "1" # no python3 in this image; the guard job checked versions.lock
     DOCKLE_ACCEPT: --accept-key KEY_SHA512 --accept-file settings.py # nginx key checksum, Python settings.py modules
-    TRIVY_USERNAME: $CI_REGISTRY_USER
-    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
-    DOCKLE_USERNAME: $CI_REGISTRY_USER
-    DOCKLE_PASSWORD: $CI_REGISTRY_PASSWORD
   script:
     - '[ -f "digests/$IMAGE" ] || { echo "no $IMAGE image in this pipeline"; exit 0; }'
-    - ci/scripts/install-scanners.sh trivy dockle
     - ref=$(cat "digests/$IMAGE")
-    - cp ".exc/image-$IMAGE" ignore
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - |
       for platform in $(echo "$BUILD_PLATFORMS" | tr ',' ' '); do
-        echo "== $ref ($platform)"
-        trivy image --quiet --platform "$platform" --severity HIGH,CRITICAL --exit-code 0 "$ref"
-        trivy image --quiet --platform "$platform" --severity CRITICAL --ignore-unfixed --exit-code 1 --ignorefile ignore "$ref"
+        id=$(buildah pull -q --platform "$platform" "$ref")
+        buildah push -q "$id" "docker-archive:$CI_PROJECT_DIR/image-$(echo "$platform" | tr / -).tar"
+        buildah rmi "$id" >/dev/null
       done
-    - dockle --exit-code 1 --exit-level fatal $DOCKLE_ACCEPT $(sed 's/^/--ignore /' ignore) "$ref"
+    - buildah logout "$CI_REGISTRY"
+    - unset CI_REGISTRY_PASSWORD CI_JOB_TOKEN CI_BUILD_TOKEN CI_REPOSITORY_URL CI_DEPENDENCY_PROXY_PASSWORD
+    - ci/scripts/install-scanners.sh trivy dockle
+    - cp ".exc/image-$IMAGE" ignore
+    - |
+      for tar in image-linux-*.tar; do
+        echo "== $ref ($tar)"
+        trivy image --quiet --input "$tar" --severity HIGH,CRITICAL --exit-code 0
+        trivy image --quiet --input "$tar" --severity CRITICAL --ignore-unfixed --exit-code 1 --ignorefile ignore
+        dockle --exit-code 1 --exit-level fatal $DOCKLE_ACCEPT $(sed 's/^/--ignore /' ignore) --input "$tar"
+      done
 
 # --- sign: only scanned digests; key pair from protected variables -------------------------------------
 sign:image:
