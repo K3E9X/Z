@@ -308,6 +308,8 @@ class Gateway:
         if inv.files and isinstance(inv.body, dict):
             inv.body["screenshots"] = await self._store_files(job, mission, connector, inv.files)
         body = redactor.value(shape(inv.body))
+        if connector.kind == "browser" and isinstance(body, dict):
+            await self._browser_event(job, mission, op, body)
         text = (
             body if isinstance(body, str) else json.dumps(body, ensure_ascii=False, separators=(",", ":"), default=str)
         )
@@ -321,6 +323,24 @@ class Gateway:
             self.state, text, judge.scan(text), owner=(mission.created_by, mission.team_id or "")
         )
         return await self._finish(job, mission, connector, op, inv, args, text, body, verdict)
+
+    async def _browser_event(self, job: Job, mission: Mission, op: Operation, body: dict[str, Any]) -> None:
+        """The live timeline shows where the flow ended and its first screenshot (events schema `browser`)."""
+        shots = body.get("screenshots") or []
+        async with self.state.sessions() as db, db.begin():
+            await events.append(
+                db,
+                mission.id,
+                "browser",
+                {
+                    "url": str(body.get("url") or ""),
+                    "action": op.id,
+                    "screenshot_ref": shots[0]["screenshot_ref"] if shots else None,
+                },
+                job_id=job.id,
+                agent=job.agent_name,
+                step_id=job.step_id,
+            )
 
     async def _store_files(
         self, job: Job, mission: Mission, connector: Connector, files: list[tuple[str, bytes]]

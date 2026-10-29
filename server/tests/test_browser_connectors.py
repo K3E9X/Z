@@ -131,7 +131,26 @@ def test_read_flow_signs_in_with_the_read_account_and_extracts(
     assert '"Name":"deny-telnet"' in text and "allow-dns" not in text
     assert "ro-fwconsole" not in text and "rw-fwconsole" not in text
     assert "z-read" in audited_identities(app, "gateway.call")
+    browser_events = [e for e in mission_events(app, runner) if e["type"] == "browser"]
+    assert browser_events and browser_events[-1]["payload"]["action"] == "fwconsole.rules.search"
+    assert browser_events[-1]["payload"]["url"].endswith("/fwconsole/rules?q=deny")
     assert result["_meta"]["io.z/judge"] == "clean"
+
+
+def mission_events(app: TestClient, runner: ScriptedRunner) -> list[dict[str, Any]]:
+    from sqlalchemy import select
+    from z_server.db.models import Event, Job
+
+    state = app.app.state.z  # type: ignore[attr-defined]
+
+    async def go() -> list[dict[str, Any]]:
+        async with state.sessions() as db:
+            job = await db.get(Job, runner.job_id)
+            assert job is not None
+            rows = (await db.execute(select(Event).where(Event.mission_id == job.mission_id))).scalars()
+            return [{"type": r.type, "payload": r.payload} for r in rows]
+
+    return app.portal.call(go)  # type: ignore[union-attr,no-any-return]
 
 
 def audited_identities(app: TestClient, action: str) -> set[str]:
