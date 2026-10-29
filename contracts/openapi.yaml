@@ -305,6 +305,54 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /me/notifications:
+    get:
+      operationId: getMyNotifications
+      tags:
+      - auth
+      summary: My notification preferences
+      x-permission: authenticated
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyNotifications'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      operationId: putMyNotifications
+      tags:
+      - auth
+      summary: Change my notification preferences
+      x-permission: authenticated
+      x-owner: B1
+      x-audit: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MyNotifications'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyNotifications'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /me/tokens:
     get:
       operationId: listMyTokens
@@ -9202,6 +9250,36 @@ components:
       - host
       - from
       additionalProperties: false
+    MyNotifications:
+      type: object
+      properties:
+        email:
+          type: object
+          properties:
+            enabled: *id007
+            events:
+              type: array
+              items:
+                enum:
+                - approval_requested
+                - question_asked
+                - needs_attention
+                - mission_succeeded
+                - mission_failed
+          required:
+          - enabled
+          - events
+          additionalProperties: false
+        address:
+          oneOf:
+          - *id001
+          - type: 'null'
+        available: *id007
+      required:
+      - email
+      additionalProperties: false
+      description: Email about my own missions. address (from the sign-in profile) and available (an SMTP server is configured) are read-only. Content is sent up to C1; above it the email only links to
+        Z.
     NotificationSettings:
       type: object
       properties:

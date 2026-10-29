@@ -1438,6 +1438,32 @@ schemas = {
         },
         ["host", "from"],
     ),
+    "MyNotifications": obj(
+        {
+            "email": obj(
+                {
+                    "enabled": B,
+                    "events": arr(
+                        {
+                            "enum": [
+                                "approval_requested",
+                                "question_asked",
+                                "needs_attention",
+                                "mission_succeeded",
+                                "mission_failed",
+                            ]
+                        }
+                    ),
+                },
+                ["enabled", "events"],
+            ),
+            "address": nul(S),
+            "available": B,
+        },
+        ["email"],
+        desc="Email about my own missions. address (from the sign-in profile) and available (an SMTP server is "
+        "configured) are read-only. Content is sent up to C1; above it the email only links to Z.",
+    ),
     "NotificationSettings": obj(
         {"targets": arr(ref("NotificationTarget")), "smtp": nul(ref("SmtpSettings"))},
         ["targets"],
@@ -1899,6 +1925,27 @@ op(
     "Revoke one of my sessions",
     "auth",
     params=["id"],
+)
+op(
+    "get",
+    "/me/notifications",
+    "getMyNotifications",
+    "authenticated",
+    "B1",
+    "My notification preferences",
+    "auth",
+    resp=ref("MyNotifications"),
+)
+op(
+    "put",
+    "/me/notifications",
+    "putMyNotifications",
+    "authenticated",
+    "B1",
+    "Change my notification preferences",
+    "auth",
+    req=ref("MyNotifications"),
+    resp=ref("MyNotifications"),
 )
 op("get", "/me/tokens", "listMyTokens", "authenticated", "B1", "My API tokens", "auth", resp=arr(ref("ApiToken")))
 op(
