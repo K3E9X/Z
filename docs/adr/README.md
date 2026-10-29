@@ -27,3 +27,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0023 — Notifications go through a transactional outbox to admin-configured targets](0023-notifications-outbox.md)
 - [0024 — Integration with inferX (the internal inference platform)](0024-inferx-integration.md)
 - [0025 — cli connectors run reviewed argv templates in one-shot tool containers](0025-cli-connectors.md)
+- [0026 — Chat tool connectors: markers for idempotent posts, errors read from 2xx bodies](0026-chat-tool-connectors.md)

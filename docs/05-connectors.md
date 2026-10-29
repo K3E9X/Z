@@ -79,8 +79,9 @@ No tool is out of reach: anything below ships as a template (YAML + operation cl
 
 Out of scope by decision: SIEM, SOC and DFIR tooling (handled by an existing tool).
 
-Mattermost ships in the `workplace` pack: channels, posts and threads read with the read account; posts and replies
-applied by the executor with the write account, tagged `props.z_action` so a crash never posts twice.
+Mattermost and Slack ship in the `workplace` pack: channels, history and threads read with the read account; posts and
+replies applied by the executor with the write account, tagged with a marker (Mattermost `props`, Slack message
+metadata) so a crash never posts twice. Slack's HTTP 200 `ok: false` errors are read through `error_body` (ADR 0026).
 
 ## 8. Microsoft 365 in detail
 - **Two Entra ID app registrations**, so read and write stay apart even for delegated access: `z-m365-read` (read scopes, tokens held by the gateway) and `z-m365-write` (write scopes, tokens held by the executor only).

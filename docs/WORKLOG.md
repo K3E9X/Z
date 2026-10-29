@@ -84,6 +84,9 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   schemas for the archi-isp and workplace agents (checks use report.md), no `read` tool for assistant, researcher
   and the core agents (cases pass data inline), no edit/documents tool for ticket-manager and vuln-analyst (no
   report.md), the browser-flows "CSV artifact" step has no tool, meeting-prep "tasks" has no m365 operation.
+- Slack tool connector (ADR 0026), verified against slackapi/python-slack-sdk (docs.slack.dev is not reachable
+  here): `error_body` contract field for 2xx error answers; found on the way that `health.operation` was never
+  run by the connection test or the health monitor (DefectDojo's probe included).
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).
