@@ -43,6 +43,9 @@ class KeyAdmin(Protocol):
     async def check_model(self, alias: str) -> tuple[bool, str]:
         """(ok, detail) of one real call to the deployments of `alias`."""
 
+    async def aliases_without_credential(self, aliases: list[str]) -> list[str]:
+        """The aliases among `aliases` whose deployments name no LiteLLM credential (they would ignore it)."""
+
 
 class LiteLLMKeyAdmin:
     def __init__(self, base_url: str, master_key: str, http: httpx.AsyncClient) -> None:
@@ -112,6 +115,18 @@ class LiteLLMKeyAdmin:
             resp = await self._request("POST", "/credentials", body)
         if resp.status_code >= 400:
             raise LlmKeyError(f"LiteLLM refused the credential ({resp.status_code})")
+
+    async def aliases_without_credential(self, aliases: list[str]) -> list[str]:
+        # /model/info drops api_key and masks litellm_credential_name: its presence is what can be checked
+        resp = await self._request("GET", "/model/info")
+        if resp.status_code >= 400:
+            raise LlmKeyError(f"LiteLLM /model/info refused ({resp.status_code})")
+        missing = set()
+        for model in resp.json().get("data") or []:
+            name = str(model.get("model_name") or "")
+            if name in aliases and not (model.get("litellm_params") or {}).get("litellm_credential_name"):
+                missing.add(name)
+        return sorted(missing)
 
     async def check_model(self, alias: str) -> tuple[bool, str]:
         resp = await self._request("GET", "/health", params={"model": alias}, timeout=60)

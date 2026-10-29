@@ -71,8 +71,24 @@ async def status(db: AsyncSession, state: AppState) -> dict[str, Any]:
     return {"source": "env", "check": meta.get("check")}
 
 
+def internal_aliases(state: AppState) -> list[str]:
+    return [str(a) for a in (state.config.get("inference") or {}).get("aliases", []) if not str(a).startswith("ext-")]
+
+
 async def replace(db: AsyncSession, state: AppState, username: str, key: str, test: bool) -> dict[str, Any]:
     fp = fingerprint(key)
+    try:
+        # a deployment that still carries its own api_key ignores the credential: refuse rather than show a key
+        # as in use while the gateway keeps calling inferX with the old one
+        stale = await state.llm_keys.aliases_without_credential(internal_aliases(state))
+    except LlmKeyError as exc:
+        raise Problem("unavailable", f"the model gateway does not answer: {exc}") from exc
+    if stale:
+        raise Problem(
+            "conflict",
+            f"the gateway's models {', '.join(stale)} carry their own api_key: set litellm_credential_name: inferx "
+            "on them in config/litellm.yaml (see config/litellm.example.yaml, ADR 0027) and restart LiteLLM",
+        )
     try:
         await state.llm_keys.set_credential(CREDENTIAL, {"api_key": key}, {"managed_by": MANAGED_BY, "fingerprint": fp})
     except LlmKeyError as exc:

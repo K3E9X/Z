@@ -89,3 +89,13 @@ def test_an_unreachable_gateway_is_shown_as_unknown(
     keys.reachable = False
     status = app.get("/api/v1/inference/credential").json()
     assert status["source"] == "unknown" and len(status["fingerprint"]) == 12
+
+
+def test_a_gateway_whose_models_ignore_the_credential_is_refused(
+    app: TestClient, oidc: FakeGitLabOIDC, keys: RecordingKeyAdmin
+) -> None:
+    use_jar(app, sign_in_as(app, oidc, "alice"))
+    keys.without_credential = ["z-heavy"]  # an old config/litellm.yaml with api_key: os.environ/...
+    refused = app.put("/api/v1/inference/credential", json={"api_key": KEY}, headers=csrf(app))
+    assert refused.status_code == 409 and "litellm_credential_name: inferx" in refused.text
+    assert "inferx" not in keys.credentials  # nothing sent to the gateway
