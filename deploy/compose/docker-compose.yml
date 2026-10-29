@@ -44,6 +44,7 @@ services:
       STORE_MODEL_IN_DB: "False"
     volumes:
       - ../../config/litellm.yaml:/etc/litellm/config.yaml:ro
+      - ../helm/z/files/z_inference_guard.py:/etc/litellm/z_inference_guard.py:ro   # callback (ADR 0024)
     depends_on:
       postgres: { condition: service_healthy }
     networks: [core, runners]

@@ -477,6 +477,7 @@ config:
       drop_params: true
       request_timeout: 600
       return_response_headers: true
+      callbacks: [z_inference_guard.guard]   # files/z_inference_guard.py, shipped in the LiteLLM ConfigMap
     router_settings:
       num_retries: 2
       retry_after: 1

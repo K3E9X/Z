@@ -64,6 +64,9 @@ litellm_settings:
   drop_params: true            # ignore params a model does not support instead of failing
   request_timeout: 600         # inferX itself cuts a request at 1 h 05
   return_response_headers: true  # provider headers come back as llm_provider-* (x-inferx-fallback, ADR 0024)
+  # refuses answers inferX served through an external fallback for C2/C3 keys (z_inference_guard.py, mounted next
+  # to this file from deploy/helm/z/files/)
+  callbacks: [z_inference_guard.guard]
 
 router_settings:
   # inferX answers 429 (rate_limit_exceeded) and 503 (model_unavailable, outside_time_window,
