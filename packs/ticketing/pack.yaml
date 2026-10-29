@@ -1,5 +1,5 @@
 name: ticketing
-version: 1.0.1
+version: 1.0.2
 description: >-
   Ticket creation, deduplication and backlog hygiene. Needs the vuln pack, which ships the cmdb connector.
 owner: cyber-ops

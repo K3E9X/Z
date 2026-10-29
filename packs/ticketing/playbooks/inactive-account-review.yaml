@@ -1,7 +1,7 @@
 name: inactive-account-review
-version: 1.1.0
+version: 1.1.1
 domain: identity
-description: List accounts with no recent sign-in from Logos, check leavers and propose deactivations (two approvers each).
+description: List accounts with no recent sign-in from Logos, check leavers and propose deactivations (two approvers each). logos.accounts.disable is destructive and ships unexposed; an admin enables it first.
 inputs:
   schema:
     type: object

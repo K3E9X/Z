@@ -13,7 +13,7 @@ operations:
   rules:
     - { match: "assets.get", class: read, exposed: true }
     - { match: "accounts.list", class: read, exposed: true }
-    - { match: "accounts.disable", class: destructive, exposed: true }   # proposable, always two approvers
+    - { match: "accounts.disable", class: destructive, exposed: false }  # an admin opts in; then always two approvers
     - { match: "accounts.delete", class: destructive, exposed: false }
 rate_limit: { per_minute: 60 }
 data_class: C2
