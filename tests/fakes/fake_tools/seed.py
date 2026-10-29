@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from .mattermost import mattermost_seed
+from .slack import slack_seed
 
 DAY = 86400.0
 
@@ -664,4 +665,5 @@ def default_seed() -> dict[str, Any]:
         "gitlab": gitlab_seed(),
         "confluence": confluence_seed(),
         "mattermost": mattermost_seed(),
+        "slack": slack_seed(),
     }
