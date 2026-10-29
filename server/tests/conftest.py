@@ -78,7 +78,7 @@ def pg_admin_dsn() -> Iterator[str]:
         _wait_pg(dsn)
         yield dsn
     finally:
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
+        subprocess.run(["docker", "rm", "-f", "-v", name], capture_output=True, check=False)
 
 
 def _with_db(dsn: str, database: str) -> str:

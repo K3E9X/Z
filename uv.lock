@@ -6824,6 +6824,7 @@ source = { editable = "cli" }
 dependencies = [
     { name = "httpx" },
     { name = "keyring" },
+    { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "textual" },
@@ -6835,6 +6836,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "keyring", specifier = ">=25.0" },
+    { name = "pydantic", specifier = ">=2.9" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.9" },
     { name = "textual", specifier = ">=8.2" },

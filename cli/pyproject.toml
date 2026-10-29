@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "z-common",
   "httpx>=0.27",
+  "pydantic>=2.9",    # contract validation errors surfaced by the client
   "typer>=0.13",
   "rich>=13.9",
   "textual>=8.2",     # interactive session (inline) and z top (full screen), docs/10
