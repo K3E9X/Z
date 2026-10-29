@@ -53,7 +53,7 @@ z top: every agent, live.
   a        approve: open the pending decisions of the selected mission (all of them without a mission)
   l        logs of the selected agent
   p        pause or resume the selected mission
-  t        take over: open the job's workspace shell (read-only by default)
+  t        take over: print the link to the job's take-over page in the web app (read-only by default)
   x        stop (cancel) the selected mission
   r        refresh now
   /        filter rows (agent, mission, state)
