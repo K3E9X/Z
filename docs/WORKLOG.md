@@ -87,6 +87,14 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
 - Slack tool connector (ADR 0026), verified against slackapi/python-slack-sdk (docs.slack.dev is not reachable
   here): `error_body` contract field for 2xx error answers; found on the way that `health.operation` was never
   run by the connection test or the health monitor (DefectDojo's probe included).
+- Independent security review of the day's code (fresh sub-agent, code only), each finding verified then fixed:
+  shadow replay / try copied other teams' missions at the default data class (now: only missions the starter may
+  read, at their class); cli `-1` and swallowed optional flags; Docker tool logs buffered whole; `..` path
+  parameters reaching parent endpoints with the read credential; tool Secrets not owned by their Job; drafted
+  GETs without a read verb classed read; tool error text not redacted; spec and introspection fetches buffered
+  whole; planted chat markers skipping a post; streamed fallback answers passing the inference guard (fixed and
+  verified in the LiteLLM image); RestartPolicy key case; credential literals in cli.env. Left: Docker tool
+  containers have no startup sweep (their env holds the credential until z-server's cleanup runs).
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).

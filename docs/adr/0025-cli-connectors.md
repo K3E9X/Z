@@ -36,3 +36,7 @@ the command, or how the tool gets its credential.
 - Read-only kubectl, cloud CLIs or internal tools can be connected without giving agents a shell or a credential.
 - Each call costs a container start (about a second on Docker, more on Kubernetes): cli connectors suit
   occasional reads and approved writes, not high-rate polling.
+- Kubernetes returns one pod log for stdout and stderr: a tool with `output: json` must keep stderr empty there
+  (Docker keeps the streams apart). Output is capped at 1 MiB on both (Docker reads the log with a byte cap).
+- Optional arguments are written `--flag={{args.x}}` (or required) and numbers are checked as text, so an
+  argument can never become a flag; credential-looking literals in `cli.env` are refused.
