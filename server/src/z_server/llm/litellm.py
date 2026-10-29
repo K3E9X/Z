@@ -121,4 +121,5 @@ class LiteLLMKeyAdmin:
         if int(data.get("healthy_count") or 0) > 0:
             return True, f"{alias} answered"
         errors = [str(e.get("error") or "") for e in data.get("unhealthy_endpoints") or [] if isinstance(e, dict)]
-        return False, (errors[0] if errors and errors[0] else f"{alias} did not answer")
+        first = errors[0].strip().splitlines()[0] if errors and errors[0].strip() else ""
+        return False, first or f"{alias} did not answer"  # the first line: LiteLLM appends a stack trace
