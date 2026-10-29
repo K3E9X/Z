@@ -268,29 +268,44 @@ async def get_analytics(ctx: CtxDep, to: datetime | None = None, team: str | Non
 # ---------------------------------------------------------------- global stream
 
 
-async def _global(state: AppState, visible: list[str] | None, user_id: str, after: datetime) -> AsyncIterator[str]:
-    """Every event of the missions the user may see, ordered by time; `id` = `<iso ts>|<mission>|<seq>`."""
+# A transaction that appended events stamps its mission's updated_at when it ran, not when it committed: missions
+# touched within this margin are looked at again, so a slow transaction is never missed.
+DISCOVERY_MARGIN = timedelta(minutes=10)
+PAGE = 500
+
+
+async def _global(
+    state: AppState, visible: list[str] | None, user_id: str, after: datetime, resume: tuple[str, int] | None = None
+) -> AsyncIterator[str]:
+    """Every event of the missions the user may see; `id` = `<iso ts>|<mission>|<seq>`.
+
+    Paged per mission on the sequence, never on the event time (the runner sets `ts`, and transactions commit
+    in any order): `missions.next_seq` is committed with the events below it, so every event under it is
+    visible and none is skipped. A mission seen for the first time is read from `after` on."""
     yield "retry: 3000\n\n"
-    cursor = (after, "", 0)
+    seen: dict[str, int] = {resume[0]: resume[1] + 1} if resume else {}
+    since = min(after, datetime.now(UTC)) - DISCOVERY_MARGIN
     while True:
+        polled_at = datetime.now(UTC)
         async with state.sessions() as db:
-            stmt = (
-                select(Event)
-                .join(Mission, Mission.id == Event.mission_id)
-                .where(Event.ts >= cursor[0])
-                .order_by(Event.ts, Event.mission_id, Event.seq)
-                .limit(500)
-            )
+            stmt = select(Mission.id, Mission.next_seq).where(Mission.updated_at >= since)
             if visible is not None:
                 stmt = stmt.where(or_(Mission.created_by == user_id, Mission.team_id.in_(visible)))
-            rows = list((await db.execute(stmt)).scalars())
-        fresh = [r for r in rows if (r.ts, r.mission_id, r.seq) > cursor]
-        for row in fresh:
-            cursor = (row.ts, row.mission_id, row.seq)
+            behind = [(mid, top) for mid, top in (await db.execute(stmt)).all() if top > seen.get(mid, -1)]
+            rows: list[Event] = []
+            for mid, top in behind:
+                q = select(Event).where(Event.mission_id == mid, Event.seq < top).order_by(Event.seq).limit(PAGE)
+                q = q.where(Event.seq >= seen[mid]) if mid in seen else q.where(Event.ts >= after)
+                batch = list((await db.execute(q)).scalars())
+                rows.extend(batch)
+                seen[mid] = batch[-1].seq + 1 if len(batch) == PAGE else top
+        rows.sort(key=lambda r: (r.ts, r.mission_id, r.seq))
+        for row in rows:
             data = json.dumps(events.as_contract(row), separators=(",", ":"), default=str)
             yield f"id: {row.ts.isoformat()}|{row.mission_id}|{row.seq}\nevent: {row.type}\ndata: {data}\n\n"
-        if len(rows) >= 500 and fresh:
-            continue
+        since = polled_at - DISCOVERY_MARGIN
+        if any(seen[mid] < top for mid, top in behind):
+            continue  # a mission had more than a page
         await state.hub.wait(None, timeout=KEEPALIVE_S)
         yield ": keepalive\n\n"
 
@@ -299,13 +314,14 @@ async def _global(state: AppState, visible: list[str] | None, user_id: str, afte
 async def global_stream(ctx: CtxDep, last_event_id: Annotated[str | None, Header()] = None) -> StreamingResponse:
     if not ctx.user.can("missions:read"):
         raise Problem("forbidden", "missing missions:read", permission="missions:read")
-    after = datetime.now(UTC)
+    after, resume = datetime.now(UTC), None
     if last_event_id:
         with contextlib.suppress(ValueError):
-            after = datetime.fromisoformat(last_event_id.split("|", 1)[0])
+            ts, mission_id, seq = last_event_id.split("|", 2)
+            after, resume = datetime.fromisoformat(ts), (mission_id, int(seq))
     visible = _team_scope(ctx, "missions:read")
     return StreamingResponse(
-        _global(ctx.state, visible, ctx.user.user_id, after),
+        _global(ctx.state, visible, ctx.user.user_id, after, resume),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )

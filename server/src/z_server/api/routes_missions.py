@@ -49,7 +49,7 @@ def can_see(ctx: Ctx, mission: Mission) -> bool:
 
 
 async def get_mission(ctx: Ctx, mission_id: str, *, lock: bool = False, control: str | None = None) -> Mission:
-    mission = await ctx.db.get(Mission, mission_id, with_for_update=lock)
+    mission = await ctx.db.get(Mission, mission_id, with_for_update=lock, populate_existing=lock)
     if mission is None or not can_see(ctx, mission):
         raise Problem("not-found")
     if control and mission.created_by != ctx.user.user_id:
@@ -58,7 +58,12 @@ async def get_mission(ctx: Ctx, mission_id: str, *, lock: bool = False, control:
 
 
 async def get_job(ctx: Ctx, job_id: str, *, lock: bool = False) -> tuple[Job, Mission]:
-    job = await ctx.db.get(Job, job_id, with_for_update=lock)
+    if lock:  # mission row first (service.lock_with_mission)
+        job, mission = await service.lock_with_mission(ctx.db, Job, job_id)
+        if job is None or mission is None or not can_see(ctx, mission):
+            raise Problem("not-found")
+        return job, mission
+    job = await ctx.db.get(Job, job_id)
     if job is None:
         raise Problem("not-found")
     return job, await get_mission(ctx, job.mission_id)
@@ -604,7 +609,7 @@ async def save_mission_as_playbook(ctx: CtxDep, id: str, body: m.SaveAsPlaybook)
 @router.operation("takeOverMission")
 async def take_over_mission(ctx: CtxDep, id: str, body: m.TakeOver) -> m.TakeOverSession:
     """Pause the job and open its workspace in the web app (files; edits in read_write), ADR 0019."""
-    mission = await get_mission(ctx, id, control="missions:control")
+    mission = await get_mission(ctx, id, lock=True, control="missions:control")  # mission row before the job
     job = await ctx.db.get(Job, body.job_id, with_for_update=True)
     if job is None or job.mission_id != mission.id:
         raise Problem("not-found", "no such job in this mission")
@@ -619,7 +624,7 @@ async def take_over_mission(ctx: CtxDep, id: str, body: m.TakeOver) -> m.TakeOve
 
 
 async def _take_over_job(ctx: Ctx, id: str, job_id: str) -> tuple[Mission, Job]:
-    mission = await get_mission(ctx, id, control="missions:control")
+    mission = await get_mission(ctx, id, lock=True, control="missions:control")  # mission row before the job
     job = await ctx.db.get(Job, job_id, with_for_update=True)
     if job is None or job.mission_id != mission.id:
         raise Problem("not-found", "no such job in this mission")

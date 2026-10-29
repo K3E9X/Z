@@ -14,7 +14,7 @@ from sqlalchemy import select
 from z_common.models import api_internal as m
 from z_common.models import api_missions as mm
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, OperationClass
+from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, MissionStatus, OperationClass
 from z_common.models.manifests import MissionPlan
 
 from z_server import artifacts, audit, events, judge_model, memory, usage
@@ -287,6 +287,7 @@ async def propose_action(ctx: JobCtxDep, id: str, body: m.ActionIn) -> JSONRespo
     step = _step(mission, job.step_id)
 
     async def deny(rule: str, detail: str) -> JSONResponse:
+        await ctx.lock()
         await events.append(
             ctx.db,
             mission.id,
@@ -344,6 +345,15 @@ async def propose_action(ctx: JobCtxDep, id: str, body: m.ActionIn) -> JSONRespo
         artifact_path = Path(patch.storage_path)
     destructive = op.op_class == OperationClass.destructive.value
     verdict = await prechecks.run(ctx.db, ctx.state, mission, connector, op.id, body.payload, body.summary)
+    await ctx.lock()  # after the pre-checks, which may read the tool (internal.DEFERRED_LOCK)
+    job, mission = ctx.job, ctx.mission
+    if MissionStatus(mission.status).terminal:
+        raise Problem("conflict", f"the mission is {mission.status}: no more writes can be proposed")
+    existing = (
+        await ctx.db.execute(select(ProposedAction).where(ProposedAction.idempotency_key == key))
+    ).scalar_one_or_none()
+    if existing is not None:  # the same proposal, sent again while the first one was being checked
+        return JSONResponse((await action_out(ctx.db, existing)).dump(), status_code=201)
     row = ProposedAction(
         id=new_id("act"),
         mission_id=mission.id,
@@ -661,6 +671,8 @@ async def _staged(ctx: JobCtx) -> workspace.Staged:
     staged = await workspace.stage(ctx.db, ctx.mission, ctx.job, ctx.state)
     job = ctx.job
     await judge_model.review_files(ctx.state, job.id, staged.files, (ctx.mission.created_by, ctx.mission.team_id or ""))
+    await ctx.lock()  # after the model calls (internal.DEFERRED_LOCK)
+    job = ctx.job
     for f in staged.files:
         if f.verdict.verdict != JudgeVerdict.clean:
             await events.append(

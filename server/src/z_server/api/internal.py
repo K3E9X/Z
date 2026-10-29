@@ -27,6 +27,14 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 SPEC_OPERATION = "internalJobSpec"
 
 
+# Operations that make slow calls (judge model, embeddings, the tool) before they write: they read on an
+# unlocked snapshot and call `ctx.lock()` right before their first write, so a mission's other jobs, cancel
+# and the gateway are not held up behind a model call.
+DEFERRED_LOCK = frozenset(
+    {"internalJobWorkspace", "internalJobWorkspaceManifest", "internalSearchMemory", "internalProposeAction"}
+)
+
+
 @dataclass
 class JobCtx:
     request: Request
@@ -35,6 +43,26 @@ class JobCtx:
     op: ContractOperation
     job: Job
     mission: Mission
+    token_hash: str = ""
+    locked: bool = False
+
+    async def lock(self) -> None:
+        """Lock order everywhere: the mission row, then the job row, then the audit lock. `events.append`,
+        cancel and the gateway take the mission row first, so taking the job first would deadlock with them.
+        Re-checks the job under the locks and extends its lease."""
+        if self.locked:
+            return
+        column = "bootstrap_token_hash" if self.op.operation_id == SPEC_OPERATION else "session_token_hash"
+        mission = await self.db.get(Mission, self.mission.id, with_for_update=True, populate_existing=True)
+        job = await self.db.get(Job, self.job.id, with_for_update=True, populate_existing=True)
+        if mission is None or job is None:
+            raise Problem("not-found")
+        if not constant_time_equal(getattr(job, column) or "", self.token_hash):  # rotated meanwhile
+            raise Problem("unauthenticated", "invalid job token")
+        if JobStatus(job.status).terminal:
+            raise Problem("conflict", f"job is {job.status}")
+        job.lease_expires_at = utcnow() + LEASE
+        self.job, self.mission, self.locked = job, mission, True
 
 
 def _bearer(request: Request) -> str:
@@ -52,7 +80,7 @@ async def _job_ctx(request: Request) -> AsyncIterator[JobCtx]:
     path_id = request.path_params.get("id", "")
     async with state.sessions() as db, db.begin():
         column = Job.bootstrap_token_hash if op.operation_id == SPEC_OPERATION else Job.session_token_hash
-        job = (await db.execute(select(Job).where(column == token_hash(token)).with_for_update())).scalar_one_or_none()
+        job = (await db.execute(select(Job).where(column == token_hash(token)))).scalar_one_or_none()
         if job is None or job.id != path_id:
             raise Problem("unauthenticated", "invalid job token")
         if JobStatus(job.status).terminal:
@@ -62,8 +90,11 @@ async def _job_ctx(request: Request) -> AsyncIterator[JobCtx]:
         mission = await db.get(Mission, job.mission_id)
         if mission is None:
             raise Problem("not-found")
-        job.lease_expires_at = utcnow() + LEASE
-        yield JobCtx(request, db, state, op, job, mission)
+        ctx = JobCtx(request, db, state, op, job, mission, token_hash(token))
+        if op.operation_id not in DEFERRED_LOCK:
+            await ctx.lock()
+        yield ctx
+        await ctx.lock()  # a deferred operation that wrote nothing still extends the lease
 
 
 JobCtxDep = Annotated[JobCtx, Depends(_job_ctx, scope="function")]

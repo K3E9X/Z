@@ -53,14 +53,17 @@ async def _transition(
 
 async def claim(state: AppState, limit: int = MAX_PARALLEL) -> list[str]:
     async with state.sessions() as db, db.begin():
+        # the action and its mission are locked together and never waited for (SKIP LOCKED on both rows), so
+        # this never deadlocks with a transaction that holds the mission (approve, cancel) and wants the action
         rows = (
             (
                 await db.execute(
                     select(ProposedAction)
+                    .join(Mission, Mission.id == ProposedAction.mission_id)
                     .where(ProposedAction.status == "approved")
                     .order_by(ProposedAction.updated_at)
                     .limit(limit)
-                    .with_for_update(skip_locked=True)
+                    .with_for_update(of=[ProposedAction, Mission], skip_locked=True)
                 )
             )
             .scalars()
@@ -112,11 +115,10 @@ async def _artifacts(db: Any, action: ProposedAction) -> dict[str, bytes]:
 
 async def _finish(state: AppState, action_id: str, status: str, result: dict[str, Any], runs_as: str | None) -> None:
     async with state.sessions() as db, db.begin():
-        action = await db.get(ProposedAction, action_id, with_for_update=True)
+        action, mission = await service.lock_with_mission(db, ProposedAction, action_id)
         if action is None or action.status != "applying":
             return
         await _transition(db, action, status, result)
-        mission = await db.get(Mission, action.mission_id)
         await audit.record(
             db,
             audit.Actor("system:executor"),
@@ -186,18 +188,25 @@ async def apply(state: AppState, gateway: Gateway, action_id: str, *, recovering
 
 async def recover(state: AppState, gateway: Gateway) -> list[str]:
     cutoff = utcnow() - STALE_APPLYING
-    async with state.sessions() as db:
-        stale = (
+    # claimed like `claim` (one replica recovers an action; the others skip it) and stamped, so a second
+    # replica does not take it again while this one is still looking it up in the tool
+    async with state.sessions() as db, db.begin():
+        rows = (
             (
                 await db.execute(
-                    select(ProposedAction.id).where(
-                        ProposedAction.status == "applying", ProposedAction.updated_at < cutoff
-                    )
+                    select(ProposedAction)
+                    .join(Mission, Mission.id == ProposedAction.mission_id)
+                    .where(ProposedAction.status == "applying", ProposedAction.updated_at < cutoff)
+                    .limit(MAX_PARALLEL)
+                    .with_for_update(of=[ProposedAction, Mission], skip_locked=True)
                 )
             )
             .scalars()
             .all()
         )
+        for row in rows:
+            row.updated_at = utcnow()
+        stale = [row.id for row in rows]
     for action_id in stale:
         await apply(state, gateway, action_id, recovering=True)
     return list(stale)

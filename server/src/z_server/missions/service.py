@@ -44,6 +44,18 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+async def lock_with_mission(db: AsyncSession, model: Any, row_id: str) -> tuple[Any, Mission | None]:
+    """Lock a job, action or question row together with its mission, in the one order every transaction uses:
+    the mission row, then the job/action row, then the audit lock (`audit.record`). `events.append` locks the
+    mission row too, so taking the child row first deadlocks with cancel, approve or the gateway."""
+    mission_id = (await db.execute(select(model.mission_id).where(model.id == row_id))).scalar_one_or_none()
+    if mission_id is None:
+        return None, None
+    mission = await db.get(Mission, mission_id, with_for_update=True, populate_existing=True)
+    row = await db.get(model, row_id, with_for_update=True, populate_existing=True)
+    return row, mission
+
+
 # ---------------------------------------------------------------- creation
 
 
@@ -459,6 +471,28 @@ async def stop_jobs(db: AsyncSession, mission: Mission, final: JobStatus, reason
             job.control_state, job.control_reason = "cancel", reason
 
 
+async def close_actions(db: AsyncSession, mission: Mission, reason: str) -> None:
+    """An ended mission leaves nothing to approve or apply: pending and approved (not yet applying) actions are
+    rejected by the system. An action already `applying` finishes; its write may be under way."""
+    for action in (
+        await db.execute(
+            select(ProposedAction)
+            .where(ProposedAction.mission_id == mission.id, ProposedAction.status.in_(("pending", "approved")))
+            .with_for_update()
+        )
+    ).scalars():
+        previous, action.status = action.status, "rejected"
+        action.result = {"rejected_by": "system", "reason": f"mission ended: {reason}"[:2000]}
+        await events.append(
+            db,
+            mission.id,
+            "action_status",
+            {"action_id": action.id, "from": previous, "to": "rejected", "by": "system", "result": action.result},
+            job_id=action.job_id,
+            agent=action.agent,
+        )
+
+
 async def finish(
     db: AsyncSession, state: AppState, mission: Mission, status: MissionStatus, reason: str | None = None
 ) -> None:
@@ -468,6 +502,7 @@ async def finish(
         JobStatus.cancelled if status != MissionStatus.budget_exceeded else JobStatus.budget_exceeded,
         reason or status.value,
     )
+    await close_actions(db, mission, reason or status.value)
     await set_status(db, mission, status, reason)
     if mission.llm_key_enc:
         try:
@@ -551,7 +586,7 @@ def step_status(step: PlanStep, state: StepState | None) -> str:
 
 
 async def advance(db: AsyncSession, state: AppState, mission: Mission) -> None:
-    mission = await db.get(Mission, mission.id, with_for_update=True) or mission
+    mission = await db.get(Mission, mission.id, with_for_update=True, populate_existing=True) or mission
     if MissionStatus(mission.status).terminal or mission.status in {
         MissionStatus.draft.value,
         MissionStatus.planned.value,

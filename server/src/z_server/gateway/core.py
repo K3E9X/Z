@@ -390,8 +390,8 @@ class Gateway:
     ) -> Outcome:
         outcome = Outcome(inv.ok, text, verdict.verdict, structured=body if inv.ok and isinstance(body, dict) else None)
         async with self.state.sessions() as db, db.begin():
-            mission_row = await db.get(Mission, mission.id, with_for_update=True)
-            job_row = await db.get(Job, job.id, with_for_update=True)
+            mission_row = await db.get(Mission, mission.id, with_for_update=True, populate_existing=True)
+            job_row = await db.get(Job, job.id, with_for_update=True, populate_existing=True)
             assert mission_row is not None and job_row is not None
             # an error can carry the tool's data too (an HTTP error body, a GraphQL partial result, MCP isError
             # content, an error_body message): any answer from the tool raises the class, only "unreachable" does not

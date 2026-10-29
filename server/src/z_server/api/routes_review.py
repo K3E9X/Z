@@ -45,8 +45,11 @@ router = ContractRouter()
 
 
 async def _action(ctx: Ctx, action_id: str, *, lock: bool = False) -> tuple[ProposedAction, Mission]:
-    row = await ctx.db.get(ProposedAction, action_id, with_for_update=lock)
-    mission = await ctx.db.get(Mission, row.mission_id) if row else None
+    if lock:  # mission row first, before the audit lock any decision takes (service.lock_with_mission)
+        row, mission = await service.lock_with_mission(ctx.db, ProposedAction, action_id)
+    else:
+        row = await ctx.db.get(ProposedAction, action_id)
+        mission = await ctx.db.get(Mission, row.mission_id) if row else None
     if row is None or mission is None or not can_see(ctx, mission):
         raise Problem("not-found")
     return row, mission
@@ -79,6 +82,8 @@ async def approve(ctx: Ctx, row: ProposedAction, mission: Mission, body: m.Appro
     _may_decide(ctx, mission)
     if row.status != "pending":
         raise Problem("conflict", f"action is {row.status}")
+    if MissionStatus(mission.status).terminal:
+        raise Problem("conflict", f"the mission is {mission.status}: nothing of it is applied any more")
     if (row.judge_verdict or {}).get("verdict") == "block":
         raise Problem(
             "conflict",
@@ -183,6 +188,8 @@ async def edit_action(ctx: CtxDep, id: str, body: m.EditRequest) -> m.ProposedAc
     _may_decide(ctx, mission)
     if row.status != "pending":
         raise Problem("conflict", f"action is {row.status}")
+    if MissionStatus(mission.status).terminal:
+        raise Problem("conflict", f"the mission is {mission.status}: nothing of it is applied any more")
     op = await ctx.db.get(Operation, row.operation)
     connector = await ctx.db.get(Connector, op.connector_id) if op else None
     if op is None or connector is None:
@@ -272,7 +279,13 @@ async def edit_action(ctx: CtxDep, id: str, body: m.EditRequest) -> m.ProposedAc
 async def batch_approve(ctx: CtxDep, body: m.BatchApprove) -> m.BatchResult:
     """Each item is independent: one refusal does not undo the others (each runs in a savepoint)."""
     results = []
-    for action_id in body.action_ids[:200]:
+    ids = body.action_ids[:200]
+    # every mission row first, in one order, before the first approval takes the audit lock
+    for mission_id in sorted(
+        set((await ctx.db.execute(select(ProposedAction.mission_id).where(ProposedAction.id.in_(ids)))).scalars())
+    ):
+        await ctx.db.get(Mission, mission_id, with_for_update=True, populate_existing=True)
+    for action_id in ids:
         try:
             async with ctx.db.begin_nested():
                 row, mission = await _action(ctx, action_id, lock=True)
@@ -298,8 +311,7 @@ async def batch_approve(ctx: CtxDep, body: m.BatchApprove) -> m.BatchResult:
 
 @router.operation("answerQuestion")
 async def answer_question(ctx: CtxDep, id: str, body: m.AnswerRequest) -> m.Question:
-    row = await ctx.db.get(Question, id, with_for_update=True)
-    mission = await ctx.db.get(Mission, row.mission_id) if row else None
+    row, mission = await service.lock_with_mission(ctx.db, Question, id)
     if row is None or mission is None or not can_see(ctx, mission):
         raise Problem("not-found")
     if mission.created_by != ctx.user.user_id:

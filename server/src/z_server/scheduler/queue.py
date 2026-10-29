@@ -2,7 +2,8 @@
 
 - Claim: queued jobs whose `available_at` has passed, of active missions, under three limits: global
   (`executor.max_concurrency`), per mission (`executor.default_concurrency`) and per fan-out step
-  (`fanout.concurrency`). `FOR UPDATE SKIP LOCKED` lets several schedulers run.
+  (`fanout.concurrency`). Several schedulers may run: claims take turns on an advisory lock so the caps hold,
+  and candidate jobs and their missions are locked with `FOR UPDATE SKIP LOCKED` (never waited for).
 - Dispatch: a single-use bootstrap token is issued, the job goes `running` with a lease, then the executor
   starts the runner (outside the transaction).
 - Lease: every runner call extends it. An expired lease means the runner died: the job is re-queued with
@@ -21,7 +22,7 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JobStatus, MissionStatus
 from z_common.redaction import Redactor
@@ -36,6 +37,7 @@ log = logging.getLogger("z.scheduler")
 LEASE = timedelta(seconds=120)
 ACTIVE_MISSIONS = (MissionStatus.queued.value, MissionStatus.running.value, MissionStatus.waiting.value)
 BACKOFF_S = (5, 30, 120)
+CLAIM_LOCK_KEY = 0x5A_C1A1  # pg_advisory_xact_lock key: one claim at a time across replicas
 
 
 @dataclass
@@ -83,6 +85,9 @@ async def claim(state: AppState, worker: str) -> list[tuple[str, dict[str, str]]
     mission_cap = int(config.get("default_concurrency", 8))
     out: list[tuple[str, dict[str, str]]] = []
     async with state.sessions() as db, db.begin():
+        # one claim at a time across replicas, so the global, mission and fan-out caps hold (each replica would
+        # otherwise count the same running jobs and both start up to the cap)
+        await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": CLAIM_LOCK_KEY})
         running = (
             await db.execute(select(Job.mission_id, Job.step_id).where(Job.status == JobStatus.running.value))
         ).all()
@@ -104,7 +109,7 @@ async def claim(state: AppState, worker: str) -> list[tuple[str, dict[str, str]]
                 )
                 .order_by(Job.available_at, Job.created_at)
                 .limit(max(free * 4, 16))
-                .with_for_update(of=Job, skip_locked=True)
+                .with_for_update(of=[Job, Mission], skip_locked=True)  # both rows, never waited for
             )
         ).all()
         for job, mission in candidates:
@@ -164,13 +169,19 @@ async def requeue(db: AsyncSession, job: Job, reason: str) -> None:
     await service.set_job_status(db, job, JobStatus.queued, f"retry {job.attempt}: {reason}")
 
 
-async def requeue_or_fail(state: AppState, job_id: str, reason: str, log_tail: str = "") -> str:
-    """`log_tail` (the runner's last output, redacted here) is kept in the job error for diagnosis."""
+async def requeue_or_fail(
+    state: AppState, job_id: str, reason: str, log_tail: str = "", *, seen_attempt: int | None = None
+) -> str:
+    """`log_tail` (the runner's last output, redacted here) is kept in the job error for diagnosis.
+
+    `seen_attempt`: the attempt the caller saw running (the watchdog's snapshot). The job is only requeued if it
+    is still that run: another replica may have requeued and re-dispatched it since, and its new runner lives."""
     async with state.sessions() as db, db.begin():
-        job = await db.get(Job, job_id, with_for_update=True)
+        job, mission = await service.lock_with_mission(db, Job, job_id)
         if job is None or JobStatus(job.status).terminal:
             return "skipped"
-        mission = await db.get(Mission, job.mission_id)
+        if seen_attempt is not None and (job.status != JobStatus.running.value or job.attempt != seen_attempt):
+            return "skipped"
         if log_tail:
             known = [service.mission_key(state, mission)] if mission is not None and mission.llm_key_enc else []
             tail = Redactor(known).text(log_tail)[-LOG_TAIL_CHARS:]
@@ -224,9 +235,14 @@ async def watchdog(state: AppState, executor: Executor) -> TickReport:
                 except ExecutorError:
                     log.warning("could not stop %s", job.executor_ref)
             outcome = await requeue_or_fail(
-                state, job.id, "runner stopped without completing" if not alive else "lease expired", tail
+                state,
+                job.id,
+                "runner stopped without completing" if not alive else "lease expired",
+                tail,
+                seen_attempt=job.attempt,
             )
-            (report.requeued if outcome == "requeued" else report.failed).append(job.id)
+            if outcome != "skipped":
+                (report.requeued if outcome == "requeued" else report.failed).append(job.id)
     report.reaped = await reap(state, executor)
     for mission_id in missions_late:
         async with state.sessions() as db, db.begin():
@@ -265,13 +281,12 @@ async def reap(state: AppState, executor: Executor) -> list[str]:
 
 async def _time_out(state: AppState, executor: Executor, job_id: str) -> None:
     async with state.sessions() as db, db.begin():
-        job = await db.get(Job, job_id, with_for_update=True)
+        job, mission = await service.lock_with_mission(db, Job, job_id)
         if job is None or JobStatus(job.status).terminal:
             return
         ref = job.executor_ref
         job.error = {"class": "timeout", "message": "job deadline passed"}
         await service.set_job_status(db, job, JobStatus.timed_out, "deadline")
-        mission = await db.get(Mission, job.mission_id)
         if mission is not None:
             await service.advance(db, state, mission)
     if ref:
