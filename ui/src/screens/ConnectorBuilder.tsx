@@ -359,19 +359,29 @@ export function ConnectorBuilder() {
                   />
                 )}
               </Field>
-              {kind === 'openapi' && (
-                <Field label="…or paste the spec (JSON or YAML)">
-                  {(id) => (
-                    <Textarea
-                      id={id}
-                      rows={6}
-                      value={spec}
-                      onChange={(e) => setSpec(e.target.value)}
-                      className="font-mono text-[12px]"
-                    />
-                  )}
-                </Field>
-              )}
+              <Field
+                label={
+                  kind === 'graphql'
+                    ? '…or paste the introspection result (JSON)'
+                    : '…or paste the spec (JSON or YAML)'
+                }
+                hint={
+                  kind === 'graphql'
+                    ? 'When the endpoint needs a token for introspection, run it with a read token and paste the result'
+                    : undefined
+                }
+              >
+                {(id, d) => (
+                  <Textarea
+                    id={id}
+                    aria-describedby={d}
+                    rows={6}
+                    value={spec}
+                    onChange={(e) => setSpec(e.target.value)}
+                    className="font-mono text-[12px]"
+                  />
+                )}
+              </Field>
             </>
           )}
           {kind === 'mcp' && (

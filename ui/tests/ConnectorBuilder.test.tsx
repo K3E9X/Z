@@ -92,4 +92,22 @@ describe('ConnectorBuilder', () => {
     expect(await screen.findByText(/"cli" \(an object\)/)).toBeInTheDocument()
     expect(imports).toHaveLength(0)
   })
+
+  it('drafts a graphql connector from a pasted introspection result', async () => {
+    const user = userEvent.setup()
+    await render('graphql')
+    await user.type(await screen.findByLabelText('Name (slug)'), 'inventory')
+    await user.type(screen.getByLabelText('Base URL'), 'https://inventory.example.internal/graphql')
+    const pasted = screen.getByLabelText('…or paste the introspection result (JSON)')
+    await user.click(pasted)
+    await user.paste('{"data": {"__schema": {"types": []}}}')
+    await user.click(screen.getByRole('button', { name: 'List operations' }))
+    await waitFor(() => expect(imports).toHaveLength(1))
+    expect(imports[0]).toMatchObject({
+      source: 'graphql',
+      name: 'inventory',
+      base_url: 'https://inventory.example.internal/graphql',
+      spec: '{"data": {"__schema": {"types": []}}}',
+    })
+  })
 })
