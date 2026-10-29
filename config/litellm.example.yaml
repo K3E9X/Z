@@ -65,7 +65,7 @@ model_list:
 credential_list:
   - credential_name: inferx
     credential_values: { api_key: os.environ/INFERENCE_API_KEY }
-    credential_info: { description: inferX project key (environment default) }
+    credential_info: { description: inferX project key (environment default) }   # required by LiteLLM, even empty
 
 litellm_settings:
   drop_params: true            # ignore params a model does not support instead of failing

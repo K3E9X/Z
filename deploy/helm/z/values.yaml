@@ -480,7 +480,7 @@ config:
     credential_list:
       - credential_name: inferx
         credential_values: { api_key: os.environ/INFERENCE_API_KEY }
-        credential_info: { description: inferX project key (environment default) }
+        credential_info: { description: inferX project key (environment default) }   # required by LiteLLM
     litellm_settings:
       drop_params: true
       request_timeout: 600
