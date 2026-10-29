@@ -117,3 +117,18 @@ See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish
 - Upgrades: chart version = app version. There is no `CHANGELOG.md`: the release notes are generated from the conventional commits since the previous tag (`ci/scripts/changelog.py`, GitLab `release:notes` job) and published with each GitLab release; read them before upgrading.
 - `deploy/README.md` (written during the build) holds the step-by-step for each target.
 - Per-environment site values (staging, production) are templated in `deploy/environments/`; the release process (branches, versions, migrations, rollback, hotfix) is `14-release-and-changes.md`.
+
+## 5. Configuration keys accepted but not read
+`config/z.yaml` (or Helm `config.z`) is validated against `contracts/config.schema.json`, and `config/z.example.yaml` shows every section. Some keys the schema accepts are **not read by z-server or z-runner yet**: setting them changes nothing. They stay in the schema so existing files keep validating.
+
+| Key | Status | What decides it today |
+|---|---|---|
+| `memory.top_k_max` | Not read (schema only, not in the example) | The agent profile's `memory.top_k` |
+| `memory.embedding_dim` | Not read from the file | The migration reads `Z_EMBEDDING_DIM` from the environment (the example substitutes the same variable) |
+| `secrets.backend`, `secrets.vault.{address,mount,path_prefix}` | Not read | Each credential reference names its backend (`env:`, `file:`, `kubernetes:`, `vault:<mount>/<path>#<key>`); Vault uses `VAULT_ADDR`, `VAULT_TOKEN` or `VAULT_K8S_ROLE`, `VAULT_NAMESPACE`. There is no path prefix |
+| `inference.probes.{models_poll_s,tool_call_probe_s}` | Not read | Inference metrics are queried on demand (15 s cache); the synthetic tool-call probe is not built yet |
+| `inference.internal_cost_per_mtok` | Not read | Analytics cost is `null` for internal models (not built yet) |
+| `notifications.{mattermost_webhook,slack_webhook,smtp_url}` | Not read | Notification channels and SMTP are set in Admin → Notifications (stored in the database) |
+| `notifications.digest.*` | Not read | E-mail digests are not built yet |
+| `egress.browser_targets` | Not read | Each browser connector's hosts (checked by z-browser), and Helm `browser.egressTo` for the network policy |
+| `ui.default_theme`, `ui.default_font` | Not read | Present in Helm values only, used by nothing; the web app starts in `night` and each user switches the theme from the user menu or ⌘K; the font is not selectable |
