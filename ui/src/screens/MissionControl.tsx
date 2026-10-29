@@ -44,6 +44,7 @@ function useKpis(active: Mission[], finished: Mission[], now: number): Kpi[] {
   const expiring = conns.filter((c) => c.health.status === 'token_expiring').length
   const down = conns.filter((c) => c.health.status === 'unreachable').length
   const degraded = conns.filter((c) => c.health.status === 'degraded').length
+  const pending = conns.filter((c) => c.review_status === 'pending_review').length
   const h = health.data
   const fast = h?.models.find((m) => m.ttft_p95_ms !== null && m.ttft_p95_ms !== undefined)
   const tps = h?.models.reduce((n, m) => n + (m.tokens_per_s ?? 0), 0)
@@ -80,10 +81,12 @@ function useKpis(active: Mission[], finished: Mission[], now: number): Kpi[] {
     {
       label: 'Connectors',
       value: connectors.data ? String(conns.length) : '…',
-      tone: down ? 'err' : expiring || degraded ? 'wait' : conns.length ? 'ok' : undefined,
+      tone: down ? 'err' : expiring || degraded || pending ? 'wait' : conns.length ? 'ok' : undefined,
       sub: down
         ? `${down} unreachable`
-        : expiring
+        : pending
+          ? `${pending} waiting for exposure review`
+          : expiring
           ? `${plural(expiring, 'token')} expiring`
           : degraded
             ? `${degraded} degraded`
@@ -251,7 +254,7 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
         <div className="text-[14.5px] font-medium">{mission.title}</div>
       </div>
       {steps.length > 0 ? (
-        <PlanChecklist steps={steps} className="px-[18px] py-3.5" />
+        <PlanChecklist steps={steps} inputs={mission.inputs} className="px-[18px] py-3.5" />
       ) : (
         <div className="px-[18px] py-3.5 text-meta text-text-3">The plan appears once the orchestrator drafts it.</div>
       )}

@@ -1,10 +1,20 @@
 import type { PlanStep } from '@/api/types'
 import { stepState } from '@/lib/timeline'
 
-export function stepTitle(s: PlanStep): string {
-  if (s.title) return s.title
+/** Fill `{{ inputs.x }}` placeholders for display (the scheduler renders the real prompt). */
+export function fillInputs(text: string, inputs?: Record<string, unknown> | null): string {
+  if (!inputs) return text
+  return text.replace(/\{\{\s*inputs\.([\w.]+)\s*\}\}/g, (all, key: string) => {
+    const v = inputs[key]
+    return v === undefined || v === null ? all : typeof v === 'string' ? v : JSON.stringify(v)
+  })
+}
+
+export function stepTitle(s: PlanStep, inputs?: Record<string, unknown> | null): string {
+  if (s.title) return fillInputs(s.title, inputs)
   if (s.prompt) {
-    const first = s.prompt.split('\n')[0] ?? s.prompt
+    const p = fillInputs(s.prompt, inputs)
+    const first = p.split('\n')[0] ?? p
     return first.length > 90 ? `${first.slice(0, 89)}…` : first
   }
   return s.id ?? 'Step'
@@ -50,7 +60,9 @@ export function PlanChecklist({
   agentLabel,
   className = '',
   showAgents = false,
+  inputs,
 }: {
+  inputs?: Record<string, unknown> | null
   steps: PlanStep[]
   agentLabel?: (slug: string | undefined) => string
   className?: string
@@ -66,7 +78,7 @@ export function PlanChecklist({
             <Mark state={state} />
             <span className="flex min-w-0 flex-col">
               <span className={state === 'current' ? 'font-medium' : ''}>
-                {stepTitle(s)}
+                {stepTitle(s, inputs)}
                 <span className="sr-only"> ({STATE_LABEL[state]})</span>
               </span>
               {(showAgents || (j?.total ?? 0) > 1) && (

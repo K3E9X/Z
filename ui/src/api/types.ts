@@ -98,3 +98,11 @@ export type AuditEvent = S['AuditEvent']
 export type Guardrails = S['Guardrails']
 export type Guardrail = S['Guardrail']
 export type StreamMessage = S['StreamMessage']
+
+/**
+ * openapi-typescript renders the bundled JSON Schema's `$defs` as a required property of
+ * `mission-plan.schema`; it is not part of the document. Cast at the request boundary only.
+ */
+export function toContractPlan(plan: MissionPlan): S['mission-plan.schema'] {
+  return plan as S['mission-plan.schema']
+}
