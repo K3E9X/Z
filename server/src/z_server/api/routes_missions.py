@@ -540,9 +540,7 @@ async def stream_mission_events(
 
 
 @router.operation("streamJobEvents")
-async def stream_job_events(
-    ctx: CtxDep, id: str, last_event_id: Annotated[str | None, Header()] = None
-) -> Response:
+async def stream_job_events(ctx: CtxDep, id: str, last_event_id: Annotated[str | None, Header()] = None) -> Response:
     job, mission = await get_job(ctx, id)
     after = _after(None, last_event_id)
     if await _ended(ctx, mission, after, job.id):
