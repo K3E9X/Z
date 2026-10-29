@@ -393,8 +393,8 @@ export function AuditTab({
   } | null>(null)
   const s = draft ?? q.data
   const fwd = (s?.forward ?? {}) as {
-    syslog?: { enabled?: boolean; url?: string; format?: string }
-    https?: { enabled?: boolean; url?: string }
+    syslog?: { enabled?: boolean; url?: string; format?: string; status?: ForwardStatus }
+    https?: { enabled?: boolean; url?: string; token_ref?: string; status?: ForwardStatus }
   }
   const runVerify = async () => {
     setBusy(true)
@@ -506,7 +506,9 @@ export function AuditTab({
                     value={fwd.syslog?.url ?? ''}
                     onChange={(e) => setFwd('syslog', { url: e.target.value })}
                     className="font-mono text-sm"
+                    placeholder="tls://syslog.example.internal:6514"
                   />
+                  <ForwardState status={fwd.syslog?.status} enabled={!!fwd.syslog?.enabled} />
                 </div>
                 <div className="flex flex-col gap-2.5 rounded-panel border border-line px-4 py-3.5">
                   <Checkbox
@@ -521,6 +523,14 @@ export function AuditTab({
                     className="font-mono text-sm"
                     placeholder="https://logs.example.internal/z"
                   />
+                  <Input
+                    aria-label="Bearer token reference"
+                    value={fwd.https?.token_ref ?? ''}
+                    onChange={(e) => setFwd('https', { token_ref: e.target.value || undefined })}
+                    className="font-mono text-sm"
+                    placeholder="env:Z_AUDIT_TOKEN (a secret reference, never the value)"
+                  />
+                  <ForwardState status={fwd.https?.status} enabled={!!fwd.https?.enabled} />
                 </div>
               </div>
             </div>
@@ -528,6 +538,31 @@ export function AuditTab({
         }
       </QueryState>
     </div>
+  )
+}
+
+type ForwardStatus = {
+  last_seq?: number
+  last_sent_at?: string | null
+  last_error?: string | null
+  last_error_at?: string | null
+}
+
+/** Delivery state of one forwarding target, reported by the audit worker (at-least-once, in order). */
+function ForwardState({ status, enabled }: { status?: ForwardStatus; enabled: boolean }) {
+  if (!enabled) return null
+  if (!status) return <span className="text-meta text-text-2">Waiting for the first delivery</span>
+  if (status.last_error)
+    return (
+      <span className="text-meta text-err">
+        Failing: {status.last_error}. Retrying from event #{(status.last_seq ?? 0) + 1}
+      </span>
+    )
+  return (
+    <span className="text-meta text-ok">
+      Delivered up to event #{status.last_seq ?? 0}
+      {status.last_sent_at ? `, last sent ${new Date(status.last_sent_at).toLocaleString()}` : ''}
+    </span>
   )
 }
 
