@@ -1,6 +1,7 @@
 # k3s team server: Traefik (bundled), local-path storage (bundled), embedded Postgres, one replica each.
 # k3s enforces NetworkPolicy with its bundled controller.
-#   helm upgrade --install z deploy/helm/z -n z --create-namespace -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
+#   kubectl create namespace z && kubectl label namespace z pod-security.kubernetes.io/enforce=restricted
+#   helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
 
 server:
   replicas: 1

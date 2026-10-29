@@ -34,6 +34,10 @@
     "env": { "type": "string", "minLength": 1, "description": "Z_ENV" },
     "publicUrl": { "type": "string", "pattern": "^(https?://.+)?$" },
     "authMode": { "enum": ["oidc", "dev"] },
+    "releaseNamespace": {
+      "type": "object",
+      "properties": { "create": { "type": "boolean", "description": "Render the release Namespace with PSA restricted labels (helm template / Argo CD only)" } }
+    },
     "oidc": {
       "type": "object",
       "properties": { "issuerUrl": { "type": "string" }, "clientId": { "type": "string" } }

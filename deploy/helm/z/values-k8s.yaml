@@ -1,10 +1,11 @@
 # Vanilla Kubernetes: ingress-nginx, external Postgres (DSNs in an existing Secret), PDBs on.
 # NetworkPolicy needs a CNI that enforces it (Cilium, Calico...).
+#   kubectl create namespace z && kubectl label namespace z pod-security.kubernetes.io/enforce=restricted
 #   kubectl -n z create secret generic z-db \
 #     --from-literal=DATABASE_URL='postgresql://z_app:...@pg.example.internal:5432/z' \
 #     --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg.example.internal:5432/z' \
 #     --from-literal=LITELLM_DATABASE_URL='postgresql://litellm:...@pg.example.internal:5432/litellm'
-#   helm upgrade --install z deploy/helm/z -n z --create-namespace -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
+#   helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
 
 server:
   # Two `all` replicas: the queue, action executor and intake claim work with FOR UPDATE SKIP LOCKED, and the

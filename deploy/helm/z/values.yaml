@@ -43,6 +43,18 @@ containerSecurityContext:
     type: RuntimeDefault
   procMount: Default
 
+# The release namespace must enforce Pod Security Admission `restricted` (docs/07 §3), like the runner
+# namespace. With `helm install` create and label it before the install (Helm stores the release there before
+# it creates resources, so the chart cannot own it):
+#   kubectl create namespace z
+#   kubectl label namespace z pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest \
+#     pod-security.kubernetes.io/audit=restricted pod-security.kubernetes.io/warn=restricted
+# NOTES.txt warns after install/upgrade when the label is missing.
+releaseNamespace:
+  # Render the Namespace with the PSA labels (runners.podSecurity), for `helm template | kubectl apply` or
+  # Argo CD. Leave false with `helm install` / `helm upgrade` (the Namespace would conflict with the release).
+  create: false
+
 # --------------------------------------------------------------------------------------------------- z-server
 server:
   # `all`: api + scheduler + gateway + executor + learner + monitor in one process. Several replicas are safe

@@ -35,9 +35,15 @@ Values files:
 - `values-k3s.yaml`: `ingress.className: traefik`, `persistence.storageClass: local-path`, `postgres.embedded: true`, single replica per component.
 - `values-k8s.yaml`: `ingress.className: nginx`, `postgres.embedded: false` (external DSN), 2 replicas for api and gateway, PDBs on.
 
+The release namespace must enforce Pod Security `restricted` like `z-runners` (`07-security.md` §3). Helm stores the release record in that namespace before it creates any resource, so the chart cannot create or label it on `helm install`: create and label it first instead of `--create-namespace` (NOTES.txt warns after install or upgrade when the label is missing). `releaseNamespace.create: true` renders the labelled Namespace for `helm template | kubectl apply` and Argo CD.
+
 ```bash
+kubectl create namespace z
+kubectl label namespace z pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted pod-security.kubernetes.io/warn=restricted
+
 # k3s
-helm upgrade --install z deploy/helm/z -n z --create-namespace \
+helm upgrade --install z deploy/helm/z -n z \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
 # first connection: user z-bootstrap. z-server writes the one-time password to a memory-backed file
 # (Z_BOOTSTRAP_SECRET_FILE=/run/z-secrets/bootstrap), never to the log; the log line names the file and,
@@ -47,7 +53,7 @@ kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=se
 kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
 
 # Kubernetes
-helm upgrade --install z deploy/helm/z -n z --create-namespace \
+helm upgrade --install z deploy/helm/z -n z \
   -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
 ```
 

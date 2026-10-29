@@ -39,6 +39,22 @@ WARNING: images without a digest: {{ join ", " $missing }}. Deploy by digest (<c
 z-server REFUSES TO START with env=production until runners.image.digest is set (Z_RUNNER_IMAGE@sha256:...).
 {{- end }}
 {{- end }}
+{{- /* lookup is empty under `helm template` and without get on namespaces: then only the reminder shows */}}
+{{- $nsObj := lookup "v1" "Namespace" "" .Release.Namespace }}
+{{- $enforce := dig "metadata" "labels" "pod-security.kubernetes.io/enforce" "" ($nsObj | default dict) }}
+{{- if ne $enforce "restricted" }}
+
+{{- if $nsObj }}
+WARNING: namespace {{ .Release.Namespace }} does not enforce Pod Security `restricted` (docs/07 §3; enforce={{ default "none" $enforce }}).
+{{- else }}
+CHECK: namespace {{ .Release.Namespace }} must enforce Pod Security `restricted` (docs/07 §3); it could not be read here.
+{{- end }}
+Every chart pod satisfies it; label the namespace (the chart cannot own it with helm install):
+
+  kubectl label namespace {{ .Release.Namespace }} --overwrite pod-security.kubernetes.io/enforce=restricted \
+    pod-security.kubernetes.io/enforce-version=latest pod-security.kubernetes.io/audit=restricted \
+    pod-security.kubernetes.io/warn=restricted
+{{- end }}
 {{- if not .Values.persistence.artifacts.enabled }}
 
 WARNING: persistence.artifacts.enabled=false: artifacts live in an emptyDir and are lost with the pod.

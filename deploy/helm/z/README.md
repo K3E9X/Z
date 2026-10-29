@@ -51,10 +51,23 @@ config:
     model_list: [...]         # the real inferX model ids (see values.yaml for the shape)
 ```
 
+The release namespace must enforce Pod Security `restricted` (docs/07 §3) like `z-runners`. Helm keeps the
+release record in that namespace before it creates anything, so the chart cannot create or label it on
+`helm install`: create and label it first (instead of `--create-namespace`). NOTES warns after every
+install or upgrade if the label is missing. For `helm template | kubectl apply` or Argo CD,
+`releaseNamespace.create: true` renders the labelled Namespace.
+
+```bash
+kubectl create namespace z
+kubectl label namespace z pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted pod-security.kubernetes.io/warn=restricted
+```
+
 ### k3s
 
 ```bash
-helm upgrade --install z deploy/helm/z -n z --create-namespace \
+helm upgrade --install z deploy/helm/z -n z \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
 ```
 
@@ -80,7 +93,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 Then the DSN Secret and the release:
 
 ```bash
-kubectl create namespace z
+# namespace z created and labelled as above
 kubectl -n z create secret generic z-db \
   --from-literal=DATABASE_URL='postgresql://z_app:...@pg.example.internal:5432/z' \
   --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg.example.internal:5432/z' \
@@ -153,8 +166,8 @@ the migrations ran).
   `policy-cidr-match-mode=nodes`), the external Postgres (`networkPolicy.databaseEgress`, required when
   `postgres.embedded: false`), and `serverEgress.allow`: GitLab (OIDC issuer and connector), the tool APIs of
   your connectors, notification webhooks, audit forwarding, `INFERENCE_PROMETHEUS_URL`. Nothing else.
-- Label the release namespace for Pod Security Admission yourself (docs/07 §3), e.g.
-  `kubectl label ns z pod-security.kubernetes.io/enforce=restricted`: every chart pod satisfies `restricted`.
+- Pod Security Admission: the chart labels `z-runners` `restricted`; label the release namespace yourself
+  before the install (see [Install](#install)): every chart pod satisfies `restricted`.
 
 ## gVisor
 
