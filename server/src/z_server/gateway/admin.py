@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import yaml
@@ -116,7 +117,7 @@ async def sync_credentials(db: AsyncSession, connector: Connector) -> None:
             db.add(Credential(id=new_id("cred"), connector_id=connector.id, purpose=purpose, scope="service", **data))
         elif (row.ref, row.identity) != (data["ref"], data["identity"]):
             row.backend, row.ref, row.identity = data["backend"], data["ref"], data["identity"]
-            row.rotated_at = None
+            row.rotated_at = datetime.now(UTC)  # a new secret reference: "rotated X ago" counts from here
     for purpose, row in rows.items():
         if purpose not in wanted:
             await db.delete(row)

@@ -44,6 +44,8 @@ async def start_oauth(ctx: CtxDep, connector: str, body: dict[str, Any]) -> dict
     row = (await ctx.db.execute(select(Connector).where(Connector.name == connector))).scalar_one_or_none()
     if row is None or not row.enabled or row.review_status != "approved":
         raise Problem("not-found", f"no connector {connector} to connect to")
+    if ctx.user.local_kind in oauth.LOCAL_NO_GRANTS:  # docs/12 §1: test, break-glass, bootstrap hold no user grant
+        raise Problem("forbidden", "local accounts cannot connect personal accounts; sign in with GitLab")
     purpose = str(body["purpose"])  # read | write (validated against the contract)
     verifier, challenge = oauth.pkce()
     state = new_token("zo", 24)

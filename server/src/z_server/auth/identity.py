@@ -16,7 +16,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from z_server import rbac
 from z_server.crypto import new_token, token_hash
-from z_server.db.models import ApiToken, AuthSession, LocalAccount, Role, RoleBinding, Setting, Team, User, UserTeam
+from z_server.db.models import (
+    ApiToken,
+    AuthSession,
+    Credential,
+    LocalAccount,
+    PersonalConnection,
+    Role,
+    RoleBinding,
+    Setting,
+    Team,
+    User,
+    UserTeam,
+)
 from z_server.ids import new_id
 
 GROUP_MAPPING_KEY = "group_mapping"
@@ -228,8 +240,23 @@ async def resolve_api_token(db: AsyncSession, token: str) -> tuple[ApiToken, Use
 
 
 async def revoke_user_access(db: AsyncSession, user_id: str, reason: str) -> int:
-    """Revoke every session, CLI token and API token of a user. Returns the number of sessions revoked."""
+    """Revoke every session, CLI token and API token of a user, and their personal connections (docs/12 §1
+    Lifecycle: the sealed delegated grants are deleted, so running missions cannot act as them any more).
+    Returns the number of sessions revoked."""
     at = now()
+    for conn in (
+        await db.execute(
+            select(PersonalConnection)
+            .where(PersonalConnection.user_id == user_id, PersonalConnection.status != "revoked")
+            .with_for_update()
+        )
+    ).scalars():
+        for cred_id in (conn.read_credential_id, conn.write_credential_id):
+            cred = await db.get(Credential, cred_id) if cred_id else None
+            if cred is not None:
+                await db.delete(cred)
+        conn.read_credential_id = conn.write_credential_id = None
+        conn.status = "revoked"
     result = await db.execute(
         update(AuthSession)
         .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))

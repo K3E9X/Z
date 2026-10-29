@@ -32,11 +32,12 @@ import httpx
 from sqlalchemy import select
 from z_common.connectors.oauth import GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL, provider
 
-from z_server.db.models import Connector, Credential, PersonalConnection
+from z_server.db.models import Connector, Credential, PersonalConnection, User
 from z_server.gateway.secrets import SecretError, SecretResolver
 from z_server.state import AppState
 
 ACTING_USER: ContextVar[str | None] = ContextVar("z_acting_user", default=None)  # user-scope calls only
+LOCAL_NO_GRANTS = frozenset({"test", "bootstrap", "breakglass"})  # local accounts that never hold user grants
 REFRESH_MARGIN_S = 120
 MICROSOFT = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/{endpoint}"
 
@@ -237,6 +238,11 @@ async def user_token(
         cred = await db.get(Credential, cred_id, with_for_update=True) if cred_id else None
         if conn is None or conn.status != "active" or cred is None:
             raise OAuthError(f"the mission starter has no active {purpose} connection to {connector.name}")
+        owner = await db.get(User, user_id)
+        if owner is None or owner.status != "active":  # suspended or deprovisioned: their grants are not used
+            raise OAuthError(f"the mission starter is {owner.status if owner else 'gone'}: their grants are not used")
+        if owner.local_kind in LOCAL_NO_GRANTS:  # docs/12 §1: local accounts never use user-scope credentials
+            raise OAuthError("local accounts never act with user-scope credentials")
         tokens = unseal(state, cred)
         due = cred.expires_at is None or cred.expires_at - timedelta(seconds=REFRESH_MARGIN_S) <= datetime.now(UTC)
         if due:

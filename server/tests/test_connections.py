@@ -278,3 +278,29 @@ def test_app_only_service_token(app: TestClient, jars: dict[str, dict[str, str]]
 
     inv = app.portal.call(call)  # type: ignore[union-attr]
     assert inv.ok and inv.identity == "app:read_app" and inv.body["value"][0]["owner"] == "secops@example.test"
+
+
+def test_suspension_revokes_personal_connections(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    """docs/12 §1 Lifecycle: a suspended or deprovisioned person's delegated grants stop working at once."""
+    use_jar(app, jars["bob"])
+    for purpose in ("read", "write"):
+        assert connect(app, purpose).status_code == 302
+    bob_id = app.get("/api/v1/me").json()["user"]["id"]
+    use_jar(app, jars["alice"])
+    resp = app.patch(f"/api/v1/admin/users/{bob_id}", json={"action": "suspend"}, headers=csrf(app))
+    assert resp.status_code == 200, resp.text
+
+    from sqlalchemy import select
+    from z_server.db.models import Credential, PersonalConnection
+
+    state = app.app.state.z  # type: ignore[attr-defined]
+
+    async def rows() -> tuple[list[str], int]:
+        async with state.sessions() as db:
+            conns = (await db.execute(select(PersonalConnection).where(PersonalConnection.user_id == bob_id))).scalars()
+            statuses = [c.status for c in conns]
+            creds = (await db.execute(select(Credential).where(Credential.scope == "user"))).scalars().all()
+            return statuses, len(creds)
+
+    statuses, sealed = app.portal.call(rows)  # type: ignore[union-attr]
+    assert statuses == ["revoked"] and sealed == 0
