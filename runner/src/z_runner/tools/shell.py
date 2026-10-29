@@ -57,6 +57,9 @@ _PASSTHROUGH = (
     "REQUESTS_CA_BUNDLE",
 )
 _SECRETISH_ENV = re.compile(r"(?i)(token|secret|password|passwd|api_?key|credential|auth)")
+# `scheme://user:password@host` (or `scheme://token@host`) inside a passed-through value (proxy, index or
+# registry URLs, possibly comma- or space-separated lists): the userinfo is a credential and is dropped.
+_URL_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s,;@]+@")
 
 
 def sandbox_home() -> Path:
@@ -67,7 +70,11 @@ def sandbox_home() -> Path:
 
 def sandbox_env() -> dict[str, str]:
     """Environment for agent-controlled processes: an allowlist, never Z_* or anything secret-looking."""
-    env = {k: v for k, v in os.environ.items() if k in _PASSTHROUGH and not _SECRETISH_ENV.search(k)}
+    env = {
+        k: _URL_USERINFO.sub(r"\1", v)
+        for k, v in os.environ.items()
+        if k in _PASSTHROUGH and not _SECRETISH_ENV.search(k)
+    }
     home = sandbox_home()
     env.update(
         {

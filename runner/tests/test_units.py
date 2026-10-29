@@ -506,6 +506,21 @@ def test_background_processes_do_not_survive(tmp_path: Path) -> None:
     assert slow.timed_out and slow.exit_code is None
 
 
+def test_sandbox_env_drops_credentials_embedded_in_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    from z_runner.tools.shell import sandbox_env
+
+    monkeypatch.setenv("PIP_INDEX_URL", "https://ci-bot:s3cr3t-pass@nexus.internal/repository/pypi/simple")
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxyuser:hunter2@egress:3128")
+    monkeypatch.setenv("GOPROXY", "https://tok123@goproxy.internal,direct")
+    monkeypatch.setenv("NO_PROXY", "localhost,.svc")
+    env = sandbox_env()
+    assert env["PIP_INDEX_URL"] == "https://nexus.internal/repository/pypi/simple"
+    assert env["HTTPS_PROXY"] == "http://egress:3128"
+    assert env["GOPROXY"] == "https://goproxy.internal,direct"
+    assert env["NO_PROXY"] == "localhost,.svc"
+    assert not any(secret in " ".join(env.values()) for secret in ("s3cr3t", "hunter2", "tok123"))
+
+
 # ---------------------------------------------------------------------- CLI
 def test_cli_help_and_usage_errors(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as info:
