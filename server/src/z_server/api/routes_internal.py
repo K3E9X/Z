@@ -14,10 +14,10 @@ from sqlalchemy import select
 from z_common.models import api_internal as m
 from z_common.models import api_missions as mm
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, MissionStatus, OperationClass
+from z_common.models.enums import ActionStatus, DataClass, JobStatus, JudgeVerdict, MissionStatus, OperationClass
 from z_common.models.manifests import MissionPlan
 
-from z_server import artifacts, audit, events, judge_model, memory, usage
+from z_server import artifacts, audit, events, judge, judge_model, memory, usage
 from z_server.actions import prechecks
 from z_server.actions.previews import build as build_preview
 from z_server.api.internal import InternalRouter, JobCtx, JobCtxDep, _bearer, require_service
@@ -686,6 +686,19 @@ async def _staged(ctx: JobCtx) -> workspace.Staged:
     await judge_model.review_files(ctx.state, job.id, staged.files, (ctx.mission.created_by, ctx.mission.team_id or ""))
     await ctx.lock()  # after the model calls (internal.DEFERRED_LOCK)
     job = ctx.job
+    # data classification of staged inputs: credentials in a delivered file make the mission C3 before the
+    # agent sees it (invariant 10: the key allowlist shrinks first; no file goes out if it cannot)
+    for f in staged.delivered:
+        if not judge.is_text(f.data):
+            continue
+        level, kinds = judge.classify(f.data.decode("utf-8", errors="replace"))
+        if level is not None and level.rank > DataClass(ctx.mission.data_class).rank:
+            try:
+                await service.raise_data_class(
+                    ctx.db, ctx.state, ctx.mission, level, "judge", f"{f.path}: {', '.join(kinds)}"[:300], job
+                )
+            except LlmKeyError as exc:
+                raise Problem("unavailable", "could not restrict the mission model key; inputs withheld") from exc
     for f in staged.files:
         if f.verdict.verdict != JudgeVerdict.clean:
             await events.append(

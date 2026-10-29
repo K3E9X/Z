@@ -239,6 +239,24 @@ def test_judge_flags_and_blocks_staged_inputs(
     assert runner2.control()["state"] == "run" and only_job(app, blocked)["status"] == "running"
 
 
+def test_credentials_in_staged_inputs_make_the_mission_c3(
+    app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
+) -> None:
+    """docs/06 §2: the judge's classification of staged inputs raises the class before the agent sees them."""
+    h = as_user(app, jars, "bob")
+    example = summarize_mission(app, h, b"Set password: changeme123 in the example config.")
+    start_runner(app, executor, example).workspace()
+    assert app.get(f"/api/v1/missions/{example}").json()["data_class"] == "C2"  # an example is not a credential
+    token = "gl" + "pat-" + "A1b2C3d4E5f6G7h8I9j0"  # built here so no scanner mistakes the test for a leak
+    secret = summarize_mission(app, h, f"Deploy with {token} on the runner.".encode())
+    files = start_runner(app, executor, secret).workspace()
+    assert "notes.md" in files
+    mission = app.get(f"/api/v1/missions/{secret}").json()
+    assert mission["data_class"] == "C3", mission["data_class"]
+    raised = [e for e in app.get(f"/api/v1/missions/{secret}/replay").json()["events"] if e["type"] == "data_class"]
+    assert raised and raised[0]["payload"]["cause"] == "judge" and "gitlab_token" in raised[0]["payload"]["detail"]
+
+
 def test_token_budget_cancels_the_job(
     app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
 ) -> None:

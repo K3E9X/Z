@@ -15,7 +15,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from z_common.models.enums import JudgeVerdict
+from z_common.models.enums import DataClass, JudgeVerdict
 
 SAMPLE_HEAD = 256 * 1024
 SAMPLE_TAIL = 64 * 1024
@@ -184,3 +184,30 @@ def scan_bytes(data: bytes, content_type: str | None = None) -> Verdict:
     if not is_text(data, content_type):
         return Verdict(JudgeVerdict.clean)
     return scan(data.decode("utf-8", errors="replace"))
+
+
+# Data classification of staged inputs (docs/04 §5, docs/06 §2): credentials in a file make the mission C3
+# (restricted: secrets, credentials). Only formats that are credentials by construction count; a `password: …`
+# line in an example config does not, so documentation does not lock every mission to C3.
+CREDENTIAL_PATTERNS = frozenset(
+    {
+        "pem_private_key",
+        "url_credentials",
+        "gitlab_token",
+        "github_token",
+        "slack_token",
+        "openai_style_key",
+        "inferx_key",
+        "aws_access_key",
+        "jwt",
+        "z_token",
+    }
+)
+
+
+def classify(text: str) -> tuple[DataClass | None, list[str]]:
+    """(C3, the credential kinds found) when the text holds credentials, else (None, [])."""
+    from z_common.redaction import PATTERNS
+
+    found = [name for name, pattern in PATTERNS if name in CREDENTIAL_PATTERNS and pattern.search(text)]
+    return (DataClass.C3, found) if found else (None, [])
