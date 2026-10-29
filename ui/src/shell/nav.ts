@@ -7,11 +7,19 @@ export interface NavItem {
   to: string
   label: string
   icon: IconName
-  /** Hidden when the user lacks this permission (server enforces it anyway). */
-  permission?: PermissionName
+  /** Hidden when the user lacks this permission, or every one of a list (server enforces it anyway). */
+  permission?: PermissionName | PermissionName[]
   shortcut?: string
   group: 'main' | 'configure'
 }
+
+/** Who reaches the admin area: each of its tabs is gated on its own endpoints' permission. */
+export const ADMIN_PERMISSIONS: PermissionName[] = [
+  'users:manage',
+  'teams:manage',
+  'audit:export',
+  'guardrails:manage',
+]
 
 export const NAV: NavItem[] = [
   {
@@ -81,12 +89,15 @@ export const NAV: NavItem[] = [
   },
   { to: '/docs', label: 'Documentation', icon: 'doc', group: 'configure', shortcut: 'G D' },
   { to: '/settings', label: 'Settings', icon: 'settings', group: 'configure', shortcut: 'G S' },
-  { to: '/admin', label: 'Admin', icon: 'admin', group: 'configure', permission: 'users:manage' },
+  { to: '/admin', label: 'Admin', icon: 'admin', group: 'configure', permission: ADMIN_PERMISSIONS },
 ]
 
 /** The entries this user may open: every navigation (sidebar, rail, mobile menu) uses this filter. */
 export function visibleNav(items: NavItem[], me: Me | null): NavItem[] {
-  return items.filter((i) => !i.permission || can(me, i.permission))
+  return items.filter(
+    (i) =>
+      !i.permission || (Array.isArray(i.permission) ? i.permission : [i.permission]).some((p) => can(me, p)),
+  )
 }
 
 export function isActive(path: string, to: string): boolean {

@@ -10,6 +10,7 @@ import { EmptyState, QueryState } from '@/components/states'
 import { useToast } from '@/components/toast'
 import { Button, Field, IconButton, Input, Select, Textarea } from '@/components/ui'
 import { compactNumber } from '@/lib/format'
+import { useCan } from '@/lib/auth'
 import { StepUpCancelled, useStepUp } from '@/shell/stepup'
 import { PendingChange } from './PendingChange'
 import { WhoCan } from './Users'
@@ -82,6 +83,7 @@ function TeamDialog({ team, onClose }: { team: Team | null; onClose: () => void 
 
 export function TeamsTab() {
   const teams = useTeams()
+  const canManage = useCan('teams:manage')
   const [edit, setEdit] = useState<Team | null | 'new'>(null)
   return (
     <div className="flex flex-col gap-4">
@@ -90,9 +92,11 @@ export function TeamsTab() {
           Teams own agents, playbooks, budgets and connectors. Members come from GitLab groups (Group mapping)
           and manual bindings.
         </p>
-        <Button size="sm" icon="plus" onClick={() => setEdit('new')}>
-          New team
-        </Button>
+        {canManage && (
+          <Button size="sm" icon="plus" onClick={() => setEdit('new')}>
+            New team
+          </Button>
+        )}
       </div>
       <QueryState query={teams} what="Teams" endpoint="GET /teams">
         {() => (
@@ -118,9 +122,11 @@ export function TeamsTab() {
                     {t.monthly_token_budget ? compactNumber(t.monthly_token_budget) : '—'}
                   </td>
                   <td className="text-right">
-                    <Button size="xs" onClick={() => setEdit(t)}>
-                      Edit
-                    </Button>
+                    {canManage && (
+                      <Button size="xs" onClick={() => setEdit(t)}>
+                        Edit
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}

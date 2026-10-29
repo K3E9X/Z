@@ -11,6 +11,7 @@ import { Dot } from '@/components/StatusMark'
 import { useToast } from '@/components/toast'
 import { Button, Checkbox, DefList, Field, Input, Select } from '@/components/ui'
 import { dateTime, relative, titleCase } from '@/lib/format'
+import { useCan } from '@/lib/auth'
 import { StepUpCancelled, useStepUp } from '@/shell/stepup'
 import { PendingChange } from './PendingChange'
 
@@ -378,9 +379,12 @@ export function AuditTab({
   verify: AuditVerify | null
   onVerified: (v: AuditVerify) => void
 }) {
+  const canSettings = useCan('users:manage')
+  const canVerify = useCan('audit:export')
   const q = useQuery({
     queryKey: qk.admin.auditSettings,
     queryFn: () => unwrap(api.GET('/admin/audit-settings')),
+    enabled: canSettings,
   })
   const qc = useQueryClient()
   const toast = useToast()
@@ -439,9 +443,11 @@ export function AuditTab({
             </span>
           )}
         </div>
-        <Button busy={busy} onClick={() => void runVerify()}>
-          Verify the chain
-        </Button>
+        {canVerify && (
+          <Button busy={busy} onClick={() => void runVerify()}>
+            Verify the chain
+          </Button>
+        )}
         <Link
           to="/history"
           className="flex h-8 items-center rounded-btn border border-line-2 px-3.5 no-underline hover:bg-raised"
@@ -449,94 +455,96 @@ export function AuditTab({
           Search the log
         </Link>
       </section>
-      <QueryState query={q} what="Audit settings" endpoint="GET /admin/audit-settings">
-        {() =>
-          !s ? null : (
-            <div className="flex flex-col gap-5">
-              {draft && q.data && (
-                <PendingChange
-                  title="Audit retention and forwarding"
-                  before={q.data}
-                  after={draft}
-                  onDiscard={() => setDraft(null)}
-                  onSave={async () => {
-                    await unwrap(api.PUT('/admin/audit-settings', { body: draft }))
-                    await qc.invalidateQueries({ queryKey: qk.admin.auditSettings })
-                    setDraft(null)
-                  }}
-                />
-              )}
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Field
-                  label="Retention (days)"
-                  hint="Minimum 90, independent of mission data"
-                  error={s.retention_days < 90 ? 'At least 90 days' : null}
-                >
-                  {(id, d) => (
-                    <Input
-                      id={id}
-                      aria-describedby={d}
-                      type="number"
-                      min={90}
-                      value={s.retention_days}
-                      onChange={(e) => setDraft({ ...s, retention_days: Number(e.target.value) })}
-                    />
-                  )}
-                </Field>
-                <Field label="Checkpoint every (minutes)">
-                  {(id) => (
-                    <Input
-                      id={id}
-                      type="number"
-                      value={s.checkpoint_minutes}
-                      onChange={(e) => setDraft({ ...s, checkpoint_minutes: Number(e.target.value) })}
-                    />
-                  )}
-                </Field>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2.5 rounded-panel border border-line px-4 py-3.5">
-                  <Checkbox
-                    checked={!!fwd.syslog?.enabled}
-                    onChange={(v) => setFwd('syslog', { enabled: v })}
-                    label="Forward as syslog (RFC 5424 over TLS)"
+      {canSettings && (
+        <QueryState query={q} what="Audit settings" endpoint="GET /admin/audit-settings">
+          {() =>
+            !s ? null : (
+              <div className="flex flex-col gap-5">
+                {draft && q.data && (
+                  <PendingChange
+                    title="Audit retention and forwarding"
+                    before={q.data}
+                    after={draft}
+                    onDiscard={() => setDraft(null)}
+                    onSave={async () => {
+                      await unwrap(api.PUT('/admin/audit-settings', { body: draft }))
+                      await qc.invalidateQueries({ queryKey: qk.admin.auditSettings })
+                      setDraft(null)
+                    }}
                   />
-                  <Input
-                    aria-label="Syslog URL"
-                    value={fwd.syslog?.url ?? ''}
-                    onChange={(e) => setFwd('syslog', { url: e.target.value })}
-                    className="font-mono text-sm"
-                    placeholder="tls://syslog.example.internal:6514"
-                  />
-                  <ForwardState status={fwd.syslog?.status} enabled={!!fwd.syslog?.enabled} />
+                )}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field
+                    label="Retention (days)"
+                    hint="Minimum 90, independent of mission data"
+                    error={s.retention_days < 90 ? 'At least 90 days' : null}
+                  >
+                    {(id, d) => (
+                      <Input
+                        id={id}
+                        aria-describedby={d}
+                        type="number"
+                        min={90}
+                        value={s.retention_days}
+                        onChange={(e) => setDraft({ ...s, retention_days: Number(e.target.value) })}
+                      />
+                    )}
+                  </Field>
+                  <Field label="Checkpoint every (minutes)">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="number"
+                        value={s.checkpoint_minutes}
+                        onChange={(e) => setDraft({ ...s, checkpoint_minutes: Number(e.target.value) })}
+                      />
+                    )}
+                  </Field>
                 </div>
-                <div className="flex flex-col gap-2.5 rounded-panel border border-line px-4 py-3.5">
-                  <Checkbox
-                    checked={!!fwd.https?.enabled}
-                    onChange={(v) => setFwd('https', { enabled: v })}
-                    label="Forward as JSON over HTTPS"
-                  />
-                  <Input
-                    aria-label="HTTPS URL"
-                    value={fwd.https?.url ?? ''}
-                    onChange={(e) => setFwd('https', { url: e.target.value })}
-                    className="font-mono text-sm"
-                    placeholder="https://logs.example.internal/z"
-                  />
-                  <Input
-                    aria-label="Bearer token reference"
-                    value={fwd.https?.token_ref ?? ''}
-                    onChange={(e) => setFwd('https', { token_ref: e.target.value || undefined })}
-                    className="font-mono text-sm"
-                    placeholder="env:Z_AUDIT_TOKEN (a secret reference, never the value)"
-                  />
-                  <ForwardState status={fwd.https?.status} enabled={!!fwd.https?.enabled} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2.5 rounded-panel border border-line px-4 py-3.5">
+                    <Checkbox
+                      checked={!!fwd.syslog?.enabled}
+                      onChange={(v) => setFwd('syslog', { enabled: v })}
+                      label="Forward as syslog (RFC 5424 over TLS)"
+                    />
+                    <Input
+                      aria-label="Syslog URL"
+                      value={fwd.syslog?.url ?? ''}
+                      onChange={(e) => setFwd('syslog', { url: e.target.value })}
+                      className="font-mono text-sm"
+                      placeholder="tls://syslog.example.internal:6514"
+                    />
+                    <ForwardState status={fwd.syslog?.status} enabled={!!fwd.syslog?.enabled} />
+                  </div>
+                  <div className="flex flex-col gap-2.5 rounded-panel border border-line px-4 py-3.5">
+                    <Checkbox
+                      checked={!!fwd.https?.enabled}
+                      onChange={(v) => setFwd('https', { enabled: v })}
+                      label="Forward as JSON over HTTPS"
+                    />
+                    <Input
+                      aria-label="HTTPS URL"
+                      value={fwd.https?.url ?? ''}
+                      onChange={(e) => setFwd('https', { url: e.target.value })}
+                      className="font-mono text-sm"
+                      placeholder="https://logs.example.internal/z"
+                    />
+                    <Input
+                      aria-label="Bearer token reference"
+                      value={fwd.https?.token_ref ?? ''}
+                      onChange={(e) => setFwd('https', { token_ref: e.target.value || undefined })}
+                      className="font-mono text-sm"
+                      placeholder="env:Z_AUDIT_TOKEN (a secret reference, never the value)"
+                    />
+                    <ForwardState status={fwd.https?.status} enabled={!!fwd.https?.enabled} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        }
-      </QueryState>
+            )
+          }
+        </QueryState>
+      )}
     </div>
   )
 }
@@ -757,6 +765,7 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
 }
 
 export function PlatformTab() {
+  const canChannels = useCan('connectors:manage')
   const guardrails = useGuardrails()
   const channels = useChannels()
   const [adding, setAdding] = useState(false)
@@ -810,7 +819,7 @@ export function PlatformTab() {
       <section aria-label="Channels" className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h3 className="m-0 text-[15px] font-semibold">Channels</h3>
-          {!isNotServed(channels.error) && (
+          {canChannels && !isNotServed(channels.error) && (
             <Button size="xs" icon="plus" onClick={() => setAdding(true)}>
               Add a channel
             </Button>

@@ -7,8 +7,10 @@ import type { AuditVerify } from '@/api/types'
 import { Forbidden } from '@/components/states'
 import { Dot } from '@/components/StatusMark'
 import { PageTitle, Tabs } from '@/components/ui'
-import { stepUpRemaining, useCan, useCurrentMe } from '@/lib/auth'
+import type { PermissionName } from '@/api/permissions.gen'
+import { can, stepUpRemaining, useCan, useCurrentMe } from '@/lib/auth'
 import { useNow } from '@/lib/useMedia'
+import { ADMIN_PERMISSIONS } from '@/shell/nav'
 import { GroupMappingTab, RolesTab, TeamsTab } from './AccessTabs'
 import { NotificationsTab } from './NotificationsTab'
 import { AuditTab, PlatformTab, SessionsTab, SignInTab } from './PlatformTabs'
@@ -16,16 +18,18 @@ import { UsersTab } from './Users'
 
 type Tab =
   'users' | 'teams' | 'roles' | 'mapping' | 'signin' | 'sessions' | 'audit' | 'notifications' | 'platform'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'users', label: 'Users' },
-  { id: 'teams', label: 'Teams' },
-  { id: 'roles', label: 'Roles and permissions' },
-  { id: 'mapping', label: 'Group mapping' },
-  { id: 'signin', label: 'Sign-in' },
-  { id: 'sessions', label: 'Sessions and tokens' },
-  { id: 'audit', label: 'Audit log' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'platform', label: 'Platform' },
+/** Each tab is shown to whoever holds one of the permissions of its endpoints (contracts/openapi.yaml). */
+const TABS: { id: Tab; label: string; anyOf: PermissionName[] }[] = [
+  { id: 'users', label: 'Users', anyOf: ['users:manage'] },
+  { id: 'teams', label: 'Teams', anyOf: ['teams:read', 'teams:manage'] },
+  { id: 'roles', label: 'Roles and permissions', anyOf: ['users:manage'] },
+  { id: 'mapping', label: 'Group mapping', anyOf: ['users:manage'] },
+  { id: 'signin', label: 'Sign-in', anyOf: ['users:manage'] },
+  { id: 'sessions', label: 'Sessions and tokens', anyOf: ['users:manage'] },
+  // audit settings: users:manage; chain verification: audit:export
+  { id: 'audit', label: 'Audit log', anyOf: ['users:manage', 'audit:export'] },
+  { id: 'notifications', label: 'Notifications', anyOf: ['guardrails:manage'] },
+  { id: 'platform', label: 'Platform', anyOf: ['users:manage'] },
 ]
 /** The bootstrap admin only sees Sign-in and Group mapping (docs/12 §1). */
 const BOOTSTRAP_TABS: Tab[] = ['signin', 'mapping']
@@ -93,13 +97,15 @@ export function Admin() {
   const me = useCurrentMe()
   const search = useSearch({ from: '/admin' })
   const navigate = useNavigate()
-  const allowed = useCan('users:manage')
+  const manageUsers = useCan('users:manage')
   const now = useNow(15_000)
   const [verify, setVerify] = useState<AuditVerify | null>(null)
   const bootstrap = me.user.local_kind === 'bootstrap'
-  const tabs = bootstrap ? TABS.filter((t) => BOOTSTRAP_TABS.includes(t.id)) : TABS
-  const fallback: Tab = bootstrap ? 'signin' : 'users'
-  const tab = (tabs.some((t) => t.id === search.tab) ? search.tab : fallback) as Tab
+  const tabs = TABS.filter(
+    (t) => t.anyOf.some((p) => can(me, p)) && (!bootstrap || BOOTSTRAP_TABS.includes(t.id)),
+  )
+  const allowed = ADMIN_PERMISSIONS.some((p) => can(me, p)) && tabs.length > 0
+  const tab = (tabs.some((t) => t.id === search.tab) ? search.tab : tabs[0]?.id) as Tab
   const left = stepUpRemaining(me, 300, now)
   const roles =
     [...new Set(me.user.effective_roles.map((r) => r.role))].join(', ') || me.user.local_kind || 'viewer'
@@ -108,7 +114,7 @@ export function Admin() {
     return (
       <main className="flex w-full max-w-[1440px] flex-col gap-6 px-10 pt-11">
         <PageTitle title="Admin" />
-        <Forbidden permission="users:manage" what="the admin area" />
+        <Forbidden permission={ADMIN_PERMISSIONS.join(' or ')} what="the admin area" />
       </main>
     )
   }
@@ -134,7 +140,7 @@ export function Admin() {
           It is disabled when the first GitLab admin signs in.
         </div>
       )}
-      <StatusStrip verify={verify} />
+      {manageUsers && <StatusStrip verify={verify} />}
       <Tabs<Tab>
         label="Admin sections"
         value={tab}
