@@ -57,8 +57,8 @@ Follow the same system:
 - **Trace replay**: full-width timeline scrubber over a finished mission, synced with terminal, browser screenshots and diffs.
 - **Evals**: per agent/skill score history by model; case table expected vs. got; run evals.
 - **Analytics**: hours saved by playbook (baseline minutes × completed), approval rate, edit rate, failure by connector, tokens and cost by team, trends.
-- **Agent builder**: "Describe the agent you need" composer → drafted profile (name, handle, avatar, role, instructions, persona, model, skills, tools, objectives) → edit → test on a sample mission → create. Also from a template or by duplicating an agent.
-- **Objectives** (agent tab and a Mission control widget): each objective with metric, target, trend sparkline, status, assigned objects, last check, proposed missions; create/edit/pause.
+- **Agent builder**: "Describe the agent you need" composer → drafted profile (name, handle, avatar, role, instructions, persona, model, skills, tools, objectives) → edit → test on a sample mission (not built yet) → create. Also from a template or by duplicating an agent.
+- **Objectives** (agent tab and a Mission control widget, the widget not built yet): each objective with metric, target, trend sparkline, status, assigned objects, last check, proposed missions; create/edit/pause.
 - **Settings → Connections**: the user's personal connections (Outlook, Teams, OneDrive, Google…) with scopes granted, last used, revoke.
 - **Channels** (admin): Teams, Slack, Mattermost, email; default agent per channel; allowed teams; test message.
 

@@ -59,7 +59,7 @@ Z does not assume how inferX is built. The monitor reads a **Prometheus** endpoi
 | GPU utilization, memory, temperature | `DCGM_FI_DEV_GPU_UTIL`, `DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)`, `DCGM_FI_DEV_GPU_TEMP` by node |
 | Replicas ready | `kube_deployment_status_replicas_available` (kube-state-metrics), if the cluster is visible |
 
-Also: `GET /v1/models` on the gateway every minute, and a synthetic tool-call probe per alias every 10 minutes (records `tool_call_parse_error_rate`). If no Prometheus is configured, the screen shows gateway-side numbers only (latency, errors, tokens from LiteLLM).
+Also: `GET /v1/models` and `/model/info` on the gateway, queried when the Inference screen or the health check asks (cached 15 s, not polled on a timer). A synthetic tool-call probe per alias (recording `tool_call_parse_error_rate`) is not built yet: the field stays empty and `inference.probes` is not read. If no Prometheus is configured, the screen shows gateway-side numbers only (latency, errors, tokens from LiteLLM).
 
 ## 6. Usage and budgets
 - **Views**: tokens per hour by model (stacked), by agent, top missions with used/cap, by team, by playbook; input/output split; cache hit; requests and errors; GPU-hours when available.
@@ -73,4 +73,4 @@ Also: `GET /v1/models` on the gateway every minute, and a synthetic tool-call pr
   The chart ships a "Z overview" Grafana dashboard (`metrics.grafanaDashboard.enabled`).
 
 ## 7. Cost model
-Internal tokens have no invoice, but GPU time is not free. `config/z.yaml` can set an internal cost per 1M input/output tokens per alias so budgets and analytics can show a comparable cost, and external providers their real price.
+Internal tokens have no invoice, but GPU time is not free. `config/z.yaml` is meant to set an internal cost per 1M input/output tokens per alias (`inference.internal_cost_per_mtok`) so budgets and analytics can show a comparable cost, and external providers their real price. Not built yet: the key is accepted but not read, and Analytics reports cost as `null`.

@@ -104,14 +104,14 @@ Mappings edited in the Admin UI are stored in the database and override the file
 ## 3. Admin area (web: Configure → Admin; CLI: `z admin`)
 | Tab | What admins do |
 |---|---|
-| **Users** | List (name, GitLab username, teams, effective roles with their source, last sign-in, 2FA-enforced, status); open a user: bindings, sessions, tokens, connections, recent activity; add a manual role (with expiry), suspend, revoke all sessions |
+| **Users** | List (name, GitLab username, teams, effective roles with their source, last sign-in, 2FA-enforced, status); open a user: bindings, sessions, tokens, connections (not built yet), recent activity; add a manual role (with expiry), suspend, revoke all sessions |
 | **Teams** | Teams, GitLab groups, members (from GitLab groups + manual), monthly team token budget. Teams own missions, agents and playbooks; connectors are org-wide and have no team (ADR 0012) |
 | **Roles and permissions** | Built-in roles (read-only) and custom roles; permission matrix; "who can do X?" lookup |
 | **Group mapping** | GitLab group path → role and scope, team mapping, allowed groups, no-match policy; **dry run** showing who gains or loses access before saving |
 | **Sign-in** | OIDC settings (issuer, client, scopes, claim), test login, JWKS status, session lifetimes, step-up policy, local accounts (bootstrap state, test accounts, break-glass) |
 | **Sessions and tokens** | Active web sessions and CLI tokens (user, device, IP, last seen), revoke; personal API tokens (scopes, expiry), revoke |
-| **Audit log** | Same data as History, with admin filters (actor, action, target, result, IP), saved searches, export, retention, syslog forwarding, chain verification |
-| **Platform** | Guardrails (locked ones shown as locked), budgets, providers and routing policy, retention, maintenance mode, version and health |
+| **Audit log** | Same data as History, with admin filters (actor, action, target, result, IP), saved searches (not built yet), export, retention, syslog forwarding, chain verification |
+| **Platform** | Guardrails (locked ones shown as locked), budgets, providers and routing policy, retention, maintenance mode (not built yet: no config key or API), version and health |
 
 Every admin change shows a **diff before save**, requires step-up, and writes an audit event with before/after values.
 
