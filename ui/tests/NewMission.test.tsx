@@ -117,4 +117,31 @@ describe('NewMission', () => {
       ])
     })
   })
+  it('shows the webhook URL and the one-time secret before leaving', async () => {
+    server.use(
+      http.post('*/api/v1/triggers', () =>
+        HttpResponse.json({
+          id: 'trg_2',
+          kind: 'webhook',
+          config: {},
+          filter: {},
+          inputs: {},
+          webhook_url: 'https://z.example/api/v1/hooks/trg_2',
+          secret: 'whsec-once',
+        }),
+      ),
+    )
+    const user = userEvent.setup()
+    await render(builder)
+    await ready()
+    await user.click(screen.getByRole('radio', { name: /On every new event/ }))
+    await user.selectOptions(screen.getByLabelText('Event source'), 'webhook')
+    await user.click(screen.getByLabelText(/Every signed call to the webhook starts a mission/))
+    await user.click(screen.getByRole('button', { name: 'Create the trigger' }))
+    expect(await screen.findByDisplayValue('whsec-once')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://z.example/api/v1/hooks/trg_2')).toBeInTheDocument()
+    expect(screen.queryByText('route: /tasks')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(await screen.findByText('route: /tasks')).toBeInTheDocument()
+  })
 })

@@ -23,7 +23,8 @@ import { defaultsFor, SchemaForm, validate, type FormValue, type JsonSchema } fr
 import { stepTitle } from '@/components/PlanChecklist'
 import { NotServed } from '@/components/states'
 import { useToast } from '@/components/toast'
-import { Button, Checkbox, Chip, Input, Radio, Select } from '@/components/ui'
+import { Dialog } from '@/components/Dialog'
+import { Button, Checkbox, Chip, Field, Input, Radio, Select } from '@/components/ui'
 import { useCan } from '@/lib/auth'
 import { describeCron } from '@/lib/cron'
 import { bytes, compactNumber } from '@/lib/format'
@@ -129,6 +130,8 @@ export function NewMission() {
   const [saveAs, setSaveAs] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [busy, setBusy] = useState(false)
+  // a webhook or GitLab trigger answers with its URL and signing secret once: show them before leaving
+  const [hooked, setHooked] = useState<{ webhook_url?: string | null; secret?: string | null } | null>(null)
 
   const pbList = useMemo(() => playbooks.data?.items ?? [], [playbooks.data])
   const playbook = pbList.find((p) => p.name === playbookName || p.id === playbookName) ?? null
@@ -278,7 +281,7 @@ export function NewMission() {
           toast.info(whenError ?? 'Schedules and events need a playbook.')
           return
         }
-        await unwrap(
+        const trigger = await unwrap(
           api.POST('/triggers', {
             body: {
               kind: when === 'schedule' ? 'schedule' : eventKind,
@@ -293,7 +296,8 @@ export function NewMission() {
         )
         await qc.invalidateQueries({ queryKey: ['triggers'] })
         toast.ok('Trigger created. Missions will start on their own and their writes still come to Review.')
-        void navigate({ to: '/tasks' })
+        if (trigger.webhook_url || trigger.secret) setHooked(trigger)
+        else void navigate({ to: '/tasks' })
         return
       }
       if (playbook && !plan) {
@@ -381,6 +385,30 @@ export function NewMission() {
   return (
     <main className="mx-auto flex w-full max-w-[900px] flex-col gap-9 px-10 pt-12 pb-16 max-md:px-5">
       <h1 className="m-0 font-display-face text-display leading-[1.05]">What should Z do?</h1>
+      <Dialog
+        open={!!hooked}
+        onClose={() => void navigate({ to: '/tasks' })}
+        title="Point the tool at this webhook"
+        footer={
+          <Button variant="primary" onClick={() => void navigate({ to: '/tasks' })}>
+            Done
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-text-2">The secret is shown once; requests are checked with HMAC.</p>
+          <Field label="Webhook URL">
+            {(id) => (
+              <Input id={id} readOnly value={hooked?.webhook_url ?? ''} className="font-mono text-sm" />
+            )}
+          </Field>
+          {hooked?.secret && (
+            <Field label="Signing secret (shown once)">
+              {(id) => <Input id={id} readOnly value={hooked.secret ?? ''} className="font-mono text-sm" />}
+            </Field>
+          )}
+        </div>
+      </Dialog>
 
       <section aria-label="Request" className="rounded-card border border-line-2 bg-panel">
         <div className="px-5 pt-4 pb-3">
