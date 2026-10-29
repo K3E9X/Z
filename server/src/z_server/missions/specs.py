@@ -9,6 +9,7 @@ only with a workspace. Platform guardrail caps apply to the agent limits.
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -18,6 +19,7 @@ from z_common.models.api_internal import (
     GatewayTool,
     JobSpec,
     LlmSpec,
+    MemorySnippet,
     OutputSpec,
     SkillBundle,
     ToolSpec,
@@ -33,6 +35,8 @@ from z_server.catalog import schemas
 from z_server.db.models import Connector, EvalRun, Job, Mission, Operation, Playbook, Skill
 from z_server.missions.service import agent_profile, mission_key
 from z_server.state import AppState
+
+log = logging.getLogger("z.specs")
 
 LOCAL_TOOLS = ("read", "edit", "terminal", "code", "documents", "browser")
 UNTRUSTED_NOTICE = (
@@ -125,6 +129,34 @@ async def output_spec(db: AsyncSession, state: AppState, mission: Mission, step:
     )
 
 
+async def _known_facts(
+    db: AsyncSession, state: AppState, mission: Mission, job: Job, profile: AgentProfile
+) -> list[MemorySnippet]:
+    """docs/08 §7: the top-k approved facts for the step prompt, in the fixed "Known facts" block. Memory is
+    a help, not a dependency: when embeddings are unavailable the job starts without it."""
+    config = profile.memory
+    if config is None or not config.top_k:
+        return []
+    from z_server import memory
+
+    try:
+        facts = await memory.search(
+            db,
+            state.http,
+            state.settings.litellm_url,
+            mission_key(state, mission),
+            query=job.prompt or mission.prompt or mission.title,
+            scopes=list(config.scopes),
+            team=mission.team_id,
+            agent=job.agent_name,
+            top_k=min(config.top_k, 20),
+        )
+    except memory.MemoryUnavailable as exc:
+        log.warning("job %s starts without memory: %s", job.id, exc)
+        return []
+    return [MemorySnippet(id=f.id, scope=f.scope, text=f.text) for f in facts]
+
+
 async def build(
     db: AsyncSession, state: AppState, mission: Mission, job: Job, session_token: str, deadline: datetime
 ) -> JobSpec:
@@ -166,7 +198,7 @@ async def build(
         resume_from_step=job.resume_from_step,
         agent=profile,
         skills=skills,
-        memory=[],
+        memory=await _known_facts(db, state, mission, job, profile),
         prompt=job.prompt,
         input=job.input,
         output=output,

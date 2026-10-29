@@ -248,6 +248,13 @@ def test_learner_proposes_evaluates_and_applies(app: TestClient, llm: FakeLLM, j
     assert rules[0]["origin"] == "learned" and rules[0]["target"] == {"agent": "summarizer"}
     fact = app.post(f"/api/v1/proposals/{proposals['memory_fact']['id']}/apply", json={}, headers=csrf(app))
     assert fact.status_code == 200, fact.text
+    # the approved fact reaches the agent's next job in the "Known facts" block
+    mission = app.post(
+        "/api/v1/missions", json={"prompt": "Summarise the release notes", "agents": ["summarizer"]}, headers=csrf(app)
+    )
+    assert mission.status_code == 201, mission.text
+    [spec] = play_all(app, lambda spec: GOOD)
+    assert [m["text"] for m in spec["memory"]] == ["Release notes are in notes.md."]
     use_jar(app, jars["bob"])  # an operator cannot apply learning
     assert app.post(f"/api/v1/proposals/{skill['id']}/reject", json={}, headers=csrf(app)).status_code == 403
 
