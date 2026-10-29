@@ -972,7 +972,7 @@ schemas = {
     "ConnectorPatch": obj({"manifest": ext("connector.schema.json"), "enabled": B}),
     "ConnectorImport": obj(
         {
-            "source": {"type": "string", "enum": ["openapi", "graphql", "mcp", "docs"]},
+            "source": {"type": "string", "enum": ["openapi", "graphql", "mcp", "docs", "browser"]},
             "name": ext(C + "Slug"),
             "display_name": S,
             "base_url": S,
@@ -980,9 +980,12 @@ schemas = {
             "spec": {"type": ["object", "string"]},
             "mcp": ext("connector.schema.json#/$defs/McpServer"),
             "docs": S,
+            "flows": {"type": "object", "additionalProperties": ext("connector.schema.json#/$defs/BrowserFlow")},
+            "declared": arr(ext("connector.schema.json#/$defs/DeclaredOperation")),
             "data_class": ext(C + "DataClass"),
         },
         ["source", "name"],
+        desc="browser: `flows` and the `declared` operations that name them (docs/05 §1).",
     ),
     "ConnectorDraft": obj(
         {"manifest": ext("connector.schema.json"), "operations": arr(ref("Operation")), "warnings": arr(S)},

@@ -23,6 +23,11 @@
     "builtin": { "type": "string", "description": "builtin kind: name of the platform-provided connector (web, sandbox)." },
     "config": { "type": "object", "description": "builtin kind: connector-specific settings." },
     "declared": { "type": "array", "items": { "$ref": "#/$defs/DeclaredOperation" }, "description": "rest, graphql, cli, database, browser: operations declared explicitly." },
+    "flows": {
+      "type": "object",
+      "description": "browser kind: named flows replayed by the z-browser worker; a declared operation names one in `flow`. Agent arguments ({{args.x}}) only fill values and URLs, credentials ({{auth.username}}, {{auth.password}}) are only typed into fields.",
+      "additionalProperties": { "$ref": "#/$defs/BrowserFlow" }
+    },
     "auth": { "$ref": "#/$defs/AuthSet" },
     "oauth": { "$ref": "#/$defs/OAuthApps" },
     "operations": { "$ref": "#/$defs/OperationPolicy" },
@@ -63,9 +68,40 @@
         "path": { "type": "string" },
         "query": { "type": "string", "description": "graphql document or parameterised read-only SQL." },
         "command": { "type": "array", "items": { "type": "string" }, "description": "cli: argv template." },
-        "flow": { "type": "string", "description": "browser: recorded flow reference." },
+        "flow": { "type": "string", "description": "browser: the name of a flow in `flows`." },
         "input_schema": { "type": "object" },
         "output_hint": { "type": "string" }
+      }
+    },
+    "BrowserStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "type": "string", "enum": ["goto", "click", "fill", "select", "check", "uncheck", "press", "wait_for", "wait_for_url", "extract_text", "extract_table", "extract_attribute", "assert_text", "assert_visible", "screenshot"] },
+        "selector": { "type": "string", "description": "Playwright selector; never contains a placeholder." },
+        "url": { "type": "string", "description": "goto, wait_for_url: relative to base_url or absolute on an allowed host." },
+        "value": { "type": "string" },
+        "key": { "type": "string" },
+        "name": { "type": "string", "description": "extract_*: output key; screenshot: file name." },
+        "attribute": { "type": "string" },
+        "all": { "type": "boolean" },
+        "state": { "type": "string", "enum": ["visible", "hidden", "attached", "detached"] },
+        "full_page": { "type": "boolean" },
+        "optional": { "type": "boolean", "description": "A failure of this step does not fail the flow." },
+        "timeout_ms": { "type": "integer", "minimum": 100, "maximum": 120000 }
+      }
+    },
+    "BrowserFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "description": { "type": "string" },
+        "start_url": { "type": "string" },
+        "allowed_hosts": { "type": "array", "items": { "type": "string" }, "description": "Hosts besides base_url's the page may load (exact or *.example.com); every other request is blocked." },
+        "timeout_s": { "type": "integer", "minimum": 5, "maximum": 300 },
+        "steps": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "#/$defs/BrowserStep" } }
       }
     },
     "SimpleAuth": {

@@ -7553,6 +7553,7 @@ components:
           - graphql
           - mcp
           - docs
+          - browser
         name:
           $ref: common.schema.json#/$defs/Slug
         display_name: *id001
@@ -7565,12 +7566,21 @@ components:
         mcp:
           $ref: connector.schema.json#/$defs/McpServer
         docs: *id001
+        flows:
+          type: object
+          additionalProperties:
+            $ref: connector.schema.json#/$defs/BrowserFlow
+        declared:
+          type: array
+          items:
+            $ref: connector.schema.json#/$defs/DeclaredOperation
         data_class:
           $ref: common.schema.json#/$defs/DataClass
       required:
       - source
       - name
       additionalProperties: false
+      description: 'browser: `flows` and the `declared` operations that name them (docs/05 §1).'
     ConnectorDraft:
       type: object
       properties:
