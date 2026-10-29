@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import yaml
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JudgeVerdict, ProposalKind, ProposalStatus
 
@@ -55,6 +55,7 @@ from z_server.state import AppState
 
 log = logging.getLogger("z.learner")
 MAX_SIGNALS = 30
+LEARNER_LOCK = 0x7A6C6561  # pg advisory lock key ('zlea')
 MAX_PROPOSALS = 3
 OPEN = {ProposalStatus.proposed.value, ProposalStatus.evaluating.value, ProposalStatus.ready.value}
 SYSTEM = (
@@ -194,7 +195,21 @@ async def observe(state: AppState, agent_name: str | None = None) -> list[str]:
     min_signals = int((state.config.get("learning") or {}).get("min_signals", 3))
     created: list[str] = []
     async with state.sessions() as db:
-        groups = await _unused_signals(db)
+        # one learner at a time across replicas: the others skip this round (session-level advisory lock)
+        if not (await db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": LEARNER_LOCK})).scalar():
+            return created
+        try:
+            groups = await _unused_signals(db)
+            created = await _draft_all(state, groups, agent_name, min_signals)
+        finally:
+            await db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": LEARNER_LOCK})
+    return created
+
+
+async def _draft_all(
+    state: AppState, groups: dict[str, list[Signal]], agent_name: str | None, min_signals: int
+) -> list[str]:
+    created: list[str] = []
     for name, sigs in groups.items():
         if (agent_name and name != agent_name) or len(sigs) < min_signals:
             continue
