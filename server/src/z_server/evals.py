@@ -20,6 +20,7 @@ from typing import Any
 import jsonschema
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from z_common.contracts import errors as contract_errors
 from z_common.models.enums import DataClass, MissionStatus
 from z_common.models.manifests import Check, EvalCase, MissionPlan
 
@@ -95,8 +96,8 @@ async def load_cases(db: AsyncSession, state: AppState, target: str) -> tuple[Ag
                 cases.append(EvalCase.model_validate_json(line))
             except ValueError as exc:
                 raise Problem("validation", f"{rel}:{n}: {exc}") from exc
-    if kind == "skill":
-        cases = [c for c in cases if c.skill in (None, name)]
+    if kind == "skill" and any(c.skill for c in cases):
+        cases = [c for c in cases if c.skill == name]  # a shared file: only the cases marked for this skill
     return agent, version, pack, cases
 
 
@@ -242,6 +243,53 @@ async def start_shadow(
     return run
 
 
+GENERIC_OUTPUT = "core/schemas/result.json"  # any JSON object: checks on output.* without a schema of their own
+
+
+def output_schema(case: EvalCase, pack: str | None) -> str | None:
+    """The step output schema of an eval mission: the pack schema of the case's `json_schema` check on the output,
+    else a generic object when a check reads `output`, else none. Paths are relative to the packs root."""
+    reads_output = False
+    for item in case.checks:
+        if item.type in {"has_sources", "tests_pass", "duplicate_detected"}:
+            reads_output = True
+        if item.type not in {"json_schema", "field_equals", "contains", "regex"}:
+            continue
+        path = str((item.model_extra or {}).get("path", "output"))
+        if not path.startswith("output"):
+            continue
+        reads_output = True
+        schema = str(item.param("schema")) if item.type == "json_schema" else ""
+        if schema and path == "output" and not schema.startswith("contracts/"):
+            return f"{pack}/{schema}" if pack else schema
+    return GENERIC_OUTPUT if reads_output else None
+
+
+def agent_connectors(agent: Agent) -> set[str]:
+    """Connectors the agent's gateway tools name (`gateway:jira.issues.*` -> jira), attached to eval missions so
+    their reads work as in a real mission (writes stay captured)."""
+    names = set()
+    for tool in (agent.profile or {}).get("tools") or []:
+        ref = str(tool).removeprefix("gateway:")
+        if str(tool).startswith("gateway:") and not ref.startswith("@"):
+            names.add(ref.split(".", 1)[0])
+    return names
+
+
+def fixture_bytes(state: AppState, pack: str | None, source: Any) -> bytes:
+    """A context fixture: a pack file when the string names one, else literal text (eval-case.schema.json);
+    objects and arrays are staged as JSON."""
+    if not isinstance(source, str):
+        return json.dumps(source, ensure_ascii=False).encode()
+    try:
+        path = _pack_file(state, pack, source)
+    except Problem:
+        return source.encode()
+    if path.is_dir():
+        raise Problem("validation", f"fixture {source} is a directory: stage its files one by one")
+    return path.read_bytes() if path.is_file() else source.encode()
+
+
 async def _launch(
     db: AsyncSession,
     state: AppState,
@@ -267,6 +315,9 @@ async def _launch(
             "model": model,
             "writes": writes,
         }
+        output = output_schema(case, pack)
+        if output:
+            step["output"] = {"schema": output}
         if files:
             step["workspace"] = "files"
         plan = MissionPlan.model_validate({"goal": f"eval {target} {case.id}", "steps": [step], "writes": writes})
@@ -280,7 +331,7 @@ async def _launch(
                 playbook=None,
                 inputs={},
                 plan=plan,
-                connectors=list(connectors or []),
+                connectors=sorted(set(connectors or []) | agent_connectors(agent)),
                 data_class=None,
                 autonomy=None,
                 plan_first=False,
@@ -290,11 +341,7 @@ async def _launch(
         )
         mission.eval_run_id = run.id
         for name, source in files.items():
-            data = (
-                _pack_file(state, pack, source).read_bytes()
-                if isinstance(source, str)
-                else json.dumps(source, ensure_ascii=False).encode()
-            )
+            data = fixture_bytes(state, pack, source)
             await artifacts.create(
                 db,
                 state.settings.artifacts_dir,
@@ -429,11 +476,18 @@ async def check(
     ctx = ctx if ctx is not None else await result_context(db, mission, job)
     kind = item.type
     if kind == "json_schema":
+        target = resolve(ctx, (item.model_extra or {}).get("path", "output"))
+        name = str(item.param("schema"))
+        if name.startswith("contracts/"):  # a contract schema, with its $refs to the other contract files
+            try:
+                errors = contract_errors(name.removeprefix("contracts/"), target)
+            except (OSError, ValueError) as exc:
+                return False, f"schema not readable: {exc}"
+            return not errors, "valid" if not errors else "; ".join(errors[:3])
         try:
-            schema = json.loads(_pack_file(state, pack, str(item.param("schema"))).read_text())
+            schema = json.loads(_pack_file(state, pack, name).read_text())
         except (OSError, ValueError, Problem) as exc:
             return False, f"schema not readable: {exc}"
-        target = resolve(ctx, (item.model_extra or {}).get("path", "output"))
         errors = [e.message for e in jsonschema.Draft202012Validator(schema).iter_errors(target)]
         return not errors, "valid" if not errors else "; ".join(errors[:3])
     if kind in {"field_equals", "contains", "regex"}:
@@ -479,7 +533,7 @@ async def check(
         return len(sources) >= int(item.param("min")), f"{len(sources)} sources"
     if kind == "tests_pass":
         tests: dict[str, Any] = output["tests"] if isinstance(output.get("tests"), dict) else {}
-        ok = output.get("tests_passed") is True or tests.get("passed") is True
+        ok = output.get("tests_passed") is True or tests.get("passed") is True or output.get("tests") == "passed"
         return ok, "tests passed" if ok else "no passing test report in the output"
     if kind == "duplicate_detected":
         ok = bool(output.get("duplicate") or output.get("duplicates") or output.get("duplicate_of"))
@@ -575,6 +629,29 @@ async def finish(db: AsyncSession, state: AppState, run: EvalRun) -> None:
     await audit.record(db, audit.Actor("system:evals"), "eval.finished", "eval_run", run.id, after=run.scores)
 
 
+async def _end_stuck(db: AsyncSession, state: AppState, mission_ids: list[str]) -> None:
+    """An eval mission has nobody to attend it (questions are answered, writes captured): one that waits on a job
+    needing attention (an output that stays invalid after repairs, a loop, a blocked input) ends as failed."""
+    waiting = (
+        await db.execute(select(Mission).where(Mission.id.in_(mission_ids), Mission.status == "waiting"))
+    ).scalars()
+    for mission in waiting:
+        reasons = [
+            r
+            for (r,) in (
+                await db.execute(
+                    select(Job.needs_attention_reason).where(
+                        Job.mission_id == mission.id, Job.status == "needs_attention"
+                    )
+                )
+            ).all()
+        ]
+        if not reasons:
+            continue
+        mission.error = f"needs attention: {', '.join(sorted({str(r) for r in reasons}))}"
+        await service.finish(db, state, mission, MissionStatus.failed, mission.error)
+
+
 async def tick(state: AppState) -> list[str]:
     """Grade the runs whose case missions have all ended."""
     async with state.sessions() as db:
@@ -586,6 +663,7 @@ async def tick(state: AppState) -> list[str]:
             if run is None or run.status != "running":
                 continue
             ids = [e["mission_id"] for e in run.cases]
+            await _end_stuck(db, state, ids)
             statuses = [s for (s,) in (await db.execute(select(Mission.status).where(Mission.id.in_(ids)))).all()]
             if len(statuses) == len(ids) and all(s in TERMINAL for s in statuses):
                 try:

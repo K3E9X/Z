@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Result",
+  "description": "Any JSON object: the structured result of a step whose playbook or eval case gives no schema of its own (an eval case that checks output.* fields).",
+  "type": "object"
+}

@@ -158,7 +158,7 @@ def test_failing_checks_fail_the_case(app: TestClient, llm: FakeLLM, jars: dict[
     call(app, evals.tick)
     [case] = app.get(f"/api/v1/evals/{run['id']}").json()["cases"]
     failed = {c["type"] for c in case["checks"] if not c["ok"]}
-    assert case["passed"] is False and {"json_schema", "field_equals"} <= failed
+    assert case["passed"] is False and {"json_schema", "field_equals"} <= failed, case
     unknown = app.post("/api/v1/evals", json={"target": "agent:summarizer", "cases": ["nope"]}, headers=csrf(app))
     assert unknown.status_code == 422
 
