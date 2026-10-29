@@ -29,3 +29,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0025 — cli connectors run reviewed argv templates in one-shot tool containers](0025-cli-connectors.md)
 - [0026 — Chat tool connectors: markers for idempotent posts, errors read from 2xx bodies](0026-chat-tool-connectors.md)
 - [0027 — The inferX key can be set from Z, and lives in the model gateway only](0027-inferx-key-from-z.md)
+- [0028 — Google Workspace connectors: delegated only, Google's OAuth conventions, idempotent mails and events](0028-google-workspace-connectors.md)

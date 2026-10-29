@@ -99,6 +99,14 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   and proven on the litellm 1.105.0 image with Postgres (env default; API key from the next call and after a
   restart; wrong key reported without echo; value encrypted in LiteLLM's DB). Needs `STORE_MODEL_IN_DB=True` and a
   kept `LITELLM_SALT_KEY`. Z keeps the fingerprint, who and when, never the key.
+- Google Workspace (ADR 0028): `google` (Gmail, Calendar, Drive) and `gchat` connectors, delegated only, with
+  `oauth.provider: google`. developers.google.com is not reachable from this sandbox: paths, parameters and scopes
+  were checked against the discovery documents (`www.googleapis.com/discovery/v1/apis/<api>/<v>/rest`, reachable)
+  and Google's OpenID configuration. Unauthenticated probes showed gmail/calendar/drive on www.googleapis.com and
+  Chat only on chat.googleapis.com, hence two connectors. The fake enforces Google's rules (no offline_access,
+  refresh token only with access_type=offline, gmail.metadata cannot use q, requestId idempotence).
+- Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
+  operation could be approved (422). The pack linter now refuses it (the connector API already did).
 - Trap: `pkill -f <pattern>` with the pattern in the same command line kills the shell (exit 144): kill by PID.
 - Trap: `config/litellm.yaml` is git-ignored (local copy): edit `config/litellm.example.yaml` for the repository.
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):

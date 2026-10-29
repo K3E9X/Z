@@ -63,7 +63,7 @@ No tool is out of reach: anything below ships as a template (YAML + operation cl
 | Work tracking | **Jira (P0)**, Linear, Azure Boards, GitLab issues | search, issue, sprint | create/update issue, comment, transition | mcp / openapi |
 | Docs and knowledge | **Confluence (P0 read)**, SharePoint, Notion, Google Drive, wiki | pages, search, files | page create/update | mcp / openapi |
 | **Microsoft 365 (P1)** | **Outlook mail**, **Outlook calendar**, **Teams** (channels, chats, meetings, transcripts), **SharePoint**, **OneDrive**, Planner, To Do | mail search/read, events, free/busy, channel messages, meeting transcripts, files | send/reply mail, create event, post in a channel or chat, upload file, create task | Microsoft Graph (openapi) |
-| Google Workspace | Gmail, Calendar, Drive, Docs, Sheets, Chat | same as above | same as above | openapi |
+| **Google Workspace (P1)** | **Gmail**, **Calendar**, **Drive** (Docs and Sheets read as text), **Chat**; Docs, Sheets and Slides edits later | mail search/read, events, files, spaces and messages | send/reply mail, create event, post in a space or thread | openapi (`google`, `gchat`) |
 | Chat | **Mattermost (P1)**, Slack, Teams (via Graph) | channel history, threads | post, reply | openapi / mcp |
 | Email (generic) | IMAP/SMTP | mailbox search | send | rest (gateway-side client) |
 | Vulnerability and security tooling | **DefectDojo (P0)**, scanners (e.g. Logos), dependency trackers, secret scanners | findings, products | — (v1) | openapi |
@@ -82,6 +82,12 @@ Out of scope by decision: SIEM, SOC and DFIR tooling (handled by an existing too
 Mattermost and Slack ship in the `workplace` pack: channels, history and threads read with the read account; posts and
 replies applied by the executor with the write account, tagged with a marker (Mattermost `props`, Slack message
 metadata) so a crash never posts twice. Slack's HTTP 200 `ok: false` errors are read through `error_body` (ADR 0026).
+
+Google Workspace ships in the `workplace` pack as two delegated connectors, `google` (Gmail, Calendar, Drive on
+`www.googleapis.com`) and `gchat` (Chat on `chat.googleapis.com`), with `oauth.provider: google` (offline access
+without `offline_access`, no client credentials). Z builds every mail from reviewed fields (no Bcc, no extra
+headers) and tags mails (`X-Z-Action`), events (a private extended property) and Chat posts (`requestId`) so a crash
+never sends twice (ADR 0028).
 
 ## 8. Microsoft 365 in detail
 - **Two Entra ID app registrations**, so read and write stay apart even for delegated access: `z-m365-read` (read scopes, tokens held by the gateway) and `z-m365-write` (write scopes, tokens held by the executor only).
