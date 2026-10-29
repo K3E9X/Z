@@ -104,6 +104,31 @@ def connector_operations(manifest: dict[str, Any], pack_root: Path) -> list[Know
     return result
 
 
+def spec_problems(manifest: dict[str, Any], pack_root: Path) -> list[str]:
+    """openapi connectors: `builtin:` specs do not exist, and with a local spec every exact rule must name one of
+    its operations (a rule for an operation the spec lacks would expose an id with no method or path)."""
+    spec = manifest.get("spec")
+    if manifest.get("kind") != "openapi" or not isinstance(spec, str):
+        return []
+    if spec.startswith("builtin:"):
+        return [f"spec {spec!r}: there are no built-in specs; ship the OpenAPI file next to the connector"]
+    if spec.startswith(("http", "$")):
+        return []  # fetched when the connector is created; checked then
+    path = (pack_root / "connectors" / spec).resolve()
+    if not path.is_file():
+        return [f"spec {spec!r} not found next to the connector"]
+    from z_common.connectors.openapi import operations_from_spec
+
+    in_spec = set(operations_from_spec(path, manifest.get("operation_ids") or "from_operation_id"))
+    declared = {str(d["id"]) for d in manifest.get("declared") or []}
+    rules = (manifest.get("operations") or {}).get("rules") or []
+    return [
+        f"rule {rule['match']!r} names no operation of {spec}"
+        for rule in rules
+        if not is_glob(rule["match"]) and rule["match"] not in in_spec | declared
+    ]
+
+
 def lint(packs: list[Pack], repo_root: Path) -> Report:
     report = Report()
     agents: dict[str, tuple[Pack, dict[str, Any]]] = {}
@@ -162,7 +187,7 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
                 report.error(_rel(doc.path, repo_root), f"connector {cname!r} already defined")
             connectors[cname] = (pack, doc.data)
             _lint_connector_rules(doc.data, pack, _rel(doc.path, repo_root), report)
-            for problem in browser_problems(doc.data) + query_problems(doc.data):
+            for problem in browser_problems(doc.data) + query_problems(doc.data) + spec_problems(doc.data, pack.root):
                 report.error(_rel(doc.path, repo_root), problem)
             for known in connector_operations(doc.data, pack.root):
                 operations[known.full_id] = known

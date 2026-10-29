@@ -185,3 +185,38 @@ def test_lint_skill_name_must_match_directory(packs_copy: Path) -> None:
     path = packs_copy / "dev/skills/fix-issue/SKILL.md"
     path.write_text(path.read_text().replace("name: fix-issue", "name: fix-bug"))
     assert any("does not match directory" in e for e in _errors(packs_copy))
+
+
+def test_openapi_rules_must_name_operations_of_the_spec(tmp_path: Path) -> None:
+    from z_common.packs.lint import spec_problems
+
+    (tmp_path / "connectors").mkdir()
+    (tmp_path / "connectors" / "api.json").write_text(
+        '{"openapi": "3.0.3", "info": {"title": "t", "version": "1"},'
+        ' "paths": {"/items": {"get": {"operationId": "items.list"}}}}'
+    )
+    rules = {"rules": [{"match": "items.list", "class": "read"}, {"match": "items.purge", "class": "destructive"}]}
+    manifest = {"name": "x", "kind": "openapi", "spec": "./api.json", "operations": rules}
+    assert spec_problems(manifest, tmp_path) == ["rule 'items.purge' names no operation of ./api.json"]
+    assert spec_problems({**manifest, "spec": "builtin:anything"}, tmp_path)[0].startswith("spec 'builtin:anything'")
+    assert spec_problems({**manifest, "spec": "./missing.json"}, tmp_path) == [
+        "spec './missing.json' not found next to the connector"
+    ]
+    assert spec_problems({**manifest, "spec": "https://example.test/openapi.json"}, tmp_path) == []
+
+
+def test_workplace_m365_operations_come_from_the_graph_subset(repo: Path) -> None:
+    from z_common.connectors.operations import materialize
+
+    path = repo / "packs" / "workplace" / "connectors" / "m365.yaml"
+    ops = {o.local_id: o for o in materialize(yaml.safe_load(path.read_text()), path.parent)}
+    agent_tools = {
+        tool.removeprefix("gateway:m365.")
+        for agent in (repo / "packs" / "workplace" / "agents").glob("*.yaml")
+        for tool in yaml.safe_load(agent.read_text()).get("tools", [])
+        if tool.startswith("gateway:m365.")
+    }
+    assert agent_tools and agent_tools <= set(ops)
+    assert all(ops[t].source_ref.split(" ")[0] in {"GET", "POST"} for t in agent_tools)
+    assert ops["mail.reply"].source_ref == "POST /me/messages/{message_id}/reply"
+    assert ops["mail.delete"].op_class == OperationClass.destructive and not ops["mail.delete"].proposed_exposed
