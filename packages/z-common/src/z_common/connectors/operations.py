@@ -79,6 +79,10 @@ def _openapi_input_schema(operation: dict[str, Any], path_item: dict[str, Any]) 
     schema: dict[str, Any] = {"type": "object", "properties": properties}
     if required:
         schema["required"] = sorted(set(required))
+    if "body" in properties:
+        # a write is reviewed from its parameters and body only: an extra top-level key would be merged into the
+        # request (gateway.http.prepare) without appearing in the preview
+        schema["additionalProperties"] = False
     return schema
 
 

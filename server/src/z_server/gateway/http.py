@@ -97,6 +97,8 @@ def prepare(base: str, source_ref: str, input_schema: dict[str, Any], args: dict
     if remaining:
         if method in {"GET", "HEAD", "DELETE"}:
             params.update(remaining)
+        elif "body" in props:  # the body has its own schema: an undeclared key must not slip into it
+            raise InvokeError(f"unknown arguments {sorted(remaining)}")
         else:
             body = {**(body if isinstance(body, dict) else {}), **remaining}
     params = {k: (json.dumps(v) if isinstance(v, dict | list) else v) for k, v in params.items() if v is not None}

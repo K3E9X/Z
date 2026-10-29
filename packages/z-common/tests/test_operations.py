@@ -78,3 +78,23 @@ def test_google_connectors_are_delegated_only() -> None:
     service = {**google, "auth": {"write": {"service": {"flow": "client_credentials", "app": "write_app"}}}}
     assert "no client credentials grant" in connector_problems(service)[0]
     assert provider({"oauth": {"tenant_id": "t"}}) == "microsoft" and provider({}) is None
+
+
+def test_openapi_writes_with_a_body_take_no_other_top_level_key() -> None:
+    from z_common.connectors.operations import from_openapi
+
+    spec = {
+        "paths": {
+            "/items/{id}": {
+                "get": {"operationId": "items.get", "parameters": [{"name": "id", "in": "path"}]},
+                "post": {
+                    "operationId": "items.update",
+                    "parameters": [{"name": "id", "in": "path"}],
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                },
+            }
+        }
+    }
+    ops = {o.local_id: o.input_schema for o in from_openapi({"name": "t", "kind": "openapi"}, spec)}
+    assert ops["items.update"]["additionalProperties"] is False
+    assert "additionalProperties" not in ops["items.get"]
