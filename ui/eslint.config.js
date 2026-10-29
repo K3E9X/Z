@@ -53,7 +53,11 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Hooks and helpers live next to their provider components; fast refresh falls back to a reload.
+      'react-refresh/only-export-components': 'off',
+      // API responses are typed from the contract, but the UI stays defensive against older servers
+      // (fields the contract marks required may be missing on a server that lags the contract).
+      '@typescript-eslint/no-unnecessary-condition': 'off',
     },
   },
   {
