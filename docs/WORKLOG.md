@@ -70,6 +70,12 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   the pack linter (`threads.get`, not `posts.thread`).
 - Trap: FastAPI fakes defined inside a function must not use `from __future__ import annotations` with
   `Annotated[..., Depends(local)]` (the string annotation cannot be resolved and becomes a query parameter).
+- Found by reading the grader: eval checks only saw `output`, so every check on `actions[...]`/`report` and the
+  bare paths in three packs (`priority`, `verdict`, `playbook`) could never pass. The grader now builds the whole
+  job result of the contract; the linter refuses unrooted paths and warns below docs/08 minimums (10 per agent,
+  5 per skill). Eval suites written by five sub-agents (one per pack group), reviewed and committed per pack.
+- Connector builder "from docs": planner-model draft of `rest` operations, sanitised (relative paths, no header
+  arguments, classifier classes, reads only proposed for exposure); database and webhook kinds stay YAML.
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).

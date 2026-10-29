@@ -49,6 +49,7 @@ Each proposal carries its evidence (signal ids), the diff, and expected effect.
 
 ## 6. Evals
 - Format: JSONL per agent or skill, validated by `contracts/eval-case.schema.json`: `{id, input, context_fixtures?, expected?, rubric[], checks[]}`. Fixture paths are relative to the pack (`evals/fixtures/…`).
+- Check paths start at the job result: `output`, `report` (the agent's report.md), `actions[]` (captured proposals: operation, summary, payload, class), `questions[]`, `artifacts[]`, `tool_calls[]` and `diff`; the pack linter refuses other roots and warns on suites below the minimums below.
 - **Checks** are deterministic. Enum: `json_schema {schema}`, `field_equals {path, value}`, `contains {path, value}`, `regex {path, pattern}`, `artifact_exists {name}`, `diff_contains {value}`, `tests_pass`, `asked_human`, `count_actions {operation, equals}`, `no_action {operation}`, `no_write_tools`, `has_sources {min}`, `duplicate_detected`.
 - **Rubric** items are graded by `z-judge` with a 0–2 scale and a short justification; graders are themselves spot-checked by humans weekly.
 - `z eval <agent|skill> --models z-fast,z-heavy` compares models; results show on the agent's Evals tab and drive the default model choice per agent.
