@@ -1,0 +1,18 @@
+// Adds a group mapping in Admin, runs the dry run, saves (diff + step-up path) against the real server.
+import { chromium } from 'playwright-core'
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } })
+await ctx.addInitScript(() => localStorage.setItem('z.pref.theme', 'slate'))
+const p = await ctx.newPage()
+await p.goto('http://127.0.0.1:5173/admin?tab=mapping', { waitUntil: 'networkidle' })
+await p.getByRole('button', { name: 'Add a mapping' }).click()
+const inputs = p.getByLabel('GitLab group path')
+await inputs.last().fill('cyber/archi')
+await p.getByRole('combobox', { name: 'Role', exact: true }).last().selectOption('approver')
+await p.getByRole('button', { name: 'Run a dry run first' }).click()
+await p.waitForTimeout(800)
+await p.screenshot({ path: 'e2e/out/admin-mapping-pending.slate.png' })
+await p.getByRole('button', { name: /^(Save|Re-authenticate and save)$/ }).click()
+await p.waitForTimeout(1200)
+await p.screenshot({ path: 'e2e/out/admin-mapping-saved.slate.png' })
+await b.close()
