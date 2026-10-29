@@ -226,12 +226,19 @@ function EventBody({ p }: { p: EventPreview }) {
   )
 }
 
+const PLATFORM: Record<ChatMessagePreview['platform'], string> = {
+  teams: 'Teams',
+  slack: 'Slack',
+  mattermost: 'Mattermost',
+  google_chat: 'Google Chat',
+}
+
 function ChatBody({ p }: { p: ChatMessagePreview }) {
   return (
     <Section>
       <div className="flex items-center gap-2 text-meta text-text-3">
         <Icon name="chat" size={13} />
-        {p.platform} · {p.target}
+        {PLATFORM[p.platform] ?? p.platform} · {p.target}
       </div>
       <Markdown>{p.text}</Markdown>
     </Section>

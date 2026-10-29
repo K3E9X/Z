@@ -11,9 +11,11 @@ from z_common.models.actions import (
     CommentPreview,
     DiffFile,
     DiffPreview,
+    EventPreview,
     IssuePreview,
     IssueUpdatePreview,
     JsonPreview,
+    MailPreview,
 )
 
 MAX_DIFF_CHARS = 20_000
@@ -93,5 +95,46 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
         target = str(body.get("channel_id", "")) + (f" (reply to {body['root_id']})" if body.get("root_id") else "")
         return ChatMessagePreview(
             kind="chat_message", platform="mattermost", target=target, text=str(body.get("message", ""))
+        ).dump()
+    if operation == "gchat.messages.create":
+        body = payload.get("body") or {}
+        thread = (body.get("thread") or {}).get("name")
+        target = f"spaces/{payload.get('space', '')}" + (f" (reply in {thread})" if thread else "")
+        return ChatMessagePreview(
+            kind="chat_message", platform="google_chat", target=target, text=str(body.get("text", ""))
+        ).dump()
+    if operation == "google.gmail.messages.send":
+        mail = payload.get("body") or {}
+        return MailPreview(
+            kind="mail",
+            to=list(mail.get("to") or []),
+            cc=list(mail["cc"]) if mail.get("cc") else None,
+            subject=str(mail.get("subject", "")),
+            body=str(mail.get("body", "")),
+            in_reply_to=mail.get("in_reply_to"),
+        ).dump()
+    if operation == "google.calendar.events.insert":
+        event = payload.get("body") or {}
+
+        def when(value: Any) -> str:
+            v = value if isinstance(value, dict) else {}
+            return " ".join(str(x) for x in (v.get("dateTime") or v.get("date"), v.get("timeZone")) if x)
+
+        notify = {
+            "all": "invitations sent to every attendee",
+            "externalOnly": "invitations sent to guests outside the organisation",
+            "none": "no invitation sent",
+        }.get(str(payload.get("sendUpdates") or "none"))
+        return EventPreview(
+            kind="event",
+            title=str(event.get("summary", "")),
+            start=when(event.get("start")),
+            end=when(event.get("end")),
+            attendees=[str(a.get("email")) for a in event.get("attendees") or []] or None,
+            location=event.get("location"),
+            body="\n\n".join(
+                x for x in (event.get("description"), f"({notify})" if event.get("attendees") else None) if x
+            )
+            or None,
         ).dump()
     return JsonPreview(kind="json", data=payload).dump()

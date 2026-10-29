@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { StackedBars } from '@/components/charts'
 import { activeToken, MentionTextarea, parseMentions, type MentionOption } from '@/components/MentionTextarea'
+import { PreviewView } from '@/components/previews'
 import { defaultsFor, SchemaForm, validate, type FormValue, type JsonSchema } from '@/components/SchemaForm'
 import { StatusMark } from '@/components/StatusMark'
 import { can } from '@/lib/auth'
@@ -145,5 +146,35 @@ describe('permission checks', () => {
     expect(can(me, 'actions:approve', 't2')).toBe(false)
     expect(can(me, 'users:manage')).toBe(false)
     expect(can(null, 'missions:read')).toBe(false)
+  })
+})
+
+describe('PreviewView', () => {
+  it('names the chat platform and shows every mail recipient', () => {
+    const { unmount } = renderWithProviders(
+      <PreviewView
+        preview={{
+          kind: 'chat_message',
+          platform: 'google_chat',
+          target: 'spaces/AAAA',
+          text: 'edge-01 belongs to netops',
+        }}
+      />,
+    )
+    expect(screen.getByText(/Google Chat · spaces\/AAAA/)).toBeInTheDocument()
+    unmount()
+    renderWithProviders(
+      <PreviewView
+        preview={{
+          kind: 'mail',
+          to: ['bob@example.test'],
+          cc: ['carol@example.test'],
+          subject: 'Re: review',
+          body: 'Done',
+        }}
+      />,
+    )
+    expect(screen.getByText('carol@example.test')).toBeInTheDocument()
+    expect(screen.getByText('Re: review')).toBeInTheDocument()
   })
 })

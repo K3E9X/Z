@@ -1,0 +1,38 @@
+# Google Chat on each person's own account (the Chat API with user authentication). Two OAuth clients keep read and
+# write apart, as for the google connector (the same two clients can serve both: a personal connection is per connector):
+#   read  -> chat.spaces.readonly, chat.messages.readonly (gateway)
+#   write -> chat.messages.create (executor only; each post carries a request id, so a retry never posts twice)
+# The Chat API must be enabled and configured (a Chat app) in the Google Cloud project. Delegated only.
+name: gchat
+kind: openapi
+display_name: Google Chat
+base_url: ${GOOGLE_CHAT_API_URL:-https://chat.googleapis.com}
+spec: ./gchat.openapi.json    # Chat v1 subset (operationIds = Z operation ids)
+operation_ids: from_operation_id
+oauth:
+  provider: google
+  read_app:  { client_id: <z-google-read-client-id>,  secret: env:GOOGLE_READ_CLIENT_SECRET }
+  write_app: { client_id: <z-google-write-client-id>, secret: env:GOOGLE_WRITE_CLIENT_SECRET }
+auth:
+  read:
+    user:
+      flow: authorization_code_pkce
+      app: read_app
+      scopes:
+        - https://www.googleapis.com/auth/chat.spaces.readonly
+        - https://www.googleapis.com/auth/chat.messages.readonly
+  write:
+    user:
+      flow: authorization_code_pkce
+      app: write_app
+      scopes:
+        - https://www.googleapis.com/auth/chat.messages.create
+operations:
+  default_exposed: false
+  rules:
+    - { match: "spaces.list", class: read, exposed: true }
+    - { match: "messages.list", class: read, exposed: true }
+    - { match: "messages.create", class: write, exposed: true }
+    - { match: "messages.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 60 }
+data_class: C2

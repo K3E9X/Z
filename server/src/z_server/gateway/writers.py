@@ -7,7 +7,10 @@ adapter use the generic path: the operation's own request with the payload as ar
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
+from email import policy
+from email.message import EmailMessage
 from typing import Any, Protocol
 from urllib.parse import quote
 
@@ -443,6 +446,154 @@ class Slack:
         )
 
 
+MAIL_MARKER = "X-Z-Action"
+SENT_SCAN = 25  # recent sent mails read again after a crash (the executor retries within minutes, not days)
+
+
+class Google:
+    """Gmail, Calendar (the `google` connector), on the mission starter's account.
+
+    - gmail.messages.send: Z builds the RFC 2822 message from the reviewed fields (recipients, subject, text), so
+      the agent cannot add headers or hidden recipients; it carries an `X-Z-Action` header. After a crash the
+      account's latest SENT mails are read (headers only: the gmail.metadata scope) for it; only the account itself
+      can put a mail in SENT.
+    - calendar.events.insert: the event carries the private extended property `z_action` (private properties
+      belong to this calendar's copy of the event: an invitation from someone else cannot carry it); after a crash
+      the calendar is searched for it, and only an event this account created or organises counts.
+    """
+
+    @staticmethod
+    def _calendar(p: dict[str, Any]) -> str:
+        return quote(str(p.get("calendarId") or "primary"), safe="@")
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        if op.local_id == "gmail.messages.send":
+            listed = await gw.send(
+                connector,
+                "GET",
+                "/gmail/v1/users/me/messages",
+                "write",
+                params={"labelIds": "SENT", "maxResults": SENT_SCAN},
+            )
+            _fail(listed, "idempotency lookup")
+            since_ms = (action.created_at.timestamp() - 60) * 1000  # tolerate clock skew with Google
+            for item in (listed.body or {}).get("messages") or [] if isinstance(listed.body, dict) else []:
+                got = await gw.send(
+                    connector,
+                    "GET",
+                    f"/gmail/v1/users/me/messages/{quote(str(item.get('id', '')), safe='')}",
+                    "write",
+                    params={"format": "metadata", "metadataHeaders": MAIL_MARKER},
+                )
+                _fail(got, "idempotency lookup")
+                mail = got.body if isinstance(got.body, dict) else {}
+                headers = (mail.get("payload") or {}).get("headers") or []
+                if any(
+                    str(h.get("name", "")).lower() == MAIL_MARKER.lower() and h.get("value") == action.id
+                    for h in headers
+                    if isinstance(h, dict)
+                ):
+                    return {"id": mail.get("id"), "thread_id": mail.get("threadId"), "recovered": True}
+                if int(mail.get("internalDate") or 0) < since_ms:
+                    break  # newest first: older mails were sent before the proposal
+            return None
+        if op.local_id == "calendar.events.insert":
+            inv = await gw.send(
+                connector,
+                "GET",
+                f"/calendar/v3/calendars/{self._calendar(action.payload)}/events",
+                "write",
+                params={"privateExtendedProperty": f"z_action={action.id}", "showDeleted": "true", "maxResults": 5},
+            )
+            _fail(inv, "idempotency lookup")
+            for event in (inv.body or {}).get("items") or [] if isinstance(inv.body, dict) else []:
+                own = (event.get("creator") or {}).get("self") or (event.get("organizer") or {}).get("self")
+                private = (event.get("extendedProperties") or {}).get("private") or {}
+                if own and private.get("z_action") == action.id:
+                    return {"id": event.get("id"), "url": event.get("htmlLink"), "recovered": True}
+            return None
+        return None
+
+    @staticmethod
+    def mime(p: dict[str, Any], action_id: str) -> bytes:
+        message = EmailMessage(policy=policy.SMTP)
+        try:
+            message["To"] = ", ".join(p["to"])
+            if p.get("cc"):
+                message["Cc"] = ", ".join(p["cc"])
+            message["Subject"] = p["subject"]
+            if p.get("in_reply_to"):
+                message["In-Reply-To"] = p["in_reply_to"]
+                message["References"] = p["in_reply_to"]
+            message[MAIL_MARKER] = action_id
+            message.set_content(str(p.get("body") or ""))
+        except (ValueError, TypeError) as exc:  # a header with a line break, a malformed address
+            raise WriteError(f"the mail cannot be built: {exc}") from exc
+        return message.as_bytes()
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        p = action.payload
+        if op.local_id == "gmail.messages.send":
+            mail = dict(p.get("body") or {})
+            body: dict[str, Any] = {"raw": base64.urlsafe_b64encode(self.mime(mail, action.id)).decode()}
+            if mail.get("thread_id"):
+                body["threadId"] = mail["thread_id"]
+            inv = await gw.send(connector, "POST", "/gmail/v1/users/me/messages/send", "write", json_body=body)
+            _fail(inv, "send mail")
+            sent = inv.body if isinstance(inv.body, dict) else {}
+            return Applied(inv, {"id": sent.get("id"), "thread_id": sent.get("threadId")})
+        if op.local_id == "calendar.events.insert":
+            event = {**(p.get("body") or {}), "extendedProperties": {"private": {"z_action": action.id}}}
+            params = {"sendUpdates": p["sendUpdates"]} if p.get("sendUpdates") else None
+            inv = await gw.send(
+                connector,
+                "POST",
+                f"/calendar/v3/calendars/{self._calendar(p)}/events",
+                "write",
+                json_body=event,
+                params=params,
+            )
+            _fail(inv, "create event")
+            created = inv.body if isinstance(inv.body, dict) else {}
+            return Applied(inv, {"id": created.get("id"), "url": created.get("htmlLink")})
+        return await Generic().apply(gw, connector, op, action, files)
+
+
+class GoogleChat:
+    """Google Chat as the mission starter. A post carries the action id as its `requestId`: Chat returns the
+    existing message for a repeated request id instead of posting again, so a post after a crash is safe."""
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        return None  # messages.create is idempotent by its request id
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        if op.local_id != "messages.create":
+            return await Generic().apply(gw, connector, op, action, files)
+        p = action.payload
+        params: dict[str, Any] = {"requestId": action.id}
+        if p.get("messageReplyOption"):
+            params["messageReplyOption"] = p["messageReplyOption"]
+        inv = await gw.send(
+            connector,
+            "POST",
+            f"/v1/spaces/{quote(str(p.get('space', '')), safe='')}/messages",
+            "write",
+            json_body=dict(p.get("body") or {}),
+            params=params,
+        )
+        _fail(inv, "post")
+        posted = inv.body if isinstance(inv.body, dict) else {}
+        return Applied(inv, {"name": posted.get("name"), "thread": (posted.get("thread") or {}).get("name")})
+
+
 class Generic:
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -473,11 +624,16 @@ def writer_for(connector: Connector, op: Operation) -> Writer:
         return Mattermost()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("slack."):
         return Slack()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("google."):
+        return Google()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("gchat."):
+        return GoogleChat()
     return Generic()
 
 
 def idempotent(op: Operation) -> bool:
-    return op.source_ref.split(" ", 1)[0].upper() in {"PUT", "DELETE"} or op.local_id in {
-        "issues.update",
-        "issues.transition",
-    }
+    return (
+        op.source_ref.split(" ", 1)[0].upper() in {"PUT", "DELETE"}
+        or op.local_id in {"issues.update", "issues.transition"}
+        or op.id == "gchat.messages.create"  # the request id makes a second post return the first
+    )

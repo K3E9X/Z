@@ -20,6 +20,7 @@ from . import (
     defectdojo,
     fwconsole,
     gitlab,
+    google,
     graphql,
     jira,
     logos,
@@ -93,6 +94,8 @@ def create_app(seed: dict[str, Any] | None = None, tokens: dict[str, dict[str, s
     app.include_router(m365.router(store))
     app.include_router(mattermost.router(store))
     app.include_router(slack.router(store))
+    for google_router in google.routers(store):
+        app.include_router(google_router)
     app.include_router(botframework.router(store))
     app.include_router(fwconsole.router(store))
     app.include_router(graphql.router(store))
@@ -114,7 +117,7 @@ def create_app(seed: dict[str, Any] | None = None, tokens: dict[str, dict[str, s
     async def seed_data(request: Request) -> JSONResponse:
         """Replace the data of each tool present in the body (other tools keep their data)."""
         body = await request.json()
-        unknown = set(body) - set(TOOLS)
+        unknown = set(body) - set(TOOLS) - {"google"}  # google keeps its own state (OAuth grants)
         if unknown:
             return JSONResponse({"error": f"unknown tools {sorted(unknown)}"}, status_code=422)
         store.load(body, replace_all=False)

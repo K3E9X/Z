@@ -1,0 +1,244 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Google Chat API (subset used by Z)",
+    "version": "1",
+    "description": "Paths and parameters checked against Google's discovery document (chat v1). operationIds are Z operation ids. Calls act as the signed-in person (a delegated OAuth grant). A space is given by the id after spaces/ in its name (spaces/AAAA -> AAAA)."
+  },
+  "servers": [
+    {
+      "url": "https://chat.googleapis.com"
+    }
+  ],
+  "paths": {
+    "/v1/spaces": {
+      "get": {
+        "operationId": "spaces.list",
+        "summary": "Spaces (rooms, group chats, direct messages) I am a member of",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "e.g. spaceType = \"SPACE\""
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "nextPageToken of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/spaces/{space}/messages": {
+      "get": {
+        "operationId": "messages.list",
+        "summary": "Messages of a space, oldest first (filter by create_time or thread.name)",
+        "parameters": [
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Space id (spaces/AAAA -> AAAA)"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "description": "e.g. create_time > \"2026-10-01T00:00:00Z\""
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "create_time ASC",
+                "create_time DESC"
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "nextPageToken of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "messages.create",
+        "summary": "Post a message in a space, or reply in a thread",
+        "parameters": [
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Space id (spaces/AAAA -> AAAA)"
+          },
+          {
+            "name": "messageReplyOption",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+                "REPLY_MESSAGE_OR_FAIL"
+              ]
+            },
+            "description": "With thread.name: reply in that thread"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "thread": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "pattern": "^spaces/[A-Za-z0-9_\\-]{1,100}/threads/[A-Za-z0-9_\\-]{1,100}$"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/spaces/{space}/messages/{message}": {
+      "delete": {
+        "operationId": "messages.delete",
+        "summary": "Delete a message",
+        "parameters": [
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Space id"
+          },
+          {
+            "name": "message",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.\\-]{1,100}$"
+            },
+            "description": "Message id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
