@@ -102,6 +102,7 @@ function RejectDialog({ open, onClose, onReject }: { open: boolean; onClose: () 
         <Textarea
           rows={3}
           autoFocus
+          data-autofocus
           value={reason}
           onChange={(e) => {
             setReason(e.target.value)

@@ -163,6 +163,7 @@ export function StepUpProvider({ children, maxAgeS = 300 }: { children: ReactNod
                     }}
                     required
                     autoFocus
+                    data-autofocus
                   />
                 )}
               </Field>
@@ -190,7 +191,7 @@ export function StepUpProvider({ children, maxAgeS = 300 }: { children: ReactNod
             )}
             <div className="grid grid-cols-2 gap-2">
               <Button onClick={cancel}>Cancel</Button>
-              <Button type="submit" variant="primary" busy={busy} autoFocus={!local}>
+              <Button type="submit" variant="primary" busy={busy} autoFocus={!local} data-autofocus={!local ? true : undefined}>
                 Re-authenticate
               </Button>
             </div>

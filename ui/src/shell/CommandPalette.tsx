@@ -14,6 +14,28 @@ import { THEME_LABELS, THEMES, usePrefs } from '@/lib/prefs'
 import { missionStatus } from '@/lib/status'
 import { NAV } from './nav'
 
+/**
+ * Word-based matching instead of cmdk's fuzzy default (which matched "crit" against any value holding
+ * those letters in order). Every typed word must appear; prefix-of-a-word matches rank above inner ones.
+ */
+const ASK_Z = 'ask z new mission'
+
+export function paletteFilter(value: string, search: string, keywords?: string[]): number {
+  // "New mission: <what you typed>" always matches and stays first: Ask Z is the default action.
+  if (value.startsWith(ASK_Z)) return 1
+  const hay = `${value} ${(keywords ?? []).join(' ')}`.toLowerCase()
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 1
+  let score = 1
+  for (const w of words) {
+    const at = hay.indexOf(w)
+    if (at < 0) return 0
+    const boundary = at === 0 || /[\s\-_.:/@#"“]/.test(hay[at - 1] ?? '')
+    score *= hay.startsWith(w) ? 1 : boundary ? 0.8 : 0.4
+  }
+  return score
+}
+
 function Item({
   value,
   keywords,
@@ -65,6 +87,8 @@ export function CommandPalette({ open, initial, onClose }: { open: boolean; init
       setQuery(initial)
       if (typeof d.showModal === 'function') d.showModal()
       else d.setAttribute('open', '')
+      // React's autoFocus ran while the dialog was still closed (not focusable): focus the input now.
+      d.querySelector('input')?.focus()
     } else if (!open && d.open) {
       if (typeof d.close === 'function') d.close()
       else d.removeAttribute('open')
@@ -131,6 +155,7 @@ export function CommandPalette({ open, initial, onClose }: { open: boolean; init
         <Command
           label="Command palette"
           loop
+          filter={paletteFilter}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault()
@@ -154,9 +179,9 @@ export function CommandPalette({ open, initial, onClose }: { open: boolean; init
               Nothing matches. Press ↵ on “New mission” to ask Z.
             </Command.Empty>
             {canStart && (
-              <Command.Group heading="Ask Z" forceMount>
+              <Command.Group heading="Ask Z">
                 <Item
-                  value={`new mission ${q}`}
+                  value={`${ASK_Z} ${q}`}
                   keywords={[q]}
                   icon="arrowRight"
                   hint="↵"

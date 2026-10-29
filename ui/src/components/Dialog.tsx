@@ -38,6 +38,8 @@ export function Dialog({
     if (open && !d.open) {
       if (typeof d.showModal === 'function') d.showModal()
       else d.setAttribute('open', '')
+      // autoFocus ran while the dialog was closed (not focusable); [data-autofocus] marks the field to focus.
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus()
     } else if (!open && d.open) {
       if (typeof d.close === 'function') d.close()
       else d.removeAttribute('open')

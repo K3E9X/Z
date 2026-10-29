@@ -158,6 +158,7 @@ function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'renam
               aria-describedby={d}
               value={name}
               autoFocus
+              data-autofocus
               onChange={(e) => {
                 setName(e.target.value)
                 if (mode === 'duplicate' || !handle) setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
