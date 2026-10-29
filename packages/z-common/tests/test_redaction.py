@@ -20,6 +20,7 @@ from z_common.redaction import MASK, redact
         ("-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----", "MIIEow"),
         ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "ghp_abcdefghijklmnopqrstuvwxyz0123456789"),
         ("session zs_abcdefghijklmnopqrstuvwxyz", "zs_abcdefghijklmnopqrstuvwxyz"),
+        ("INFERX_API_KEY=ixk_" + "0f" * 32, "ixk_" + "0f" * 32),  # built at run time: no key-shaped literal
     ],
 )
 def test_patterns(raw: str, must_vanish: str) -> None:

@@ -21,6 +21,7 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("github_token", re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})")),
     ("slack_token", re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}")),
     ("openai_style_key", re.compile(r"\bsk-[A-Za-z0-9_-]{16,}")),
+    ("inferx_key", re.compile(r"\bixk_[0-9a-fA-F]{32,}")),  # inferX API keys: ixk_ + 64 hex
     ("aws_access_key", re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")),
     ("z_token", re.compile(r"\b(zs|zt|zw|zj|zr)_[A-Za-z0-9_-]{20,}")),
