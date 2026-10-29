@@ -48,7 +48,9 @@ async def connector_out(ctx: Ctx, row: Connector) -> m.Connector:
         for a in (await ctx.db.execute(select(Agent))).scalars()
         if any(t.startswith(f"gateway:{row.name}.") for t in a.profile.get("tools", []))
     )
-    creds = (await ctx.db.execute(select(Credential).where(Credential.connector_id == row.id))).scalars()
+    creds = (  # personal (user-scope) grants belong to their owner: listed only in /me/connections
+        await ctx.db.execute(select(Credential).where(Credential.connector_id == row.id, Credential.scope != "user"))
+    ).scalars()
     return m.Connector(
         id=row.id,
         name=row.name,
@@ -188,6 +190,10 @@ def _secret_refs(manifest: dict[str, Any]) -> list[tuple[str, Any]]:
             for f in SECRET_FIELDS:
                 if f in auth:
                     out.append((f"auth.{purpose}.{f}", auth[f]))
+    for app in ("read_app", "write_app"):
+        cfg = (manifest.get("oauth") or {}).get(app)
+        if isinstance(cfg, dict) and "secret" in cfg:
+            out.append((f"oauth.{app}.secret", cfg["secret"]))
     for name, value in ((manifest.get("mcp") or {}).get("env") or {}).items():
         out.append((f"mcp.env.{name}", value))
     return out
@@ -214,6 +220,23 @@ async def _validated_manifest(ctx: Ctx, manifest: dict[str, Any]) -> dict[str, A
         and read.get("secret") == write.get("secret")
     ):
         raise Problem("validation", "read and write credentials must be different secrets (invariant 7)")
+    apps = manifest.get("oauth") or {}
+    read_app, write_app = (apps.get(a) or {} for a in ("read_app", "write_app"))
+    if (
+        read_app
+        and write_app
+        and (
+            read_app.get("client_id") == write_app.get("client_id")
+            or (read_app.get("secret") and read_app.get("secret") == write_app.get("secret"))
+        )
+    ):
+        raise Problem("validation", "the read and write OAuth apps must be different registrations (invariant 7)")
+    for purpose in ("read", "write"):
+        auth = (manifest.get("auth") or {}).get(purpose)
+        for scope_flow in (auth or {}).values() if isinstance(auth, dict) and "type" not in auth else []:
+            wanted = "read_app" if purpose == "read" else "write_app"
+            if isinstance(scope_flow, dict) and scope_flow.get("app") not in (None, wanted):
+                raise Problem("validation", f"auth.{purpose} must use the {wanted} (read and write stay apart)")
     problems = [
         f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: does not match the connector schema ({e.validator})"
         for e in contract_validator("connector.schema.json").iter_errors(manifest)
