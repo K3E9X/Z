@@ -54,7 +54,11 @@ policy `security/licenses.yaml`: permissive and weak-copyleft allowed, strong co
 unknown metadata reviewed per package). Its first run excluded a closed `lmnr-claude-code-proxy` binary pulled in by
 openhands-sdk (`tool.uv.exclude-dependencies`).
 
-Not built yet: ZAP baseline, kind/k3d smoke installs, changelog generation (ADR 0018).
+The `kind` job of the e2e workflow installs the chart (values-k3s + `ci/kind/values-smoke.yaml`) with the images
+of the commit on a kind cluster whose `z` namespace enforces Pod Security `restricted`, then checks `/readyz`, the
+dev sign-in and the seeded playbooks.
+
+Not built yet: ZAP baseline, changelog generation (ADR 0018).
 
 ## 5. What the repository owner sets up
 **GitHub**
