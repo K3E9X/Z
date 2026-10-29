@@ -173,6 +173,15 @@ export function NewMission() {
     if (pb?.autonomy === 'read_only') setMode('read_only')
   }
 
+  // a playbook preselected from the URL (Playbooks -> Use) gets its own budget, data class and autonomy, as if picked
+  // (adjusted during render once the list has loaded: https://react.dev/learn/you-might-not-need-an-effect)
+  const [preselected, setPreselected] = useState<string | null>(null)
+  if (search.playbook && pbList.length && preselected !== search.playbook) {
+    setPreselected(search.playbook)
+    const pb = pbList.find((p) => p.name === search.playbook || p.id === search.playbook)
+    if (pb) choosePlaybook(pb.name ?? null)
+  }
+
   const draftPlan = async () => {
     if (playbook) {
       setPlan((playbook.steps ?? []).map((s) => ({ ...s })))
