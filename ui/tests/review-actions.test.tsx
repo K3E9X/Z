@@ -36,7 +36,12 @@ function action(id: string, summary: string): ProposedAction {
 
 const A = action('act_a', 'Write A: create SECOPS-1')
 const B = action('act_b', 'Write B: create SECOPS-2')
-const item = (a: ProposedAction): ReviewItem => ({ kind: 'action', action: a })
+const item = (a: ProposedAction): ReviewItem => ({
+  kind: 'action',
+  action: a,
+  mission_title: 'Weekly triage',
+  age_s: 60,
+})
 
 let steppedUp = false
 let reviewItems: ReviewItem[] = []
