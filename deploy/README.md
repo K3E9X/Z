@@ -92,3 +92,22 @@ helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f 
 3. Admin → Group mapping: map your GitLab groups to roles; run the dry run; save.
 4. Sign in with GitLab as a user mapped to `admin`: the bootstrap account is disabled automatically.
    To re-enable it: `docker compose ... exec z-server z-server bootstrap --reset`.
+
+## Audit log operations
+- **Forwarding** (Admin → Audit): syslog RFC 5424 over TLS (`tls://host:6514`) or JSON lines over HTTPS with an
+  optional bearer token given as a secret reference. Delivery is at-least-once and in order; the tab shows the
+  last delivered event and the last error. An internal CA is trusted through `SSL_CERT_FILE` (ADR 0021).
+- **Retention.** The app's database role cannot delete audit rows. Purge with the owner role, only up to a signed
+  checkpoint older than `retention_days`, so `verify` still anchors the remaining chain on that checkpoint:
+
+  ```sql
+  -- as the database owner (not z_app); keep audit_checkpoints
+  BEGIN;
+  ALTER TABLE audit_events DISABLE TRIGGER audit_events_append_only;
+  DELETE FROM audit_events WHERE seq <= (
+    SELECT max(seq) FROM audit_checkpoints WHERE ts < now() - interval '365 days');
+  ALTER TABLE audit_events ENABLE TRIGGER audit_events_append_only;
+  COMMIT;
+  ```
+
+  Export the range first (`GET /audit/export`) if your policy keeps an archive.

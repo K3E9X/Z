@@ -22,3 +22,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0018 — CI pipelines as built](0018-ci-pipelines.md)
 - [0019 — Take-over works on the checkpoint, not inside the runner](0019-take-over.md)
 - [0020 — GraphQL and database connectors run declared documents only](0020-graphql-and-database-connectors.md)
+- [0021 — Audit checkpoints and forwarding run in one leader-elected worker](0021-audit-checkpoints-and-forwarding.md)
