@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { describeCron } from '@/lib/cron'
-import { clockDuration, compactNumber, countWord, initials, percent, relative, shortHash } from '@/lib/format'
+import {
+  clockDuration,
+  compactNumber,
+  countWord,
+  dateTime,
+  initials,
+  percent,
+  relative,
+  shortHash,
+} from '@/lib/format'
 
 describe('format', () => {
   it('compacts token counts like the mockups', () => {
@@ -34,5 +43,17 @@ describe('format', () => {
     expect(describeCron('0 9 1 * *')).toBe('1st of every month, 9:00')
     expect(describeCron(undefined)).toBe('On demand')
     expect(describeCron('*/5 * * * *')).toBe('*/5 * * * *')
+  })
+
+  it('formats a date and time in UTC when asked, whatever the local zone', () => {
+    const tz = process.env.TZ
+    process.env.TZ = 'Pacific/Kiritimati'
+    try {
+      expect(dateTime('2026-03-01T23:30:05Z', { utc: true })).toBe('Mar 1, 2026 23:30:05')
+      expect(dateTime('2026-03-01T23:30:05Z')).toBe('Mar 2, 2026 13:30:05')
+    } finally {
+      if (tz === undefined) delete process.env.TZ
+      else process.env.TZ = tz
+    }
   })
 })

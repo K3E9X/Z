@@ -86,12 +86,16 @@ export function shortAge(seconds: number): string {
   return `${Math.round(seconds / 86400)} d`
 }
 
-export function clock(iso: string | null | undefined, withSeconds = false): string {
+/** HH:MM[:SS] in local time, or in UTC with `utc` (label it so). */
+export function clock(iso: string | null | undefined, withSeconds = false, utc = false): string {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
   const pad = (v: number) => String(v).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}${withSeconds ? `:${pad(d.getSeconds())}` : ''}`
+  const [h, m, s] = utc
+    ? [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
+    : [d.getHours(), d.getMinutes(), d.getSeconds()]
+  return `${pad(h)}:${pad(m)}${withSeconds ? `:${pad(s)}` : ''}`
 }
 
 export function shortDate(iso: string | null | undefined): string {
@@ -101,11 +105,18 @@ export function shortDate(iso: string | null | undefined): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function dateTime(iso: string | null | undefined): string {
+/** "Mar 1, 2026 23:30:05" in local time, or in UTC with `utc: true` (the caller labels it UTC). */
+export function dateTime(iso: string | null | undefined, opts: { utc?: boolean } = {}): string {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return `${d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} ${clock(iso, true)}`
+  const day = d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...(opts.utc ? { timeZone: 'UTC' } : {}),
+  })
+  return `${day} ${clock(iso, true, opts.utc)}`
 }
 
 export function isToday(iso: string | null | undefined, now = new Date()): boolean {

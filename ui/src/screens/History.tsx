@@ -106,7 +106,7 @@ function Detail({ e }: { e: AuditEvent }) {
       </div>
       <dl className="m-0 grid grid-cols-[96px_1fr] gap-x-4 gap-y-2.5 border-b border-line px-5 py-4 text-ui">
         <dt className="text-text-3">When</dt>
-        <dd className="m-0 font-mono text-[12.5px]">{dateTime(e.ts)} UTC</dd>
+        <dd className="m-0 font-mono text-[12.5px]">{dateTime(e.ts, { utc: true })} UTC</dd>
         <dt className="text-text-3">Actor</dt>
         <dd className="m-0">
           {actorLabel(e.actor)}
