@@ -5,8 +5,14 @@ inspect, logs, remove of runner containers) and checks every `create` body again
 compromised z-server still cannot start a privileged container, mount the host, join another network or run
 another image. Standard library only; one file.
 
+Two profiles, by container name:
+  z-job-<id>   agent runners: a runner image, `--job <id>`, user 10001, tmpfs /workspace and /tmp
+  z-tool-<id>  cli connector tools (ADR 0025): a tool image, any argv of strings (bounded), user 65534, tmpfs /tmp
+Both get the same host hardening (read-only root, no capability, no-new-privileges, runners network, limits).
+
 Environment:
   Z_RUNNER_IMAGES     comma-separated images that may be started (exact match, pin by digest)
+  Z_TOOL_IMAGES       comma-separated cli tool images (exact match, pinned by digest); empty: no tool containers
   Z_RUNNER_NETWORK    network runners join (default z_runners)
   Z_ALLOWED_RUNTIMES  optional extra OCI runtimes, e.g. runsc (gVisor)
   Z_MAX_MEMORY, Z_MAX_NANO_CPUS, Z_MAX_PIDS  ceilings (bytes, 1e-9 CPUs, processes)
@@ -34,6 +40,9 @@ CONTAINER = re.compile(
     r"^/containers/(?P<id>[A-Za-z0-9][A-Za-z0-9_.-]{0,127})(?P<rest>/json|/logs|/start|/stop|/wait)?$"
 )
 NAME = re.compile(r"^z-job-[a-z0-9-]{1,80}$")
+TOOL_NAME = re.compile(r"^z-tool-[a-z0-9-]{1,80}$")
+MAX_TOOL_ARGV = 64
+MAX_TOOL_ARG = 4096
 TOP_KEYS = {"Image", "Cmd", "Env", "User", "WorkingDir", "Labels", "HostConfig"}
 HOST_KEYS = {
     "NetworkMode",
@@ -60,6 +69,7 @@ class Refused(Exception):
 class Policy:
     images: set[str]
     network: str = "z_runners"
+    tool_images: set[str] = field(default_factory=set)
     runtimes: set[str] = field(default_factory=set)
     max_memory: int = 8 * 1024**3
     max_nano_cpus: int = 8_000_000_000
@@ -74,6 +84,7 @@ class Policy:
         return cls(
             images=images,
             network=e.get("Z_RUNNER_NETWORK", "z_runners"),
+            tool_images={i.strip() for i in e.get("Z_TOOL_IMAGES", "").split(",") if i.strip()},
             runtimes={r.strip() for r in e.get("Z_ALLOWED_RUNTIMES", "").split(",") if r.strip()},
             max_memory=int(e.get("Z_MAX_MEMORY", 8 * 1024**3)),
             max_nano_cpus=int(e.get("Z_MAX_NANO_CPUS", 8_000_000_000)),
@@ -82,8 +93,10 @@ class Policy:
 
     def check_create(self, query: dict[str, list[str]], body: Any) -> None:
         name = (query.get("name") or [""])[0]
+        if TOOL_NAME.match(name):
+            return self._check_tool(body)
         if not NAME.match(name):
-            raise Refused("container name must be z-job-<id>")
+            raise Refused("container name must be z-job-<id> or z-tool-<id>")
         if not isinstance(body, dict):
             raise Refused("body must be a JSON object")
         if unknown := set(body) - TOP_KEYS:
@@ -102,6 +115,34 @@ class Policy:
         if not (isinstance(env, list) and all(isinstance(v, str) and "=" in v for v in env)):
             raise Refused("Env must be a list of NAME=value")
         self._check_host(body.get("HostConfig"))
+
+    def _check_tool(self, body: Any) -> None:
+        if not isinstance(body, dict):
+            raise Refused("body must be a JSON object")
+        if unknown := set(body) - TOP_KEYS:
+            raise Refused(f"keys not allowed: {sorted(unknown)}")
+        if body.get("Image") not in self.tool_images:
+            raise Refused("image is not an allowed tool image")
+        if body.get("User") != "65534:65534":
+            raise Refused("tools run as 65534:65534")
+        cmd = body.get("Cmd")
+        if not (
+            isinstance(cmd, list)
+            and 0 < len(cmd) <= MAX_TOOL_ARGV
+            and all(isinstance(c, str) and len(c) <= MAX_TOOL_ARG and "\x00" not in c for c in cmd)
+        ):
+            raise Refused(f"command must be 1 to {MAX_TOOL_ARGV} strings")
+        labels = body.get("Labels")
+        if not (isinstance(labels, dict) and str(labels.get(LABEL, "")).startswith("tool:")):
+            raise Refused(f"label {LABEL}=tool:<id> is required")
+        env = body.get("Env") or []
+        if not (isinstance(env, list) and all(isinstance(v, str) and "=" in v for v in env)):
+            raise Refused("Env must be a list of NAME=value")
+        host = body.get("HostConfig")
+        self._check_host(host)
+        if set((host or {}).get("Tmpfs") or {}) - {"/tmp"}:  # noqa: S108 - tmpfs inside the tool container
+            raise Refused("tool containers get a tmpfs on /tmp only")
+        return None
 
     def _check_host(self, host: Any) -> None:
         if not isinstance(host, dict):

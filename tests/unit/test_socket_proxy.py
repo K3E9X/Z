@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import importlib.util
+import json
 import os
 import socket
 import sys
@@ -161,3 +162,85 @@ def test_executor_through_the_proxy_on_real_docker(proxy: tuple[str, str]) -> No
         assert c.get("/v1.43/containers/json").status_code == 403  # cannot even list other containers
         assert c.post("/v1.43/images/create", params={"fromImage": "alpine"}).status_code == 403
         assert c.get("/_ping").status_code == 200
+
+
+# ---------------------------------------------------------------- tool profile (cli connectors, ADR 0025)
+
+TOOL = "registry.example.internal/kubectl@sha256:" + "b" * 64
+TOOL_POLICY = sp.Policy(images={IMAGE}, tool_images={TOOL})
+TOOL_QUERY = {"name": ["z-tool-0123456789abcdef"]}
+
+
+def tool_body() -> dict[str, Any]:
+    executor = DockerExecutor(base_url="http://proxy", image=IMAGE)
+    return executor.tool_spec("0123456789abcdef", TOOL, ["get", "pods", "-o", "json"], {"KUBE_TOKEN": "t"})
+
+
+def test_the_tool_spec_passes() -> None:
+    TOOL_POLICY.check_create(TOOL_QUERY, tool_body())
+
+
+TOOL_ESCALATIONS = [
+    ("runner image as tool", lambda b: b.update(Image=IMAGE)),
+    ("unlisted tool image", lambda b: b.update(Image="alpine@sha256:" + "c" * 64)),
+    ("root user", lambda b: b.update(User="0:0")),
+    ("runner user", lambda b: b.update(User="10001:10001")),
+    ("command not a list", lambda b: b.update(Cmd="get pods")),
+    ("command too long", lambda b: b.update(Cmd=["x"] * 65)),
+    ("empty command", lambda b: b.update(Cmd=[])),
+    ("workspace tmpfs", lambda b: b["HostConfig"]["Tmpfs"].update({"/workspace": "rw,nosuid,nodev"})),
+    ("no tool label", lambda b: b.update(Labels={sp.LABEL: "job_1"})),
+    ("privileged", lambda b: b["HostConfig"].update(Privileged=True)),
+    ("host network", lambda b: b["HostConfig"].update(NetworkMode="host")),
+    ("entrypoint", lambda b: b.update(Entrypoint=["/bin/sh"])),
+]
+
+
+@pytest.mark.parametrize(("name", "mutate"), TOOL_ESCALATIONS, ids=[e[0] for e in TOOL_ESCALATIONS])
+def test_tool_escalations_are_refused(name: str, mutate: Any) -> None:
+    body = copy.deepcopy(tool_body())
+    mutate(body)
+    with pytest.raises(sp.Refused):
+        TOOL_POLICY.check_create(TOOL_QUERY, body)
+
+
+def test_no_tool_images_means_no_tool_containers() -> None:
+    with pytest.raises(sp.Refused, match="not an allowed tool image"):
+        POLICY.check_create(TOOL_QUERY, tool_body())
+    with pytest.raises(sp.Refused):  # a runner name cannot carry a tool body either
+        TOOL_POLICY.check_create(QUERY, tool_body())
+
+
+def _local_tool_image() -> str | None:
+    for image in _docker("GET", "/v1.43/images/json").json():
+        for tag in image.get("RepoTags") or []:
+            if tag.startswith("python:3.12-slim"):  # no ENTRYPOINT: the command is the whole argv
+                return str(image["Id"])
+    return None
+
+
+def test_cli_tool_runs_through_the_proxy_on_real_docker(proxy: tuple[str, str]) -> None:
+    _url, runner_image = proxy
+    tool = _local_tool_image()
+    if tool is None:
+        pytest.skip("no local python:3.12-slim image")
+    # the fixture's proxy only knows the runner image: start a second one that also allows the tool image
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    policy = sp.Policy(images={runner_image}, tool_images={tool}, network="z_test_runners")
+    server = ThreadingHTTPServer(("127.0.0.1", port), sp.make_handler(policy, sp.Upstream(DOCKER_SOCKET)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    executor = DockerExecutor(base_url=f"http://127.0.0.1:{port}", image=runner_image, network="z_test_runners")
+    code = "import json,os,sys; print(json.dumps({'uid': os.getuid(), 'tok': os.environ['T']})); print('diag', file=sys.stderr)"
+    try:
+        ok = asyncio.run(executor.run_tool(tool, ["python3", "-c", code], {"T": "tok"}, 60))
+        failed = asyncio.run(executor.run_tool(tool, ["python3", "-c", "import sys; sys.exit(3)"], {}, 60))
+        slow = asyncio.run(executor.run_tool(tool, ["python3", "-c", "import time; time.sleep(60)"], {}, 3))
+    finally:
+        server.shutdown()
+    assert ok.exit_code == 0 and json.loads(ok.stdout) == {"uid": 65534, "tok": "tok"} and ok.stderr.strip() == "diag"
+    assert failed.exit_code == 3 and not failed.timed_out
+    assert slow.timed_out
+    leftovers = _docker("GET", "/v1.43/containers/json", params={"all": 1}).json()
+    assert not [c for c in leftovers if any(n.startswith("/z-tool-") for n in c.get("Names") or [])]
