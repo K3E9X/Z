@@ -58,7 +58,10 @@ The `kind` job of the e2e workflow installs the chart (values-k3s + `ci/kind/val
 of the commit on a kind cluster whose `z` namespace enforces Pod Security `restricted`, then checks `/readyz`, the
 dev sign-in and the seeded playbooks.
 
-Not built yet: ZAP baseline, changelog generation (ADR 0018).
+Release notes: the GitLab `release:notes` job runs `ci/scripts/changelog.py` (conventional commits since the previous
+`vX.Y.Z` tag, grouped into breaking changes, features, fixes and maintenance) and the release uses that file.
+
+Not built yet: ZAP baseline (ADR 0018).
 
 ## 5. What the repository owner sets up
 **GitHub**
