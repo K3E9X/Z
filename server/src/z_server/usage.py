@@ -92,8 +92,16 @@ async def _upsert(db: AsyncSession, values: dict[str, object]) -> None:
 
 
 async def aggregate(
-    db: AsyncSession, group_by: str, start: datetime, end: datetime, bucket: str, scope: dict[str, Any] | None = None
+    db: AsyncSession,
+    group_by: str,
+    start: datetime,
+    end: datetime,
+    bucket: str,
+    scope: dict[str, Any] | None = None,
+    prices: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    """Token series per `group_by` key. With `prices` (inference.internal_cost_per_mtok: alias -> {input,
+    output} per million tokens), each series has the `cost` of its priced models; None when none is priced."""
     if group_by not in GROUP_COLUMNS:
         raise Problem("validation", f"group_by must be one of {', '.join(GROUP_COLUMNS)}")
     if bucket not in {"hour", "day"}:
@@ -136,6 +144,27 @@ async def aggregate(
         )
         for name, v in (("tokens_in", tin), ("tokens_out", tout), ("cached_tokens", cached), ("requests", requests)):
             s[name] += int(v)
+    if prices:
+        by_model = (
+            select(
+                key.label("key"), UsageRecord.model, func.sum(UsageRecord.tokens_in), func.sum(UsageRecord.tokens_out)
+            )
+            .where(UsageRecord.bucket == "hour", UsageRecord.ts_bucket >= hour(start), UsageRecord.ts_bucket < end)
+            .group_by(key, UsageRecord.model)
+        )
+        for column, value in (scope or {}).items():
+            by_model = by_model.where(
+                GROUP_COLUMNS[column].in_(value)
+                if isinstance(value, list | set | tuple)
+                else GROUP_COLUMNS[column] == value
+            )
+        for k, model, tin, tout in (await db.execute(by_model)).all():
+            price = prices.get(model) if isinstance(prices.get(model), dict) else None
+            if price is None or (k or "(none)") not in series:
+                continue
+            target = series[k or "(none)"]
+            cost = (int(tin) * float(price.get("input", 0)) + int(tout) * float(price.get("output", 0))) / 1e6
+            target["cost"] = round((target.get("cost") or 0.0) + cost, 4)
     if group_by == "team":
         names = {t.id: t.name for t in (await db.execute(select(Team))).scalars()}
         for s in series.values():

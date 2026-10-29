@@ -136,8 +136,17 @@ def test_usage_is_recorded_and_aggregated(app: TestClient, jars: dict[str, dict[
         and series["requests"] == 2
         and series["cached_tokens"] == 20
     )
+    inference = app.app.state.z.config.setdefault("inference", {})  # type: ignore[attr-defined]
+    inference["internal_cost_per_mtok"] = {}
+    [unpriced] = app.get("/api/v1/usage", params={"group_by": "model"}).json()["series"]
+    assert unpriced.get("cost") is None
+    inference["internal_cost_per_mtok"] = {"z-heavy": {"input": 1.5, "output": 5.5}}
+    [priced] = app.get("/api/v1/usage", params={"group_by": "model"}).json()["series"]
+    assert priced["cost"] == round((1500 * 1.5 + 300 * 5.5) / 1e6, 4), priced
     by_team = app.get("/api/v1/usage", params={"group_by": "team", "bucket": "day"}).json()
     assert by_team["series"][0]["label"] == "Cyber Ops"
+    teams = app.get("/api/v1/analytics").json()["tokens_by_team"]
+    assert teams and teams[0]["cost"] == priced["cost"], teams
     csv = app.get("/api/v1/usage", params={"group_by": "agent", "format": "csv"})
     assert csv.headers["content-type"].startswith("text/csv") and "summarizer" in csv.text
     assert app.get("/api/v1/usage", params={"bucket": "minute"}).status_code == 422

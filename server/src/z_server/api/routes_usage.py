@@ -53,7 +53,7 @@ async def get_usage(
     begin, end = _window(datetime.fromisoformat(start) if start else None, to)
     teams = _team_scope(ctx, "usage:read")
     scope = {"team": teams} if teams is not None else None
-    series = await usage.aggregate(ctx.db, group_by, begin, end, bucket, scope)
+    series = await usage.aggregate(ctx.db, group_by, begin, end, bucket, scope, _prices(ctx))
     caps = {b.scope: b.limit for b in (await ctx.db.execute(select(Budget))).scalars()}
     for s in series:
         s["cap"] = caps.get(f"{group_by}:{s['key']}") if group_by in {"team", "user", "playbook", "agent"} else None
@@ -243,7 +243,9 @@ async def get_analytics(ctx: CtxDep, to: datetime | None = None, team: str | Non
     for a in actions:
         if a.status == "failed":
             failures[a.connector] = failures.get(a.connector, 0) + 1
-    tokens = await usage.aggregate(ctx.db, "team", begin, end, "day", {"team": teams} if teams is not None else None)
+    tokens = await usage.aggregate(
+        ctx.db, "team", begin, end, "day", {"team": teams} if teams is not None else None, _prices(ctx)
+    )
     return m.Analytics.model_validate(
         {
             "from": begin,
@@ -257,12 +259,17 @@ async def get_analytics(ctx: CtxDep, to: datetime | None = None, team: str | Non
                 {"connector": c, "failures": n} for c, n in sorted(failures.items(), key=lambda x: -x[1])
             ],
             "tokens_by_team": [
-                {"team": t.get("label") or t["key"], "tokens": t["tokens_in"] + t["tokens_out"], "cost": None}
+                {"team": t.get("label") or t["key"], "tokens": t["tokens_in"] + t["tokens_out"], "cost": t.get("cost")}
                 for t in tokens
             ],
             "missions_by_status": by_status,
         }
     )
+
+
+def _prices(ctx: Ctx) -> dict[str, Any]:
+    """inferX prices per alias (EUR per million tokens, inference.internal_cost_per_mtok)."""
+    return dict((ctx.state.config.get("inference") or {}).get("internal_cost_per_mtok") or {})
 
 
 # ---------------------------------------------------------------- global stream
