@@ -1,0 +1,10 @@
+# Build context is the repository root; z-ui needs only ui/, contracts/ and this directory.
+*
+!ui/
+!contracts/
+!deploy/images/z-ui/
+ui/node_modules
+ui/dist
+ui/coverage
+ui/e2e/out
+ui/test-results
