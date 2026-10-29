@@ -1,0 +1,55 @@
+# Vanilla Kubernetes: ingress-nginx, external Postgres (DSNs in an existing Secret), PDBs on.
+# NetworkPolicy needs a CNI that enforces it (Cilium, Calico...).
+#   kubectl -n z create secret generic z-db \
+#     --from-literal=DATABASE_URL='postgresql://z_app:...@pg.example.internal:5432/z' \
+#     --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg.example.internal:5432/z' \
+#     --from-literal=LITELLM_DATABASE_URL='postgresql://litellm:...@pg.example.internal:5432/litellm'
+#   helm upgrade --install z deploy/helm/z -n z --create-namespace -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
+
+server:
+  # Two `all` replicas: the queue, action executor and intake claim work with FOR UPDATE SKIP LOCKED, and the
+  # gateway divides its per-minute limits by Z_GATEWAY_REPLICAS. Both write artifacts: RWX storage below.
+  replicas: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: z
+          app.kubernetes.io/component: server
+
+ui:
+  replicas: 2
+
+litellm:
+  replicas: 2
+
+postgres:
+  embedded: false
+
+database:
+  existingSecret: z-db
+
+migrate:
+  mode: auto               # hook: pre-install,pre-upgrade Job with MIGRATE_DATABASE_URL
+
+persistence:
+  artifacts:
+    storageClass: ""       # a StorageClass that provides ReadWriteMany (NFS, CephFS, EFS, Azure Files...)
+    accessModes: [ReadWriteMany]
+
+ingress:
+  className: nginx
+
+networkPolicy:
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+
+podDisruptionBudget:
+  enabled: true

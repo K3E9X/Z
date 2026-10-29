@@ -1,10 +1,11 @@
 {{- if .Values.networkPolicy.enabled }}
 {{- $np := .Values.networkPolicy }}
-{{- $runners := dict "namespaceSelector" (dict "matchLabels" (dict "kubernetes.io/metadata.name" .Values.runners.namespace)) }}
-{{- $controller := dict "namespaceSelector" $np.ingressController.namespaceSelector }}
+{{- $runners := list (dict "namespaceSelector" (dict "matchLabels" (dict "kubernetes.io/metadata.name" .Values.runners.namespace))) }}
+{{- $peer := dict "namespaceSelector" $np.ingressController.namespaceSelector }}
 {{- if $np.ingressController.podSelector }}
-{{- $_ := set $controller "podSelector" $np.ingressController.podSelector }}
+{{- $_ := set $peer "podSelector" $np.ingressController.podSelector }}
 {{- end }}
+{{- $controller := list $peer }}
 # Release namespace: ingress to each Z pod only from the pods that need it. Egress is left open for z-server
 # (GitLab, tools, Kubernetes API) and LiteLLM (inference cluster) unless networkPolicy.litellmEgress is set.
 apiVersion: networking.k8s.io/v1
@@ -21,13 +22,13 @@ spec:
   ingress:
     - from:
         # runners: internal API (job token) and the tool gateway
-        - {{- toYaml $runners | nindent 10 }}
+        {{- toYaml $runners | nindent 8 }}
         {{- if .Values.ui.enabled }}
         - podSelector:
             matchLabels:
               {{- include "z.selectorLabels" (dict "root" . "component" "ui") | nindent 14 }}
         {{- else }}
-        - {{- toYaml $controller | nindent 10 }}
+        {{- toYaml $controller | nindent 8 }}
         {{- end }}
         {{- with $np.metricsFrom }}
         {{- toYaml . | nindent 8 }}
@@ -54,7 +55,7 @@ spec:
   ingress:
     - from:
         # runners call models with their mission's virtual key; z-server manages keys with the master key
-        - {{- toYaml $runners | nindent 10 }}
+        {{- toYaml $runners | nindent 8 }}
         - podSelector:
             matchLabels:
               {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 14 }}
@@ -101,7 +102,7 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - {{- toYaml $controller | nindent 10 }}
+        {{- toYaml $controller | nindent 8 }}
       ports:
         - protocol: TCP
           port: {{ .Values.ui.port }}
