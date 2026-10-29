@@ -19,6 +19,7 @@ from z_common.models.enums import JudgeVerdict
 
 # Runner-private files inside the workspace (skill resources). Never part of the job's output.
 PRIVATE_DIR = ".z"
+DELTA_META = ".z-delta.json"
 
 
 class JailError(PermissionError):
@@ -97,22 +98,42 @@ class Workspace:
             for rel in changed:
                 tar.add(self.root / rel, arcname=rel, recursive=False)
             meta = json.dumps({"deleted": deleted}).encode()
-            info = tarfile.TarInfo(".z-delta.json")
+            info = tarfile.TarInfo(DELTA_META)
             info.size = len(meta)
             tar.addfile(info, io.BytesIO(meta))
         return buf.getvalue(), current
 
     def apply_delta(self, blob: bytes, limits: ArchiveLimits | None = None) -> None:
+        """Apply a delta of `delta()` on the staged tree. Deletions act on the path itself (never on what a link
+        points to), and only below a parent directory that resolves inside the workspace."""
         deleted: list[str] = []
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
-            meta = tar.extractfile(".z-delta.json")
+            try:
+                meta = tar.extractfile(DELTA_META)
+            except KeyError:
+                meta = None
             if meta is not None:
-                deleted = list(json.loads(meta.read()).get("deleted", []))
-        for rel in deleted:
-            target = self.resolve(rel, for_write=True)
+                data = json.loads(meta.read())
+                deleted = [str(p) for p in data.get("deleted", [])]
+            # A file that replaced a staged link is written as itself, not through the link.
+            replaced = [m.name for m in tar if m.name != DELTA_META and not m.isdir()]
+        for rel in [*deleted, *replaced]:
+            target = self._leaf(rel)
             if target.is_symlink() or target.is_file():
                 target.unlink()
-        extract_tar(io.BytesIO(blob), self.root, limits or ArchiveLimits(), skip={".z-delta.json"})
+        extract_tar(io.BytesIO(blob), self.root, limits or ArchiveLimits(), skip={DELTA_META})
+
+    def _leaf(self, rel: str) -> Path:
+        """`rel` inside the workspace with its parent directory resolved (links followed) but not its last
+        component, so that a link is handled as itself. The private dir and paths escaping the workspace are
+        refused."""
+        name = _safe_member_name(rel)
+        if PurePosixPath(name).parts[0] == PRIVATE_DIR:
+            raise ArchiveError(f"the workspace delta touches the private directory: {rel!r}")
+        parent = Path(os.path.realpath(self.root / posixpath.dirname(name)))
+        if not parent.is_relative_to(self.root):
+            raise ArchiveError(f"the workspace delta reaches outside the workspace: {rel!r}")
+        return parent / posixpath.basename(name)
 
 
 def sha256_file(path: Path) -> str:

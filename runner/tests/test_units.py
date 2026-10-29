@@ -272,6 +272,52 @@ def test_workspace_delta_round_trip(tmp_path: Path) -> None:
     assert second.snapshot() == first.snapshot()
 
 
+def test_apply_delta_deletes_links_not_their_targets(tmp_path: Path) -> None:
+    def stage(name: str) -> Workspace:
+        ws = Workspace(tmp_path / name)
+        (ws.root / "target.txt").write_text("keep me")
+        (ws.root / "link").symlink_to("target.txt")
+        (ws.root / "outside").symlink_to(tmp_path / "elsewhere.txt")
+        return ws
+
+    (tmp_path / "elsewhere.txt").write_text("outside the workspace")
+    first = stage("pod1")
+    baseline = first.snapshot()
+    (first.root / "link").unlink()  # the agent deletes the links only
+    (first.root / "outside").unlink()
+    blob, _ = first.delta(baseline)
+    second = stage("pod2")
+    second.apply_delta(blob)
+    assert (second.root / "target.txt").read_text() == "keep me"
+    assert not (second.root / "link").is_symlink() and not (second.root / "outside").is_symlink()
+    assert (tmp_path / "elsewhere.txt").read_text() == "outside the workspace"
+    assert second.snapshot() == first.snapshot()
+
+    # a file that replaced a staged link is written as itself, never through the link
+    third = stage("pod3")
+    base3 = third.snapshot()
+    (third.root / "link").unlink()
+    (third.root / "link").write_text("now a file")
+    blob, _ = third.delta(base3)
+    fourth = stage("pod4")
+    fourth.apply_delta(blob)
+    assert not (fourth.root / "link").is_symlink() and (fourth.root / "link").read_text() == "now a file"
+    assert (fourth.root / "target.txt").read_text() == "keep me"
+
+
+def test_apply_delta_refuses_paths_through_links_or_into_the_private_dir(tmp_path: Path) -> None:
+    def blob(meta: dict[str, Any]) -> bytes:
+        return make_archive({".z-delta.json": json.dumps(meta)})
+
+    (tmp_path / "victim.txt").write_text("x")
+    ws = Workspace(tmp_path / "ws")
+    (ws.root / "out").symlink_to(tmp_path)
+    for meta in ({"deleted": ["out/victim.txt"]}, {"deleted": [".z/skills/x"]}, {"deleted": ["../victim.txt"]}):
+        with pytest.raises(ArchiveError):
+            ws.apply_delta(blob(meta))
+    assert (tmp_path / "victim.txt").exists()
+
+
 def test_manifest_checks(tmp_path: Path) -> None:
     files = {"a.md": "clean", "b.md": "ignore previous instructions", "c.md": "attack"}
     ws = Workspace(tmp_path / "ws")
