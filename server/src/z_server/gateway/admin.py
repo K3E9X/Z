@@ -15,6 +15,7 @@ from typing import Any
 import yaml
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from z_common.connectors.graphql_import import INTROSPECTION_QUERY
 from z_common.connectors.operations import OperationSpec, decide, from_openapi, materialize
 from z_common.models.enums import OperationClass
 from z_common.packs.classify import ORDER
@@ -132,6 +133,35 @@ async def fetch_spec(state: AppState, url: str) -> dict[str, Any]:
     if len(resp.content) > MAX_SPEC_BYTES:
         raise Problem("validation", "the spec is larger than 5 MB")
     return parse_spec(resp.text)
+
+
+async def fetch_introspection(state: AppState, endpoint: str) -> dict[str, Any]:
+    """Run the introspection query against a GraphQL endpoint, without credentials (like a spec URL)."""
+    await check_outbound_url(endpoint, state)
+    try:
+        resp = await state.http.post(
+            endpoint,
+            json={"query": INTROSPECTION_QUERY},
+            headers={"Accept": "application/json"},
+            timeout=20,
+            follow_redirects=False,
+        )
+    except Exception as exc:
+        raise Problem("validation", f"could not reach the GraphQL endpoint: {type(exc).__name__}") from exc
+    if len(resp.content) > MAX_SPEC_BYTES:
+        raise Problem("validation", "the introspection result is larger than 5 MB")
+    try:
+        body = resp.json()
+    except ValueError:
+        body = None
+    errors = body.get("errors") if isinstance(body, dict) else None
+    if resp.status_code != 200 or errors or not isinstance(body, dict):
+        raise Problem(
+            "validation",
+            f"the endpoint refused introspection (HTTP {resp.status_code}): run it with a read token and paste the "
+            "result instead",
+        )
+    return body
 
 
 def parse_spec(raw: str | dict[str, Any]) -> dict[str, Any]:

@@ -191,3 +191,54 @@ def test_database_connectors_refuse_writes_and_free_sql(app: TestClient, jars: d
     bad["declared"] = [{"id": "assets.purge", "query": "DELETE FROM z_demo_assets"}]
     refused = app.post("/api/v1/connectors", json=bad, headers=csrf(app))
     assert refused.status_code == 422 and "starts with SELECT or WITH" in refused.text
+
+
+def test_builder_drafts_graphql_operations_from_introspection(
+    app: TestClient, jars: dict[str, dict[str, str]], tools: FakeTools, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.fakes.fake_tools.graphql import SCHEMA
+
+    use_jar(app, jars["alice"])
+    body = {"source": "graphql", "name": "inv2", "spec_url": tools.url_for("graphql"), "data_class": "C1"}
+    draft = app.post("/api/v1/connectors/import", json=body, headers=csrf(app))
+    assert draft.status_code == 200, draft.text
+    out = draft.json()
+    assert {o["id"]: o["class"] for o in out["operations"]} == {
+        "inv2.assets.query": "read",
+        "inv2.asset.query": "read",
+        "inv2.mutations.tag_asset": "write",
+        "inv2.mutations.delete_asset": "destructive",
+        "inv2.mutations.or_create_tag": "write",  # never a read, whatever the field is called
+    }
+    assert [o["exposed"] for o in out["operations"]] == [False] * 5  # nothing exposed before review
+    manifest = out["manifest"]
+    assert manifest["base_url"] == tools.url_for("graphql")
+    assert manifest["auth"]["read"]["secret"] == "env:INV2_TOKEN_RO"
+    assert manifest["auth"]["write"]["secret"] == "env:INV2_TOKEN_RW"
+    # a pasted introspection result gives the same draft
+    pasted = {**body, "spec": {"data": {"__schema": SCHEMA}}, "spec_url": None, "base_url": tools.url_for("graphql")}
+    again = app.post("/api/v1/connectors/import", json=pasted, headers=csrf(app))
+    assert again.status_code == 200 and again.json()["manifest"]["declared"] == manifest["declared"]
+
+    monkeypatch.setenv("INV2_TOKEN_RO", "ro-graphql")
+    created = app.post("/api/v1/connectors", json=manifest, headers=csrf(app))
+    assert created.status_code == 201, created.text
+    app.post(
+        "/api/v1/connectors/inv2/approve-exposure",
+        json={"operations": [{"id": "inv2.assets.query", "exposed": True}]},
+        headers=csrf(app),
+    )
+    runner = start(app, jars, ["inv2"], [])
+    result = call(app, runner, "inv2__assets__query", {"env": "lab"})
+    assert result["isError"] is False, result
+    assert "lab-01" in result["content"][0]["text"] and "edge-01" not in result["content"][0]["text"]
+
+
+def test_builder_refuses_what_is_not_an_introspection_result(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    use_jar(app, jars["alice"])
+    for spec in ("type Query { a: Int }", {"data": {"assets": []}}):
+        body = {"source": "graphql", "name": "inv3", "spec": spec}
+        refused = app.post("/api/v1/connectors/import", json=body, headers=csrf(app))
+        assert refused.status_code == 422, refused.text
+    missing = app.post("/api/v1/connectors/import", json={"source": "graphql", "name": "inv3"}, headers=csrf(app))
+    assert missing.status_code == 422 and "spec_url" in missing.text

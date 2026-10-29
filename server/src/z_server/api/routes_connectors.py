@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi.responses import Response
 from sqlalchemy import func, select
-from z_common.connectors import browser, cli, queries
+from z_common.connectors import browser, cli, graphql_import, queries
 from z_common.contracts import validator as contract_validator
 from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
@@ -450,6 +450,45 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
         warnings.append("every flow runs exactly as reviewed: check what each step clicks before exposing it")
         if not ctx.state.settings.browser_url:
             warnings.append("the z-browser worker is not configured (Z_BROWSER_URL): flows cannot run yet")
+    elif body.source == "graphql":
+        introspection: dict[str, Any] | str
+        if body.spec is not None:
+            introspection = body.spec
+        elif body.spec_url:
+            introspection = await admin.fetch_introspection(ctx.state, body.spec_url)
+        else:
+            raise Problem(
+                "validation", "graphql import needs the endpoint (spec_url) or an introspection result (spec)"
+            )
+        try:
+            drafted = graphql_import.draft(introspection)
+        except graphql_import.IntrospectionError as exc:
+            raise Problem("validation", str(exc)) from exc
+        endpoint = body.base_url or body.spec_url
+        if endpoint:
+            manifest["base_url"] = endpoint
+        else:
+            warnings.append("no base_url: set the GraphQL endpoint before creating the connector")
+        prefix = body.name.upper().replace("-", "_")
+        manifest.update(
+            {
+                "kind": "graphql",
+                "declared": drafted.declared,
+                "auth": {
+                    "read": {"type": "bearer", "secret": f"env:{prefix}_TOKEN_RO"},
+                    "write": {"type": "bearer", "secret": f"env:{prefix}_TOKEN_RW"},
+                },
+            }
+        )
+        problems = queries.connector_problems(manifest)
+        if problems:
+            raise Problem("validation", "; ".join(problems[:5]))
+        specs = admin.operation_specs(manifest, None)
+        warnings += drafted.warnings
+        warnings.append(
+            "each document selects the scalar fields of its result two levels deep: remove what agents should not "
+            "read, and expose only the operations they need"
+        )
     elif body.source == "cli":
         if body.cli is None or not body.declared:
             raise Problem("validation", "cli import needs cli (the digest-pinned tool image) and the declared commands")
