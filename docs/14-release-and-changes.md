@@ -38,7 +38,13 @@ Unfinished work merges behind a switch instead of living in a long branch:
 - Images are tagged `sha-<short>` on every build and `vX.Y.Z` on release, and always **deployed by digest**.
 
 ## 4. Database migrations
-- Alembic migrations run before the new pods (Helm pre-upgrade Job `migrate`), forward only.
+- Alembic migrations (`z-server migrate`), forward only, run before the new z-server code serves requests, as the
+  chart's `migrate.mode` decides (`auto` by default): with an external Postgres (`values-k8s.yaml`) a
+  `pre-install,pre-upgrade` hook Job `z-server-migrate`; with the embedded Postgres (`values-k3s.yaml`, so the
+  staging and production k3s releases unless their site values name an external one) an init container of the
+  z-server pod, because the embedded database does not exist yet when pre-install hooks run (single replica only).
+  Compose runs them in the `z-migrate` service. The seed (packs into the catalog) follows as a
+  `post-install,post-upgrade` hook Job, or the `z-seed` service on Compose.
 - **Expand, then contract**: a release only adds (columns nullable or with defaults, new tables, new indexes built
   concurrently); removing or renaming happens in a later release, once no running version reads the old shape. So
   the previous release keeps working on the new schema, which is what makes a rollback possible.

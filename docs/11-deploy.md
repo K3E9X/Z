@@ -36,12 +36,12 @@ docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-serve
 - After upgrading packs: `docker compose --env-file .env -f deploy/compose/docker-compose.yml run --rm z-seed` (idempotent).
 
 ## 2. Helm chart (`deploy/helm/z`)
-Templates: Deployments for `api`, `scheduler`, `gateway`, `executor`, `learner`, `monitor` (each can be disabled to run `all` in one pod), `ui`, `litellm`, `z-browser`, `egress-proxy` (e.g. Squid or Envoy with a domain allowlist from `egress.mirrors`); label `z.io/runner-reachable: "true"` on litellm, api, gateway and egress-proxy (or the `all` pod); Services; Ingress (class configurable) or HTTPRoute; ConfigMaps from `config/z.yaml` and `config/litellm.yaml`; Secrets or ExternalSecrets; PVC for artifacts (or S3 settings); namespace `z-runners` with ResourceQuota, LimitRange, PSA labels, NetworkPolicies; scheduler ServiceAccount + Role/RoleBinding in `z-runners`; optional RuntimeClass reference; optional Postgres StatefulSet for dev; PodDisruptionBudgets; ServiceMonitor (if Prometheus Operator is present).
+Templates: one z-server Deployment running the `all` entrypoint (api, scheduler, gateway, executor, learner and monitor in one process; `server.replicas` of it), `z-ui` and `litellm` Deployments, optional `z-browser` (`browser.enabled`) and `egress-proxy` (`egressProxy.enabled`: Squid with a domain allowlist from `config.z.egress.mirrors`) Deployments; label `z.io/runner-reachable: "true"` on the z-server, LiteLLM and egress-proxy pods; Services; Ingress (class configurable, with a Traefik Middleware for the HTTPS redirect) or HTTPRoute; ConfigMaps from `config.z` and `config.litellm`; a Secret or an ExternalSecret; a PVC for artifacts; namespace `z-runners` with ResourceQuota, LimitRange, PSA labels, NetworkPolicies, the runners' ServiceAccount and the scheduler's Role/RoleBinding; NetworkPolicies of the release namespace; optional RuntimeClass; optional embedded Postgres StatefulSet; the `migrate` hook Job (with `migrate.mode: hook`) and the `seed` hook Job; PodDisruptionBudgets; optional ServiceMonitor (if Prometheus Operator is present) and Grafana dashboard ConfigMap; optional labelled release Namespace (`releaseNamespace.create`).
 
 Values files:
 - `values.yaml`: safe defaults, everything hardened.
-- `values-k3s.yaml`: `ingress.className: traefik` with an HTTP→HTTPS redirect (`ingress.traefikHttpsRedirect`: a Traefik `RedirectScheme` Middleware on the Ingress router while TLS is on), `persistence.storageClass: local-path`, `postgres.embedded: true`, single replica per component.
-- `values-k8s.yaml`: `ingress.className: nginx`, `postgres.embedded: false` (external DSN), 2 replicas for api and gateway, PDBs on.
+- `values-k3s.yaml`: `ingress.className: traefik` with an HTTP→HTTPS redirect (`ingress.traefikHttpsRedirect`: a Traefik `RedirectScheme` Middleware on the Ingress router while TLS is on), `persistence.artifacts.storageClass: local-path`, `postgres.embedded: true` (migrations in an init container of z-server), one replica of each Deployment.
+- `values-k8s.yaml`: `ingress.className: nginx`, `postgres.embedded: false` (DSNs in `database.existingSecret`, migrations in a pre-install/pre-upgrade hook Job), 2 replicas of the `all` z-server (artifacts on ReadWriteMany storage), 2 of z-ui and LiteLLM, PDBs on.
 
 `env` is `production` (default), `staging` or `development`. With `production` the chart refuses to render when the network policies are switched off (`networkPolicy.enabled`, `networkPolicy.serverEgress.enabled`, `runners.networkPolicy.enabled`; schema `if`/`then` and a template `fail`) or LiteLLM egress is not pinned (below), or an image it runs (z-server, z-runner, LiteLLM, and z-ui, z-browser, egress-proxy, Postgres when enabled) is not pinned by digest.
 
@@ -108,12 +108,12 @@ networkPolicy:
 ```
 
 ## 3. Images and CI
-See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish to GHCR), GitLab CI on the internal mirror (same checks, plus signed-image deploy to the team's k3s through a protected environment). Images: `z-server`, `z-runner`, `z-browser`, `z-ui`, multi-arch, tags `vX.Y.Z` and `sha-<short>`, always deployed by digest. The LiteLLM image is pinned by digest too.
+See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish to GHCR), GitLab CI on the internal mirror (the common checks, plus signed-image deploy to the team's k3s through a protected environment). Images: `z-server`, `z-runner`, `z-browser`, `z-ui`, `z-socket-proxy`, `egress-proxy`, multi-arch, tags `vX.Y.Z` and `sha-<short>`, always deployed by digest. The LiteLLM image is pinned by digest too.
 
 ## 4. Operations
-- `z-server migrate` (Alembic) runs as a Helm pre-upgrade Job.
-- Backups: Postgres (pg_dump or the operator), artifacts volume/S3. LiteLLM uses its own **database** (`litellm`) on the same Postgres instance; an init script / Helm hook creates both databases.
-- Key rotation: `LITELLM_MASTER_KEY`, `Z_SECRET_KEY` (job tokens are short-lived; rotate and restart), connector credentials through the Connectors screen.
-- Upgrades: chart version = app version; read `CHANGELOG.md`.
+- `z-server migrate` (Alembic) runs before the new code serves, as `migrate.mode` decides (`auto` by default): a `pre-install,pre-upgrade` hook Job with an external Postgres (`values-k8s.yaml`), an init container of the z-server pod with the embedded Postgres (`values-k3s.yaml`; single replica only, the render fails otherwise). On Compose, the `z-migrate` service. Details in `deploy/helm/z/README.md` ("Migrations").
+- Backups: Postgres (pg_dump or the operator), the artifacts volume, and the keys (`deploy/README.md`, "Backups and keys"). LiteLLM uses its own **database** (`litellm`) on the same Postgres instance: the init script of the Compose and embedded Postgres creates both databases and roles; with an external Postgres you create them first (SQL in `deploy/helm/z/README.md`).
+- Key rotation: `LITELLM_MASTER_KEY` (rotate and restart), connector credentials through the Connectors screen. `Z_SECRET_KEY` and `LITELLM_SALT_KEY` cannot be rotated in place yet (`deploy/README.md`, "Backups and keys").
+- Upgrades: chart version = app version. There is no `CHANGELOG.md`: the release notes are generated from the conventional commits since the previous tag (`ci/scripts/changelog.py`, GitLab `release:notes` job) and published with each GitLab release; read them before upgrading.
 - `deploy/README.md` (written during the build) holds the step-by-step for each target.
 - Per-environment site values (staging, production) are templated in `deploy/environments/`; the release process (branches, versions, migrations, rollback, hotfix) is `14-release-and-changes.md`.
