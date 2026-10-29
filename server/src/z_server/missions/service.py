@@ -190,14 +190,21 @@ async def _starter_team(db: AsyncSession, user: Principal) -> str | None:
 async def start(db: AsyncSession, state: AppState, mission: Mission) -> None:
     if mission.status not in {MissionStatus.draft.value, MissionStatus.planned.value}:
         raise Problem("conflict", f"mission is {mission.status}")
-    await _issue_key(state, mission)
+    from z_server import usage
+
+    await usage.check_start(
+        db, mission, utcnow(), int(state.config.get("budgets", {}).get("org_monthly_tokens") or 0) or None
+    )
+    await _issue_key(db, state, mission)
     mission.started_at = utcnow()
     await set_status(db, mission, MissionStatus.queued)
     await advance(db, state, mission)
 
 
-async def _issue_key(state: AppState, mission: Mission) -> None:
-    aliases = allowed_aliases(state.config, DataClass(mission.data_class))
+async def _issue_key(db: AsyncSession, state: AppState, mission: Mission) -> None:
+    from z_server.llm.inference import routing_config
+
+    aliases = allowed_aliases(await routing_config(db, state.config), DataClass(mission.data_class))
     key = await state.llm_keys.create(
         alias=f"mission-{mission.id}",
         models=aliases,
@@ -269,7 +276,7 @@ async def retry_job(db: AsyncSession, state: AppState, mission: Mission, job: Jo
     if MissionStatus(mission.status).terminal:
         if mission.status not in REOPENABLE:
             raise Problem("conflict", f"mission is {mission.status}")
-        await _issue_key(state, mission)
+        await _issue_key(db, state, mission)
         mission.ended_at = None
         await set_status(db, mission, MissionStatus.queued, "retry")
     previous = job.status
@@ -302,7 +309,11 @@ async def raise_data_class(
     if to.rank <= current.rank:
         return False
     if mission.llm_key_enc:
-        await state.llm_keys.set_models(mission_key(state, mission), allowed_aliases(state.config, to))
+        from z_server.llm.inference import routing_config
+
+        await state.llm_keys.set_models(
+            mission_key(state, mission), allowed_aliases(await routing_config(db, state.config), to)
+        )
     mission.data_class = to.value
     await events.append(
         db,

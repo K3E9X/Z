@@ -17,7 +17,7 @@ from z_common.models.actions import BUILTIN_PAYLOADS
 from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, OperationClass
 from z_common.models.manifests import MissionPlan
 
-from z_server import artifacts, audit, events, memory
+from z_server import artifacts, audit, events, memory, usage
 from z_server.actions.previews import build as build_preview
 from z_server.api.internal import InternalRouter, JobCtx, JobCtxDep, _bearer, require_service
 from z_server.crypto import new_token, token_hash
@@ -146,6 +146,16 @@ async def post_events(ctx: JobCtxDep, id: str, body: m.EventBatch) -> m.JobContr
             job.tokens_out += tout
             mission.tokens_in += tin
             mission.tokens_out += tout
+            await usage.record(
+                ctx.db,
+                mission,
+                job.agent_name,
+                str(event.payload.get("model", job.model)),
+                tin,
+                tout,
+                int(event.payload.get("cached_tokens") or 0),
+                event.ts,
+            )
     limit = int(mission.budget.get("max_tokens") or 0)
     if limit and mission.tokens_in + mission.tokens_out >= limit and job.control_state == "run":
         job.control_state, job.control_reason = "cancel", "mission token budget exhausted"
