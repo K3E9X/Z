@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
 from z_server.executors import Executor, ExecutorError
 from z_server.executors.docker import DockerExecutor
+from z_server.executors.kubernetes import KubernetesExecutor
 from z_server.executors.process import ProcessExecutor
 from z_server.settings import Settings
 
@@ -22,4 +25,14 @@ def from_settings(settings: Settings) -> Executor:
         if settings.production:
             raise ExecutorError("the process executor is refused when Z_ENV=production")
         return ProcessExecutor()
-    raise ExecutorError(f"executor {settings.executor!r} is not available in this build (kubernetes ships with B8)")
+    if settings.executor == "kubernetes":
+        kube = config.get("kubernetes", {})
+        env = os.environ
+        return KubernetesExecutor(
+            image=settings.runner_image,
+            namespace=env.get("Z_RUNNER_NAMESPACE") or str(kube.get("namespace", "z-runners")),
+            service_account=env.get("Z_RUNNER_SERVICE_ACCOUNT") or str(kube.get("service_account", "z-runner")),
+            runtime_class=env.get("Z_RUNNER_RUNTIME_CLASS") or kube.get("runtime_class") or None,
+            job_ttl_s=int(env.get("Z_RUNNER_JOB_TTL_S") or kube.get("job_ttl_s", 3600)),
+        )
+    raise ExecutorError(f"unknown executor {settings.executor!r} (docker, kubernetes or process)")
