@@ -255,8 +255,26 @@ def test_learner_proposes_evaluates_and_applies(app: TestClient, llm: FakeLLM, j
     assert mission.status_code == 201, mission.text
     [spec] = play_all(app, lambda spec: GOOD)
     assert [m["text"] for m in spec["memory"]] == ["Release notes are in notes.md."]
+    # invariant 14: an applied fact is deactivated (kept, audited) and restored, never only deleted in the database
+    [listed] = app.get("/api/v1/memory", params={"agent": "summarizer"}).json()["items"]
+    assert listed["active"] and listed["source"] == f"proposal:{proposals['memory_fact']['id']}", listed
+    off = app.post(f"/api/v1/memory/{listed['id']}/deactivate", json={"reason": "outdated"}, headers=csrf(app))
+    assert off.status_code == 200 and off.json()["active"] is False and off.json()["version"] == 2, off.text
+    again = app.post(f"/api/v1/memory/{listed['id']}/deactivate", json={"reason": "x"}, headers=csrf(app))
+    assert again.status_code == 409
+    app.post("/api/v1/missions", json={"prompt": "Summarise again", "agents": ["summarizer"]}, headers=csrf(app))
+    [spec] = play_all(app, lambda spec: GOOD)
+    assert spec["memory"] == []
+    assert app.get("/api/v1/memory", params={"active": False}).json()["items"][0]["id"] == listed["id"]
+    audit = app.get("/api/v1/audit", params={"action": "memory.deactivated"}).json()["items"]
+    assert audit and audit[0]["target_id"] == listed["id"], audit
     use_jar(app, jars["bob"])  # an operator cannot apply learning
     assert app.post(f"/api/v1/proposals/{skill['id']}/reject", json={}, headers=csrf(app)).status_code == 403
+    refused = app.post(f"/api/v1/memory/{listed['id']}/restore", json={"reason": "back"}, headers=csrf(app))
+    assert refused.status_code in (403, 404), refused.text
+    use_jar(app, jars["alice"])
+    back = app.post(f"/api/v1/memory/{listed['id']}/restore", json={"reason": "still true"}, headers=csrf(app))
+    assert back.status_code == 200 and back.json()["active"] is True and back.json()["version"] == 3, back.text
 
 
 def test_regression_discards_and_try_runs_the_candidate(

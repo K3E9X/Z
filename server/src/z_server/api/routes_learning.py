@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from z_common.models.enums import DataClass
 
 from z_server import evals, learner
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.paging import page
-from z_server.db.models import EvalRun, Proposal, RoutingRule, Setting, Signal
+from z_server.db.models import Agent, EvalRun, MemoryFact, Proposal, RoutingRule, Setting, Signal
 from z_server.errors import Problem
 from z_server.ids import new_id
 from z_server.llm import policy
@@ -107,8 +107,6 @@ async def run_evals(ctx: CtxDep, body: dict[str, Any]) -> list[dict[str, Any]]:
         agent_name = target.split(":", 1)[1] if target.startswith("agent:") else None
         default = None
         if agent_name:
-            from z_server.db.models import Agent
-
             agent = (await ctx.db.execute(select(Agent).where(Agent.name == agent_name))).scalar_one_or_none()
             default = agent.profile.get("model") if agent else None
         models = [str(default or "z-fast")]
@@ -202,3 +200,97 @@ async def try_proposal(ctx: CtxDep, id: str, body: dict[str, Any]) -> Any:
     mission = await learner.try_on_mission(ctx.db, ctx.state, row, ctx.user)
     await ctx.audit("proposal.tried", "proposal", row.id, after={"mission": mission.id})
     return await mission_out(ctx, mission)
+
+
+# ---------------------------------------------------------------- memory facts (invariant 14)
+
+
+def memory_out(row: MemoryFact) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "scope": row.scope,
+        "scope_ref": row.scope_ref,
+        "text": row.text,
+        "source": row.source,
+        "approved_by": row.approved_by,
+        "version": row.version,
+        "data_class": row.data_class,
+        "expires_at": row.expires_at,
+        "active": row.active,
+        "created_at": row.created_at,
+    }
+
+
+async def _fact_team(ctx: Ctx, row: MemoryFact) -> str | None:
+    """The team a fact belongs to (None: org-wide): its team, or the owner team of its agent."""
+    if row.scope == "team":
+        return row.scope_ref
+    if row.scope == "agent":
+        agent = (await ctx.db.execute(select(Agent).where(Agent.name == row.scope_ref))).scalar_one_or_none()
+        return agent.owner_team_id if agent else None
+    return None
+
+
+@router.operation("listMemoryFacts")
+async def list_memory_facts(
+    ctx: CtxDep,
+    cursor: str | None = None,
+    limit: int = 50,
+    scope: str | None = None,
+    agent: str | None = None,
+    active: bool | None = None,
+    q: str | None = None,
+) -> dict[str, Any]:
+    stmt = select(MemoryFact)
+    teams = ctx.user.teams_with("learning:read")
+    if teams is not None:  # a team grant sees its team's facts and its agents' facts, not org-wide ones
+        owned = select(Agent.name).where(Agent.owner_team_id.in_(teams))
+        stmt = stmt.where(
+            or_(
+                and_(MemoryFact.scope == "team", MemoryFact.scope_ref.in_(teams)),
+                and_(MemoryFact.scope == "agent", MemoryFact.scope_ref.in_(owned)),
+            )
+        )
+    if scope:
+        stmt = stmt.where(MemoryFact.scope == scope)
+    if agent:
+        stmt = stmt.where(MemoryFact.scope == "agent", MemoryFact.scope_ref == agent)
+    if active is not None:
+        stmt = stmt.where(MemoryFact.active.is_(active))
+    if q:
+        stmt = stmt.where(MemoryFact.text.ilike(f"%{q[:200]}%"))
+    rows, nxt = await page(ctx.db, stmt, MemoryFact.id, cursor, limit)
+    return {"items": [memory_out(r) for r in rows], "next_cursor": nxt}
+
+
+async def _set_fact(ctx: Ctx, fact_id: str, active: bool, reason: str) -> dict[str, Any]:
+    row = await ctx.db.get(MemoryFact, fact_id, with_for_update=True)
+    if row is None:
+        raise Problem("not-found", "no such memory fact")
+    team = await _fact_team(ctx, row)
+    if not ctx.user.can_on("learning:read", team):
+        raise Problem("not-found", "no such memory fact")
+    ctx.require("learning:apply", team)
+    if row.active == active:
+        raise Problem("conflict", f"the fact is already {'active' if active else 'inactive'}")
+    row.active = active
+    row.version += 1
+    await ctx.audit(
+        "memory.restored" if active else "memory.deactivated",
+        "memory_fact",
+        row.id,
+        team=team,
+        before={"active": not active},
+        after={"active": active, "version": row.version, "reason": reason[:500], "scope": row.scope},
+    )
+    return memory_out(row)
+
+
+@router.operation("deactivateMemoryFact")
+async def deactivate_memory_fact(ctx: CtxDep, id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return await _set_fact(ctx, id, False, str(body["reason"]))
+
+
+@router.operation("restoreMemoryFact")
+async def restore_memory_fact(ctx: CtxDep, id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return await _set_fact(ctx, id, True, str(body["reason"]))
