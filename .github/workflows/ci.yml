@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: "22" }
+        with: { node-version: "22.23.3" } # same as GitLab NODE_IMAGE and the z-ui image
       # pnpm comes from the packageManager field (pnpm@10.28.0), fetched and verified by corepack.
       - run: corepack enable && pnpm --version
       - run: pnpm install --frozen-lockfile --ignore-scripts
@@ -137,7 +137,7 @@ jobs:
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with: { version: "0.13.4", enable-cache: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: "22" }
+        with: { node-version: "22.23.3" } # same as GitLab NODE_IMAGE and the z-ui image
       - name: Install scanners (pinned, checksums verified)
         run: ci/scripts/install-scanners.sh gitleaks osv-scanner trivy semgrep bandit pip-audit
       - name: Active exceptions per scope (security/exceptions.yaml)
