@@ -22,9 +22,11 @@ from z_server.api import (
     routes_auth,
     routes_catalog,
     routes_connectors,
+    routes_intake,
     routes_internal,
     routes_missions,
     routes_review,
+    routes_usage,
 )
 from z_server.crypto import AuditSigner, Sealer
 from z_server.db.session import make_engine, make_sessionmaker
@@ -47,6 +49,8 @@ ROUTERS = (
     routes_missions.router,
     routes_review.router,
     routes_internal.router,
+    routes_usage.router,
+    routes_intake.router,
 )
 
 
@@ -88,13 +92,14 @@ def create_app(
         if workers:
             from z_server.executors.factory import from_settings
             from z_server.gateway import executor
-            from z_server.workers import health, identity, scheduler
+            from z_server.workers import health, identity, intake, scheduler
 
             tasks = [
                 asyncio.create_task(scheduler.run_forever(state, from_settings(settings)), name="scheduler"),
                 asyncio.create_task(identity.run_forever(state), name="identity"),
                 asyncio.create_task(executor.run_forever(state), name="executor"),
                 asyncio.create_task(health.run_forever(state), name="health"),
+                asyncio.create_task(intake.run_forever(state), name="intake"),
             ]
         try:
             async with gateway_endpoint.run():
