@@ -32,6 +32,7 @@
         "kind": { "enum": ["docker", "process", "kubernetes"] },
         "docker": { "type": "object", "additionalProperties": false, "properties": { "socket_proxy_url": { "type": "string" }, "network": { "type": "string" }, "image": { "type": "string" } } },
         "kubernetes": { "type": "object", "additionalProperties": false, "properties": { "namespace": { "type": "string" }, "service_account": { "type": "string" }, "runtime_class": { "type": "string" }, "job_ttl_s": { "type": "integer", "minimum": 0 }, "image": { "type": "string" } } },
+        "tool_images": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$" }, "description": "Images cli connectors may run (ADR 0025); the docker socket proxy has its own list (Z_TOOL_IMAGES)." },
         "default_concurrency": { "type": "integer", "minimum": 1 },
         "max_concurrency": { "type": "integer", "minimum": 1 }
       }
