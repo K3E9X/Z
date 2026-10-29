@@ -25,7 +25,16 @@ from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.routes_internal import action_out, question_out
 from z_server.api.routes_missions import can_see
 from z_server.auth import identity
-from z_server.db.models import ActionApproval, Job, Mission, MissionSuggestion, Operation, ProposedAction, Question
+from z_server.db.models import (
+    ActionApproval,
+    Agent,
+    Job,
+    Mission,
+    MissionSuggestion,
+    Operation,
+    ProposedAction,
+    Question,
+)
 from z_server.errors import Problem
 from z_server.ids import new_id
 from z_server.missions import service
@@ -338,11 +347,16 @@ async def list_review(
             await ctx.db.execute(select(Question).where(Question.answer.is_(None), Question.mission_id.in_(scope)))
         ).scalars()
     )
-    suggestions = (
-        list((await ctx.db.execute(select(MissionSuggestion).where(MissionSuggestion.status == "open"))).scalars())
-        if not mission
-        else []
-    )
+    suggestions = []
+    if not mission:  # suggestions for agents whose team the reviewer may start missions for
+        owners = {a.name: a.owner_team_id for a in (await ctx.db.execute(select(Agent))).scalars()}
+        suggestions = [
+            s
+            for s in (
+                await ctx.db.execute(select(MissionSuggestion).where(MissionSuggestion.status == "open"))
+            ).scalars()
+            if ctx.user.can("missions:start", owners.get(s.agent))
+        ]
     counts = m.ReviewCounts(
         all=len(actions) + len(questions) + len(suggestions),
         writes=len(actions),

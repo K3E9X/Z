@@ -25,6 +25,7 @@ from z_server.api import (
     routes_intake,
     routes_internal,
     routes_missions,
+    routes_objectives,
     routes_review,
     routes_sessions,
     routes_usage,
@@ -52,6 +53,7 @@ ROUTERS = (
     routes_internal.router,
     routes_usage.router,
     routes_intake.router,
+    routes_objectives.router,
     routes_sessions.router,
 )
 

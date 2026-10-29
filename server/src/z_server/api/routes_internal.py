@@ -543,8 +543,19 @@ async def subagent_status(ctx: JobCtxDep, id: str, child_id: str) -> m.SubagentS
 
 
 @router.operation("internalReportObjective")
-async def report_objective(ctx: JobCtxDep, id: str, body: m.ObjectiveReport) -> JSONResponse:
-    raise Problem("conflict", "objectives are not enabled in this version (v1.1)")
+async def report_objective(ctx: JobCtxDep, id: str, body: m.ObjectiveReport) -> Response:
+    from z_server import objectives
+    from z_server.db.models import Agent, Objective
+
+    objective = await ctx.db.get(Objective, body.objective_id, with_for_update=True)
+    agent = (await ctx.db.execute(select(Agent).where(Agent.id == ctx.job.agent_id))).scalar_one_or_none()
+    if objective is None or agent is None:
+        raise Problem("not-found", "no such objective")
+    suggested = [(s.title, s.playbook, dict(s.inputs)) for s in body.suggestions or []]
+    await objectives.record_report(
+        ctx.db, objective, agent, body.value, body.explanation, suggested, audit.Actor(f"job:{ctx.job.id}")
+    )
+    return Response(status_code=204)
 
 
 @router.operation("internalCompleteJob")

@@ -1,4 +1,5 @@
-"""Intake loop (docs/05 §11): fires due schedule triggers and polls Jira for labelled issues.
+"""Intake loop (docs/05 §11): fires due schedule triggers, polls Jira for labelled issues, and checks due
+objectives (docs/04 §3), including those whose cadence is an event that just fired.
 
 Jira: every `interval_s` (default 300) the trigger searches `project = <p> AND labels = "<label>"` (or its own
 `jql`) with the connector's read account, newest first, and creates one task per issue it has not seen.
@@ -12,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
+from z_server import objectives
 from z_server.db.models import Connector, Operation, Trigger
 from z_server.gateway.core import shape
 from z_server.intake import service as intake
@@ -104,8 +106,13 @@ async def poll_jira(state: AppState, at: datetime | None = None) -> list[str]:
 async def run_forever(state: AppState, interval_s: float = 30.0) -> None:
     while True:
         try:
-            await fire_schedules(state)
-            await poll_jira(state)
+            fired = await fire_schedules(state)
+            created = await poll_jira(state)
+            await objectives.tick(state)
+            if fired:
+                await objectives.on_event(state, "schedule")
+            if created:
+                await objectives.on_event(state, "jira")
         except asyncio.CancelledError:
             raise
         except Exception:
