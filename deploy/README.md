@@ -7,7 +7,11 @@ the egress proxy (runners reach package mirrors only through it) and the z-brows
 ## Docker Compose (local or single host)
 
 ```bash
-cp .env.example .env                                   # fill POSTGRES_PASSWORD, Z_APP_DB_PASSWORD, Z_SECRET_KEY, LITELLM_MASTER_KEY, LITELLM_SALT_KEY, OIDC_*
+cp .env.example .env                                   # then fill every secret (below) and OIDC_*
+for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD LITELLM_DB_PASSWORD LITELLM_MASTER_KEY LITELLM_SALT_KEY Z_SOCKET_PROXY_TOKEN; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" .env; done
+sed -i "s|^Z_SECRET_KEY=.*|Z_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env
+echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env   # the socket's group, for z-socket-proxy only
 cp config/litellm.example.yaml config/litellm.yaml     # put the real inferX model ids
 cp config/z.example.yaml config/z.yaml
 docker build -f deploy/images/z-server/Dockerfile -t z-server:local .
@@ -19,8 +23,16 @@ curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0
 - Behind a TLS-intercepting proxy, pass its CA at build time only:
   `docker build --secret id=extra_ca,src=/path/ca.pem ...` (or `Z_EXTRA_CA=/path/ca.pem` for `compose build`).
 - Internal package mirror: `--build-arg PIP_INDEX_URL=... --build-arg UV_INDEX_URL=...`.
-- Two database roles: `z` (owner, used only by `z-migrate`) and `z_app` (the server; it cannot update or delete
-  audit events). They are created by `deploy/compose/postgres/init.sh` on the first start.
+- Three database roles: `z` (owner, used only by `z-migrate`), `z_app` (the server; it cannot update or delete
+  audit events) and `litellm` (owns the LiteLLM database only). They are created by `deploy/compose/postgres/init.sh`
+  on the first start.
+- `Z_ENV` defaults to `production`: weak or example secrets, dev sign-in, test accounts and runner images without
+  a digest are refused. Set `Z_ENV=development` only on a laptop.
+- Each secret reaches only the containers that need it: z-server and z-seed read `.env` for connector credentials,
+  with the database owner password, the LiteLLM salt key and the model provider keys blanked out.
+- Networks: Postgres, the Docker socket proxy and z-browser are on internal networks reachable by z-server only;
+  runners are on an internal network with z-server, LiteLLM and the egress proxy. Every service has memory, CPU and
+  process limits, a read-only root and no capability.
 - Before z-server starts, `z-migrate` applies the migrations and `z-seed` loads the packs of the image into the
   catalog (idempotent: run it again after upgrading packs with `docker compose run --rm z-seed`).
 - LiteLLM runs the official image pinned by digest (`v1.105.0`). It is the only component that reaches models.
@@ -45,6 +57,13 @@ docker compose --env-file .env -f deploy/compose/docker-compose.yml -f tests/e2e
 ```
 
 Never use this overlay for a real deployment.
+
+### Backups and keys
+Back up together, and keep them apart from the server: the `pgdata` volume (`docker compose exec postgres pg_dumpall
+-U z > z.sql` daily, kept encrypted), `Z_SECRET_KEY` (it seals stored secrets and signs audit checkpoints: without it
+the sealed OIDC client secret, refresh tokens and TOTP seeds cannot be read and checkpoints cannot be verified) and
+`LITELLM_SALT_KEY` (it encrypts the inferX key LiteLLM stores). Neither key can be rotated in place yet: changing
+one means setting the inferX key, the OIDC secret and personal connections again.
 
 ## Helm (k3s and Kubernetes)
 

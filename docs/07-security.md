@@ -36,6 +36,7 @@ Boundaries: user ↔ z-server (OIDC), z-server ↔ runner (job token), runner �
 ## 3. Kubernetes and k3s hardening (chart defaults)
 - Namespaces `z` (platform) and `z-runners` (jobs). Pod Security Admission `restricted` on both.
 - `z-runners`: default-deny ingress and egress; allow egress to pods labelled `z.io/runner-reachable: "true"` in namespace `z` (LiteLLM, api, gateway, egress proxy; set on whichever pods run them, including the single `all` pod), and DNS. Nothing else. The egress proxy allows only `egress.mirrors`.
+  - Known gap: DNS is allowed to the cluster resolver, which forwards external names, so a runner could tunnel data in DNS queries. Close it on clusters that need it by giving the runners namespace a resolver that answers `cluster.local` only (a dedicated CoreDNS server block) or with FQDN egress policies (Cilium).
 - Runner pods: `automountServiceAccountToken: false`, `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, `capabilities: drop [ALL]`, `seccompProfile: RuntimeDefault`, `emptyDir` for `/workspace` and `/tmp` with size limits, CPU/memory limits, `activeDeadlineSeconds`, `ttlSecondsAfterFinished`.
 - Optional `runtimeClassName: gvisor` (k3s: configure containerd with `runsc`; Kubernetes: per distribution).
 - The scheduler's ServiceAccount can only create, get, list and delete Jobs, get and list Pods, read their logs, and create, get, patch and delete the per-job Secrets in `z-runners` (the Secret holding a job token is owned by its Job and goes with it).
@@ -45,7 +46,9 @@ Boundaries: user ↔ z-server (OIDC), z-server ↔ runner (job token), runner �
 ## 4. Docker Compose hardening
 - Runners join a dedicated `runners` network with no route out except LiteLLM and z-server.
 - The `runners` network is created with an explicit `name: z_runners` so the executor can attach to it.
-- The Docker executor talks to the Docker API through a **socket proxy** that only allows container create/start/stop/inspect/logs/remove; the raw socket is never mounted into z-server.
+- The Docker executor talks to the Docker API through a **socket proxy** that only allows container create/start/stop/inspect/logs/remove; the raw socket is never mounted into z-server. The proxy sits on an internal network shared with z-server only, requires a bearer token (`Z_SOCKET_PROXY_TOKEN`), and strips `Config.Env` (job tokens) from inspect answers.
+- Postgres, the socket proxy and z-browser are on internal networks; LiteLLM uses its own database role, never the Z owner (which could disable the audit trigger). Infrastructure secrets (database owner, LiteLLM salt key, provider keys) reach only the containers that use them.
+- `Z_ENV` defaults to `production`; weak or example values of `Z_SECRET_KEY`, `LITELLM_MASTER_KEY` and `Z_SOCKET_PROXY_TOKEN` are refused at start.
 - Same container security options as Kubernetes (`read_only`, `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, user, tmpfs).
 - `process` executor (runner as a subprocess) exists for development only and is refused when `Z_ENV=production`.
 

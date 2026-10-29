@@ -119,6 +119,18 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   Microsoft To Do in the m365 subset for meeting-prep.
 - Recorded Future connector (ADR 0030, asked by the owner): Connect API lookups checked against the official SDK
   psengine 2.14.0 from PyPI (recordedfuture.com is blocked here); internal indicators refused by the schemas.
+- Three test agents (config audit, end-to-end QA on compose, API/gateway pentest), findings verified then fixed:
+  pentest: missions of no team open to every team-scoped user (resource checks now `can_on`), tool errors carrying
+  data without raising the data class, OAuth connection and GitLab sign-in callbacks not bound to the starting
+  browser (login CSRF), API tokens renewing themselves, chunked bodies past the size limit. Config: compose ran in
+  development mode with `sk-change-me` keys, LiteLLM used the Postgres superuser, every infra secret reached z-server,
+  the socket proxy had no auth and exposed job tokens through inspect, Postgres/LiteLLM ran as root without limits;
+  Helm leaked the bootstrap password to logs, left LiteLLM egress open and namespaces without PSA labels (Helm fixed
+  by a worktree sub-agent). Still open: DNS tunnelling from runners (docs/07 §3), connectors are not attached to
+  teams so "an approver approves only for their team's connectors" (docs/12 §2) is enforced by mission team only,
+  LiteLLM mission keys have no budget of their own, Z_SECRET_KEY and the salt key cannot be rotated in place.
+- Trap: a test hardcoded a seeded agent version; bumping the pack (ADR 0030) broke it after the push. Tests read
+  the seeded version now.
 - Personal connections now record the account of each grant (`openid email`, ID token claims) and refuse read
   and write grants of different accounts; the identity field had never been filled.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
