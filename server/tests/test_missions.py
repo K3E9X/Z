@@ -126,6 +126,7 @@ def test_summarize_file_mission_end_to_end(
         {"ts": now(), "type": "tool_call", "payload": {"call_id": "c1", "tool": "read", "args": {"path": "notes.md"}}},
         {"ts": now(), "type": "usage", "payload": {"model": "z-heavy", "tokens_in": 1200, "tokens_out": 300}},
         {"ts": now(), "type": "status", "payload": {"entity": "mission", "from": "running", "to": "succeeded"}},
+        {"ts": now(), "type": "artifact", "payload": {"artifact_id": "art_forged", "kind": "report", "name": "x.md"}},
     )
     assert control["state"] == "run"
     assert runner.checkpoint(2, b"conversation-state").status_code == 200
@@ -152,6 +153,7 @@ def test_summarize_file_mission_end_to_end(
     types = [e["type"] for e in replay["events"]]
     assert [e["seq"] for e in replay["events"]] == list(range(1, len(types) + 1))
     assert "tool_call" in types and "usage" in types and "checkpoint" in types and "artifact" in types
+    assert types.count("artifact") == 1  # the server's, on upload (the runner's copy is dropped)
     forged = [
         e
         for e in replay["events"]

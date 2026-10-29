@@ -126,6 +126,7 @@ async def post_events(ctx: JobCtxDep, id: str, body: m.EventBatch) -> m.JobContr
             "learning_signal",
             "objective_update",
             "judge",
+            "artifact",  # emitted by the server when the upload lands: the runner's copy was a duplicate
         }:
             continue  # server-owned event types: the runner cannot forge them
         try:
