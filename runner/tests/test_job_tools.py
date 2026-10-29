@@ -240,7 +240,7 @@ def test_sigterm_stops_after_the_step_without_completing(harness: Harness, tmp_p
 
 
 def test_events_stream_live_during_a_long_step(harness: Harness) -> None:
-    harness.llm.add_rules({"responses": [tool_call("terminal", {"command": "sleep 2; echo slow"}), finish()]})
+    harness.llm.add_rules({"responses": [tool_call("terminal", {"command": "sleep 4; echo slow"}), finish()]})
     spec = harness.spec(output=None, tools=ALL_LOCAL)
     job = harness.add(spec)
     received: dict[str, float] = {}
@@ -252,4 +252,6 @@ def test_events_stream_live_during_a_long_step(harness: Harness) -> None:
     job.on_events = stamp
     run = harness.run(spec, job, flush_interval_s=0.2)
     assert run.completion["status"] == "succeeded"
-    assert received["terminal"] - received["tool_call"] >= 1.5  # the call was visible while the command ran
+    assert (
+        received["terminal"] - received["tool_call"] >= 2.0
+    )  # the call was visible while the command ran (4 s; slack for a loaded machine)
