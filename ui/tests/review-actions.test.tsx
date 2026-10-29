@@ -41,9 +41,14 @@ const item = (a: ProposedAction): ReviewItem => ({ kind: 'action', action: a })
 let steppedUp = false
 let reviewItems: ReviewItem[] = []
 const approvals: string[] = []
+/** When set, GET /review answers with the list as it was at request time, once the gate opens. */
+let gate: Promise<void> | null = null
+/** When set, POST /actions/{id}/approve waits for it. */
+let approveGate: Promise<void> | null = null
 const server = setupServer(
-  http.post('*/api/v1/actions/:id/approve', ({ params }) => {
+  http.post('*/api/v1/actions/:id/approve', async ({ params }) => {
     approvals.push(String(params.id))
+    if (approveGate) await approveGate
     if (!steppedUp) {
       return HttpResponse.json(
         { type: 'urn:z:problem:step-up-required', title: 'Step-up required', status: 401 },
@@ -57,13 +62,15 @@ const server = setupServer(
     steppedUp = true
     return HttpResponse.json({})
   }),
-  http.get('*/api/v1/review', () =>
-    HttpResponse.json({
-      items: reviewItems,
-      counts: { all: reviewItems.length, writes: reviewItems.length, questions: 0, suggestions: 0 },
+  http.get('*/api/v1/review', async () => {
+    const items = [...reviewItems]
+    if (gate) await gate
+    return HttpResponse.json({
+      items,
+      counts: { all: items.length, writes: items.length, questions: 0, suggestions: 0 },
       next_cursor: null,
-    }),
-  ),
+    })
+  }),
   http.get('*/api/v1/*', () => HttpResponse.json({ items: [], next_cursor: null })),
 )
 beforeAll(() => {
@@ -73,6 +80,8 @@ afterEach(() => {
   server.resetHandlers()
   approvals.length = 0
   steppedUp = false
+  gate = null
+  approveGate = null
 })
 afterAll(() => {
   server.close()
@@ -104,5 +113,38 @@ describe('useReviewActions', () => {
     })
     expect(await screen.findByText('Write B: create SECOPS-2')).toBeInTheDocument()
     expect(approvals).not.toContain('act_b')
+  })
+
+  it('cancels an in-flight refetch so it cannot put an approved write back', async () => {
+    steppedUp = true
+    reviewItems = [item(A), item(B)]
+    const user = userEvent.setup()
+    const { qc } = await renderRouted(<Harness />)
+    await screen.findByText('Write A: create SECOPS-1')
+    // A poll leaves while A is still pending on the server and answers while the approval is in flight.
+    let openPoll: () => void = () => undefined
+    gate = new Promise<void>((r) => {
+      openPoll = r
+    })
+    let openApprove: () => void = () => undefined
+    approveGate = new Promise<void>((r) => {
+      openApprove = r
+    })
+    void qc.refetchQueries({ queryKey: ['review'] }).catch(() => undefined)
+    await waitFor(() => {
+      expect(qc.isFetching({ queryKey: ['review'] })).toBeGreaterThan(0)
+    })
+    await user.click(screen.getByRole('button', { name: /^Approve/ }))
+    await waitFor(() => {
+      expect(approvals).toEqual(['act_a'])
+    })
+    gate = null
+    openPoll()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('Write A: create SECOPS-1')).toBeNull()
+    expect(screen.getByText('Write B: create SECOPS-2')).toBeInTheDocument()
+    openApprove()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('Write A: create SECOPS-1')).toBeNull()
   })
 })

@@ -27,8 +27,12 @@ function recount(list: ReviewList, removed: ReviewItem[]): ReviewList['counts'] 
   return c
 }
 
-/** Remove items from every cached review list; returns a snapshot to roll back. */
-export function removeFromReview(qc: QueryClient, ids: Set<string>): Snapshot {
+/**
+ * Remove items from every cached review list; returns a snapshot to roll back. In-flight review fetches
+ * are cancelled first: one that started before the decision would otherwise put the item back.
+ */
+export async function removeFromReview(qc: QueryClient, ids: Set<string>): Promise<Snapshot> {
+  await qc.cancelQueries({ queryKey: qk.reviewAll })
   const snapshot = qc.getQueriesData<ReviewList>({ queryKey: qk.reviewAll })
   for (const [key, list] of snapshot) {
     if (!list) continue
@@ -76,7 +80,7 @@ export function useReviewActions() {
           async () => {
             // Optimistic only while the request is in flight: when the server asks for a step-up the item
             // comes back, so the detail (and its hotkeys) stay on this write while "Confirm it's you" is open.
-            const snap = removeFromReview(qc, ids)
+            const snap = await removeFromReview(qc, ids)
             try {
               return await unwrap(
                 api.POST('/actions/{id}/approve', { params: { path: { id: action.id } }, body }),
@@ -110,7 +114,7 @@ export function useReviewActions() {
 
   const reject = useCallback(
     async (action: ProposedAction, reason: string) => {
-      const snap = removeFromReview(qc, new Set([action.id]))
+      const snap = await removeFromReview(qc, new Set([action.id]))
       try {
         const res = await unwrap(
           api.POST('/actions/{id}/reject', { params: { path: { id: action.id } }, body: { reason } }),
@@ -152,7 +156,7 @@ export function useReviewActions() {
   const batchApprove = useCallback(
     async (actions: ProposedAction[], comment?: string) => {
       const ids = actions.map((a) => a.id)
-      const snap = removeFromReview(qc, new Set(ids))
+      const snap = await removeFromReview(qc, new Set(ids))
       try {
         const res = await unwrap(
           api.POST('/actions:batch-approve', { body: { action_ids: ids, ...(comment ? { comment } : {}) } }),
@@ -178,7 +182,7 @@ export function useReviewActions() {
 
   const answer = useCallback(
     async (questionId: string, text: string) => {
-      const snap = removeFromReview(qc, new Set([questionId]))
+      const snap = await removeFromReview(qc, new Set([questionId]))
       try {
         const res = await unwrap(
           api.POST('/questions/{id}/answer', {
@@ -201,7 +205,7 @@ export function useReviewActions() {
 
   const suggestion = useCallback(
     async (id: string, accept: boolean) => {
-      const snap = removeFromReview(qc, new Set([id]))
+      const snap = await removeFromReview(qc, new Set([id]))
       try {
         if (accept) {
           const m = await unwrap(api.POST('/suggestions/{id}/accept', { params: { path: { id } }, body: {} }))
