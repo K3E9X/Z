@@ -21,6 +21,8 @@ curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0
 - Internal package mirror: `--build-arg PIP_INDEX_URL=... --build-arg UV_INDEX_URL=...`.
 - Two database roles: `z` (owner, used only by `z-migrate`) and `z_app` (the server; it cannot update or delete
   audit events). They are created by `deploy/compose/postgres/init.sh` on the first start.
+- Before z-server starts, `z-migrate` applies the migrations and `z-seed` loads the packs of the image into the
+  catalog (idempotent: run it again after upgrading packs with `docker compose run --rm z-seed`).
 - LiteLLM runs the official image pinned by digest (`v1.105.0`). It is the only component that reaches models.
 
 ### Optional: package mirrors and browser connectors
