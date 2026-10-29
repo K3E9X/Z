@@ -129,3 +129,43 @@ def test_a_chunked_body_over_the_limit_is_refused(app: TestClient, jars: dict[st
         headers={**csrf(app), "Content-Type": "application/json"},
     )
     assert big.status_code == 413, big.text
+
+
+def test_a_start_request_cannot_lower_the_playbooks_class(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    use_jar(app, jars["alice"])
+    manifest = {
+        "name": "summarize-secret",
+        "version": "1.0.0",
+        "description": "Summarize a restricted file",
+        "team": ["summarizer"],
+        "steps": [{"id": "s", "agent": "summarizer", "prompt": "Summarize {{ inputs.file }}"}],
+        "autonomy": "read_only",
+        "data_class": "C3",
+    }
+    created = app.post("/api/v1/playbooks", json=manifest, headers=csrf(app))
+    assert created.status_code == 201, created.text
+    use_jar(app, jars["bob"])
+    started = app.post(
+        "/api/v1/missions",
+        json={"playbook": "summarize-secret", "inputs": {"file": "n.md"}, "data_class": "C0"},
+        headers=csrf(app),
+    )
+    assert started.status_code == 201, started.text
+    assert started.json()["data_class"] == "C3"
+
+
+def test_a_cancelled_missions_job_cannot_call_tools(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    mission, runner = start(app, jars, "bob", [])
+    use_jar(app, jars["bob"])
+    assert app.post(f"/api/v1/missions/{mission['id']}/cancel", json={}, headers=csrf(app)).status_code == 200
+    resp = app.post(
+        "/gateway/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "jira__issues__search", "arguments": {"jql": "project = SECOPS"}},
+        },
+        headers={"Authorization": f"Bearer {runner.session}", "Accept": "application/json, text/event-stream"},
+    )
+    assert resp.status_code == 401 or resp.json().get("error") or resp.json()["result"]["isError"], resp.text

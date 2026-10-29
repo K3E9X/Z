@@ -17,7 +17,7 @@ from typing import Any
 
 import jsonschema
 from sqlalchemy import select
-from z_common.models.enums import DataClass, JobStatus, JudgeVerdict, OperationClass
+from z_common.models.enums import DataClass, JobStatus, JudgeVerdict, MissionStatus, OperationClass
 from z_common.models.manifests import AgentProfile
 from z_common.redaction import Redactor
 
@@ -227,6 +227,9 @@ class Gateway:
             mission = await db.get(Mission, job.mission_id)
             if mission is None:
                 raise GatewayRefused("unauthenticated", "mission not found")
+            if MissionStatus(mission.status).terminal:
+                # cancelled (or finished) before the runner noticed: no tool call after the person said stop
+                raise GatewayRefused("unauthenticated", f"the mission is {mission.status}")
             job.lease_expires_at = utcnow() + LEASE
             return job, mission
 

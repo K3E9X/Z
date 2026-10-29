@@ -116,9 +116,11 @@ async def create(db: AsyncSession, state: AppState, user: Principal, request: Mi
 
     config = state.config
     default_class = DataClass((await policy.effective(db, config)).get("default_mission_class", "C2"))
-    data_class = request.data_class or (
-        DataClass(manifest["data_class"]) if manifest and manifest.get("data_class") else default_class
-    )
+    declared = DataClass(manifest["data_class"]) if manifest and manifest.get("data_class") else None
+    # a class the playbook declares is a floor (docs/06 "the highest of"): a start request can raise it, never
+    # lower it; without one, the person's choice stands over the platform default
+    chosen = request.data_class or declared or default_class
+    data_class = max(chosen, declared, key=lambda c: c.rank) if declared else chosen
     autonomy = await _strictest_autonomy(
         db, plan, request.autonomy, Autonomy(manifest["autonomy"]) if manifest and manifest.get("autonomy") else None
     )
