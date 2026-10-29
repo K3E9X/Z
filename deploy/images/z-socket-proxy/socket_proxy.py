@@ -56,7 +56,11 @@ HOST_KEYS = {
     "Privileged",
     "RestartPolicy",
     "Runtime",
+    "LogConfig",
 }
+# tool containers log to a capped local file: a tool cannot fill the disk or make the proxy buffer gigabytes, and
+# no log driver may ship output elsewhere (syslog/gelf/fluentd with an address)
+TOOL_LOG_CONFIG = {"Type": "json-file", "Config": {"max-size": "2m", "max-file": "2"}}
 TMPFS_PATHS = {"/workspace", "/tmp"}  # noqa: S108 - tmpfs mounts inside the runner container
 MAX_BODY = 1024 * 1024
 
@@ -142,6 +146,8 @@ class Policy:
         self._check_host(host)
         if set((host or {}).get("Tmpfs") or {}) - {"/tmp"}:  # noqa: S108 - tmpfs inside the tool container
             raise Refused("tool containers get a tmpfs on /tmp only")
+        if (host or {}).get("LogConfig") != TOOL_LOG_CONFIG:
+            raise Refused("tool containers log to the capped json-file log")
         return None
 
     def _check_host(self, host: Any) -> None:
@@ -156,6 +162,7 @@ class Policy:
             (host.get("SecurityOpt") == ["no-new-privileges:true"], "SecurityOpt must be exactly no-new-privileges"),
             (host.get("Privileged") in (None, False), "privileged containers are refused"),
             (_no_restart(host.get("RestartPolicy")), "no restart policy"),
+            (host.get("LogConfig") in (None, TOOL_LOG_CONFIG), "LogConfig may only be the capped json-file log"),
             (host.get("Runtime") in (None, "", *self.runtimes), "runtime not allowed"),
             (_within(host.get("Memory"), self.max_memory), "Memory limit required and within the ceiling"),
             (_within(host.get("NanoCpus"), self.max_nano_cpus), "NanoCpus limit required and within the ceiling"),

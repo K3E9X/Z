@@ -195,6 +195,11 @@ TOOL_ESCALATIONS = [
     ("entrypoint", lambda b: b.update(Entrypoint=["/bin/sh"])),
     ("restart policy", lambda b: b["HostConfig"].update(RestartPolicy={"Name": "always"})),
     ("lowercase restart key", lambda b: b["HostConfig"].update(RestartPolicy={"Name": "no", "name": "always"})),
+    ("uncapped log", lambda b: b["HostConfig"].pop("LogConfig")),
+    (
+        "remote log driver",
+        lambda b: b["HostConfig"].update(LogConfig={"Type": "syslog", "Config": {"syslog-address": "udp://x:514"}}),
+    ),
 ]
 
 

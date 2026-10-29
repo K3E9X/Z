@@ -144,6 +144,8 @@ class DockerExecutor:
             "PidsLimit": limits.pids,
             "Privileged": False,
             "RestartPolicy": {"Name": "no"},
+            # capped at the source: the tool's output cannot fill the host disk (the proxy checks this exact value)
+            "LogConfig": {"Type": "json-file", "Config": {"max-size": "2m", "max-file": "2"}},
         }
         if self.runtime:
             host["Runtime"] = self.runtime
