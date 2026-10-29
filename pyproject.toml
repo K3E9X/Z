@@ -34,6 +34,9 @@ package = false
 exclude-newer = "7 days"
 # LiteLLM (pulled in as a library by the OpenHands SDK in the runner) waits 14 days (docs/13 §3).
 exclude-newer-package = { litellm = "14 days" }
+# Never installed: a closed binary under the Laminar terms of service, pulled in by openhands-sdk -> lmnr and only
+# imported by Laminar's Claude-agent instrumentation, which Z never enables (the runner strips LMNR_* env).
+exclude-dependencies = ["lmnr-claude-code-proxy"]
 
 [tool.uv.workspace]
 members = ["packages/z-common", "server", "runner", "cli", "browser"]
