@@ -344,6 +344,15 @@ class WebhookConfig(ZModel):
     secret: SecretRef | None = None
 
 
+class CliSettings(ZModel):
+    """connector.schema.json `cli` (ADR 0025)."""
+
+    image: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$")]
+    env: dict[str, str] | None = None
+    timeout_s: Annotated[int, Field(ge=1, le=300)] | None = None
+    output: Literal["text", "json"] | None = None
+
+
 class ConnectorManifest(ZModel):
     """connector.schema.json"""
 
@@ -366,6 +375,7 @@ class ConnectorManifest(ZModel):
     rate_limit: RateLimit | None = None
     health: HealthProbe | None = None
     data_class: DataClass | None = None
+    cli: CliSettings | None = None
     webhook: WebhookConfig | None = None
 
 

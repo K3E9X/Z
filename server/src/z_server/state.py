@@ -51,6 +51,7 @@ class AppState:
     hub: EventHub
     limiter: RateLimiter = field(default_factory=RateLimiter)
     gateway: Any = None  # z_server.gateway.core.Gateway, set by the app lifespan
+    sandbox: Any = None  # z_server.executors.ToolSandbox for cli connectors (docker/kubernetes executors), ADR 0025
     cache: dict[str, Any] = field(default_factory=dict)  # short-lived per-process values (platform key, settings)
     _oidc: OIDCClient | None = None
     _oidc_key: tuple[str, str, str] | None = None

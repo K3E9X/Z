@@ -9,6 +9,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, Request
@@ -69,6 +70,19 @@ ROUTERS = (
 )
 
 
+def tool_sandbox(settings: Settings) -> Any:
+    """The executor that runs cli connector tools (ADR 0025): docker or kubernetes; none for `process`."""
+    from z_server.executors.factory import from_settings
+
+    if settings.executor not in {"docker", "kubernetes"}:
+        return None
+    try:
+        return from_settings(settings)
+    except Exception as exc:  # noqa: BLE001 - cli connectors then refuse with a clear error; the API still starts
+        log.warning("no tool sandbox: %s", exc)
+        return None
+
+
 def create_app(
     settings: Settings,
     *,
@@ -76,6 +90,7 @@ def create_app(
     run_startup: bool = True,
     llm_keys: KeyAdmin | None = None,
     workers: bool = False,
+    sandbox: Any = None,
 ) -> FastAPI:
     """`workers=True` (z-server all) also runs the scheduler and the identity re-evaluation in this process."""
     settings.check()
@@ -100,6 +115,7 @@ def create_app(
             hub=EventHub(settings.database_url),
         )
         app.state.z = state
+        state.sandbox = sandbox if sandbox is not None else tool_sandbox(settings)
         from z_server.gateway.core import Gateway
 
         state.gateway = Gateway.create(state)

@@ -136,7 +136,11 @@ def make_client(database_url: str, oidc: FakeGitLabOIDC) -> Iterator[Callable[..
     clients: list[TestClient] = []
 
     def factory(
-        config: dict[str, Any] | None = None, llm_keys: Any = None, workers: bool = False, **settings_kwargs: Any
+        config: dict[str, Any] | None = None,
+        llm_keys: Any = None,
+        workers: bool = False,
+        sandbox: Any = None,
+        **settings_kwargs: Any,
     ) -> TestClient:
         settings = Settings(
             database_url=database_url,
@@ -145,7 +149,7 @@ def make_client(database_url: str, oidc: FakeGitLabOIDC) -> Iterator[Callable[..
             config=config or base_config(oidc.issuer),
             **{"oidc_client_secret": "z-web-secret", **settings_kwargs},
         )
-        app = create_app(settings, llm_keys=llm_keys, workers=workers)
+        app = create_app(settings, llm_keys=llm_keys, workers=workers, sandbox=sandbox)
         client = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
         client.event_hooks["response"].append(contract_checker(app))
         client.__enter__()

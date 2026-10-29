@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi.responses import Response
 from sqlalchemy import func, select
-from z_common.connectors import browser, queries
+from z_common.connectors import browser, cli, queries
 from z_common.contracts import validator as contract_validator
 from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
@@ -248,6 +248,12 @@ async def _validated_manifest(ctx: Ctx, manifest: dict[str, Any]) -> dict[str, A
         for e in contract_validator("connector.schema.json").iter_errors(manifest)
     ]
     problems += browser.connector_problems(manifest) + queries.connector_problems(manifest)
+    problems += cli.connector_problems(manifest)
+    if manifest.get("kind") == "cli":
+        allowed = (ctx.state.config.get("executor") or {}).get("tool_images") or []
+        image = (manifest.get("cli") or {}).get("image")
+        if image not in allowed:
+            problems.append("cli.image is not in executor.tool_images: a platform admin allows tool images there")
     if problems:
         raise Problem("validation", "; ".join(sorted(set(problems))[:5]))
     if manifest.get("base_url") and "${" not in str(manifest["base_url"]):

@@ -24,7 +24,7 @@ from z_common.redaction import Redactor
 from z_server import artifacts, audit, events, judge, judge_model
 from z_server.crypto import token_hash
 from z_server.db.models import Connector, Job, Mission, Operation
-from z_server.gateway import adf, browser, mcp_client, oauth, queries
+from z_server.gateway import adf, browser, cli, mcp_client, oauth, queries
 from z_server.gateway import http as http_invoker
 from z_server.gateway.auth import AuthError, AuthMaterial, Purpose, material
 from z_server.gateway.limits import CallStats, SlidingWindow, replica_share
@@ -173,6 +173,10 @@ class Gateway:
             if connector.kind == "database":
                 ok, body, error, latency = await queries.database(connector, op, args, auth, purpose)
                 return Invocation(ok, None, body, latency, auth.identity, auth.secrets, error)
+            if connector.kind == "cli":
+                tool = await cli.run(self.state, connector, op, args, auth)
+                latency = int((time.monotonic() - started) * 1000)
+                return Invocation(tool.ok, None, tool.body, latency, auth.identity, auth.secrets, tool.error)
             if connector.kind == "browser":
                 run = await browser.run(self.state, connector, op, args, auth, timeout_s)
                 return Invocation(
@@ -191,7 +195,7 @@ class Gateway:
             return Invocation(
                 False, exc.status, None, int((time.monotonic() - started) * 1000), auth.identity, auth.secrets, str(exc)
             )
-        except queries.QueryRefused as exc:
+        except (queries.QueryRefused, cli.CliRefused) as exc:
             return Invocation(False, None, None, 0, auth.identity, auth.secrets, str(exc))
 
     async def send(
