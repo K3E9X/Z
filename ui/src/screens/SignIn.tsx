@@ -22,9 +22,18 @@ const REASONS: Record<string, { title: string; body: string; access?: boolean }>
     body: 'An admin suspended your Z account. Sessions and CLI tokens are revoked. Ask an admin to reactivate it.',
   },
   provider_error: { title: 'GitLab refused the sign-in', body: 'GitLab answered with an error. Try again.' },
-  provider_unreachable: { title: 'GitLab is not reachable', body: 'Z could not reach GitLab. Try again in a moment.' },
-  invalid_state: { title: 'Sign-in expired', body: 'The sign-in link was not started here or was already used.' },
-  expired_state: { title: 'Sign-in expired', body: 'You took too long to come back from GitLab. Start again.' },
+  provider_unreachable: {
+    title: 'GitLab is not reachable',
+    body: 'Z could not reach GitLab. Try again in a moment.',
+  },
+  invalid_state: {
+    title: 'Sign-in expired',
+    body: 'The sign-in link was not started here or was already used.',
+  },
+  expired_state: {
+    title: 'Sign-in expired',
+    body: 'You took too long to come back from GitLab. Start again.',
+  },
   stale_authentication: {
     title: 'Re-authentication too old',
     body: 'GitLab did not ask for your password again. Sign in again to confirm it is you.',
@@ -62,9 +71,7 @@ export function SignIn({ error, redirect }: { error?: string; redirect?: string 
     setBusy(true)
     setLocalError(null)
     try {
-      await unwrap(
-        api.POST('/auth/local/login', { body: { username, password, ...(totp ? { totp } : {}) } }),
-      )
+      await unwrap(api.POST('/auth/local/login', { body: { username, password, ...(totp ? { totp } : {}) } }))
       await qc.invalidateQueries({ queryKey: qk.me })
       window.location.assign(target)
     } catch (e) {
@@ -87,7 +94,9 @@ export function SignIn({ error, redirect }: { error?: string; redirect?: string 
               <h1 id="signin-title" className="m-0 font-display-face text-[30px] leading-tight">
                 Sign in to Z
               </h1>
-              {issuer && <div className="mt-1 text-text-2">GitLab · {issuer.replace(/^https?:\/\//, '')}</div>}
+              {issuer && (
+                <div className="mt-1 text-text-2">GitLab · {issuer.replace(/^https?:\/\//, '')}</div>
+              )}
             </div>
           </div>
           <a
@@ -113,7 +122,8 @@ export function SignIn({ error, redirect }: { error?: string; redirect?: string 
                 Use a local account
               </Button>
               <p className="m-0 text-meta text-wait">
-                Only works while the bootstrap account, test accounts or break-glass are enabled on this server.
+                Only works while the bootstrap account, test accounts or break-glass are enabled on this
+                server.
               </p>
             </div>
           ) : (
@@ -185,13 +195,14 @@ export function SignIn({ error, redirect }: { error?: string; redirect?: string 
                 </Button>
               </div>
               <p className="m-0 text-meta text-text-3">
-                Local sign-ins are rate-limited, locked after 5 failures and always recorded with your IP address.
+                Local sign-ins are rate-limited, locked after 5 failures and always recorded with your IP
+                address.
               </p>
             </form>
           )}
           <p className="m-0 text-meta text-text-2">
-            Your access comes from your GitLab groups. Every action in Z, including what agents do on your behalf, is
-            recorded in the audit log.
+            Your access comes from your GitLab groups. Every action in Z, including what agents do on your
+            behalf, is recorded in the audit log.
           </p>
           <div className="border-t border-line pt-4 text-meta text-text-3">
             From a terminal: <code className="font-mono text-text">z login</code>
@@ -212,8 +223,8 @@ export function SignIn({ error, redirect }: { error?: string; redirect?: string 
             {reason.access === true && (
               <div className="rounded-btn bg-raised px-3.5 py-3 text-meta text-text-2">
                 Ask an admin to add you to one of the Z groups (for example{' '}
-                <code className="font-mono text-text">cyber/z/z-operators</code>) or to the group of your team. Access is
-                checked again at your next sign-in.
+                <code className="font-mono text-text">cyber/z/z-operators</code>) or to the group of your
+                team. Access is checked again at your next sign-in.
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">

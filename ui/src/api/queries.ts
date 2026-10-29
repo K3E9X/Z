@@ -126,7 +126,8 @@ export function useMission(id: string) {
 export function useMissionJobs(id: string, opts: { live?: boolean } = {}) {
   return useQuery({
     queryKey: qk.missionJobs(id),
-    queryFn: () => unwrap(api.GET('/missions/{id}/jobs', { params: { path: { id }, query: { limit: 500 } } })),
+    queryFn: () =>
+      unwrap(api.GET('/missions/{id}/jobs', { params: { path: { id }, query: { limit: 500 } } })),
     refetchInterval: opts.live ? 5_000 : false,
   })
 }

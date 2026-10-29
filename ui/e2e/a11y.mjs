@@ -14,7 +14,11 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/
 let failed = 0
 for (const theme of themes) {
   // The page's CSP forbids injected scripts (as it should): the audit context bypasses it.
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 }, bypassCSP: true, colorScheme: theme === 'day' ? 'light' : 'dark' })
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 960 },
+    bypassCSP: true,
+    colorScheme: theme === 'day' ? 'light' : 'dark',
+  })
   await ctx.addInitScript((t) => {
     localStorage.setItem('z.pref.theme', t)
     localStorage.setItem('z.pref.followSystem', 'false')
@@ -26,14 +30,19 @@ for (const theme of themes) {
     await page.evaluate(axeSource)
     const res = await page.evaluate(() =>
       // eslint-disable-next-line no-undef
-      axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }),
+      axe.run(document, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
+      }),
     )
     const bad = res.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
     const minor = res.violations.length - bad.length
     console.log(`${theme} ${p}: ${bad.length} serious/critical, ${minor} moderate/minor`)
     for (const v of res.violations) {
       console.log(`  [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length})`)
-      for (const n of v.nodes.slice(0, 3)) console.log(`      ${n.target.join(' ')} ${n.failureSummary?.split('\n')[1]?.trim() ?? ''}`.slice(0, 220))
+      for (const n of v.nodes.slice(0, 3))
+        console.log(
+          `      ${n.target.join(' ')} ${n.failureSummary?.split('\n')[1]?.trim() ?? ''}`.slice(0, 220),
+        )
     }
     failed += bad.length
   }

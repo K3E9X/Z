@@ -16,7 +16,18 @@ import { useHotkeys } from '@/lib/hotkeys'
 import { useNow } from '@/lib/useMedia'
 import { useStepUp } from '@/shell/stepup'
 
-export type AuditCategory = 'approval' | 'write' | 'guardrail' | 'edit' | 'read' | 'check' | 'mission' | 'auth' | 'admin' | 'config' | 'other'
+export type AuditCategory =
+  | 'approval'
+  | 'write'
+  | 'guardrail'
+  | 'edit'
+  | 'read'
+  | 'check'
+  | 'mission'
+  | 'auth'
+  | 'admin'
+  | 'config'
+  | 'other'
 
 const CATEGORY_LABEL: Record<AuditCategory, string> = {
   approval: 'Approval',
@@ -31,7 +42,12 @@ const CATEGORY_LABEL: Record<AuditCategory, string> = {
   config: 'Configuration',
   other: 'Other',
 }
-const CATEGORY_TONE: Partial<Record<AuditCategory, string>> = { approval: 'text-ok', write: 'text-wait', guardrail: 'text-err', check: 'text-text' }
+const CATEGORY_TONE: Partial<Record<AuditCategory, string>> = {
+  approval: 'text-ok',
+  write: 'text-wait',
+  guardrail: 'text-err',
+  check: 'text-text',
+}
 
 export function categoryOf(e: Pick<AuditEvent, 'action' | 'result'>): AuditCategory {
   const a = e.action
@@ -44,7 +60,8 @@ export function categoryOf(e: Pick<AuditEvent, 'action' | 'result'>): AuditCateg
   if (/^mission\.|^job\.|^question\./.test(a)) return 'mission'
   if (/^auth\.|session/.test(a)) return 'auth'
   if (/^admin\.|role|binding|group_mapping|user\./.test(a)) return 'admin'
-  if (/^connector|^operation|^catalog|^agent|^skill|^playbook|^guardrail|^provider|^routing|^budget/.test(a)) return 'config'
+  if (/^connector|^operation|^catalog|^agent|^skill|^playbook|^guardrail|^provider|^routing|^budget/.test(a))
+    return 'config'
   return 'other'
 }
 
@@ -77,7 +94,8 @@ const RANGES: Record<string, { label: string; hours: number | null }> = {
 }
 
 function Detail({ e }: { e: AuditEvent }) {
-  const missionId = e.target_type === 'mission' ? e.target_id : str((e.after as Record<string, unknown> | null)?.mission)
+  const missionId =
+    e.target_type === 'mission' ? e.target_id : str((e.after as Record<string, unknown> | null)?.mission)
   const before = e.before ? JSON.stringify(e.before, null, 2) : ''
   const after = e.after ? JSON.stringify(e.after, null, 2) : ''
   return (
@@ -132,8 +150,15 @@ function Detail({ e }: { e: AuditEvent }) {
       </dl>
       {(before || after) && (
         <div className="border-b border-line px-5 py-4">
-          <h3 className="m-0 mb-2 text-meta font-normal text-text-3">{before ? 'Before → after' : 'Recorded values'}</h3>
-          <DiffViewer files={diffTexts(e.target_type, before, after, 50)} showFileHeader={false} lineNumbers={false} maxHeight={260} />
+          <h3 className="m-0 mb-2 text-meta font-normal text-text-3">
+            {before ? 'Before → after' : 'Recorded values'}
+          </h3>
+          <DiffViewer
+            files={diffTexts(e.target_type, before, after, 50)}
+            showFileHeader={false}
+            lineNumbers={false}
+            maxHeight={260}
+          />
         </div>
       )}
       {missionId && (
@@ -173,17 +198,33 @@ export function History() {
   const type = (search.type ?? 'all') as AuditCategory | 'all'
   const hours = RANGES[range]?.hours ?? null
   const minute = useNow(60_000)
-  const from = useMemo(() => (hours && minute ? new Date(minute - hours * 3600_000).toISOString() : undefined), [hours, minute])
+  const from = useMemo(
+    () => (hours && minute ? new Date(minute - hours * 3600_000).toISOString() : undefined),
+    [hours, minute],
+  )
   const audit = useAudit(from ? { from } : {}, cursor)
   const [exporting, setExporting] = useState(false)
 
   const events = useMemo(() => {
     const seen = new Set<number>()
-    const all = [...(audit.data?.items ?? []), ...pages.flat()].filter((e) => (seen.has(e.seq) ? false : (seen.add(e.seq), true)))
+    const all = [...(audit.data?.items ?? []), ...pages.flat()].filter((e) =>
+      seen.has(e.seq) ? false : (seen.add(e.seq), true),
+    )
     const needle = q.trim().toLowerCase()
     return all
       .filter((e) => type === 'all' || categoryOf(e) === type)
-      .filter((e) => !needle || [e.actor, e.action, e.target_type, e.target_id ?? '', e.runs_as ?? '', JSON.stringify(e.after ?? {})].some((x) => x.toLowerCase().includes(needle)))
+      .filter(
+        (e) =>
+          !needle ||
+          [
+            e.actor,
+            e.action,
+            e.target_type,
+            e.target_id ?? '',
+            e.runs_as ?? '',
+            JSON.stringify(e.after ?? {}),
+          ].some((x) => x.toLowerCase().includes(needle)),
+      )
       .sort((a, b) => b.seq - a.seq)
   }, [audit.data, pages, q, type])
   const selected = events.find((e) => e.seq === search.seq) ?? events[0] ?? null
@@ -209,10 +250,13 @@ export function History() {
   const exportLog = async () => {
     setExporting(true)
     try {
-      const res = await stepUp.run(() => rawFetch(`/audit/export?format=json${from ? `&from=${encodeURIComponent(from)}` : ''}`), {
-        what: 'Exporting the full audit log',
-        detail: `${RANGES[range]?.label ?? ''} · JSON lines · the export itself is audited`,
-      })
+      const res = await stepUp.run(
+        () => rawFetch(`/audit/export?format=json${from ? `&from=${encodeURIComponent(from)}` : ''}`),
+        {
+          what: 'Exporting the full audit log',
+          detail: `${RANGES[range]?.label ?? ''} · JSON lines · the export itself is audited`,
+        },
+      )
       saveBlob(await res.blob(), `z-audit-${new Date().toISOString().slice(0, 10)}.jsonl`)
     } catch (e) {
       if (isNotServed(e)) toast.info('Audit export is not available on this server yet.')
@@ -225,7 +269,9 @@ export function History() {
     const next = audit.data?.next_cursor
     if (!next) return
     try {
-      const page = await unwrap(api.GET('/audit', { params: { query: { limit: 200, cursor: next, ...(from ? { from } : {}) } } }))
+      const page = await unwrap(
+        api.GET('/audit', { params: { query: { limit: 200, cursor: next, ...(from ? { from } : {}) } } }),
+      )
       setPages((p) => [...p, page.items])
       setCursor(undefined)
       if (!page.next_cursor) toast.info('This is the oldest event in the range.')
@@ -244,7 +290,16 @@ export function History() {
               Export audit log
             </Button>
           )}
-          <Button onClick={() => saveBlob(new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' }), 'z-history.json')}>Download JSON</Button>
+          <Button
+            onClick={() =>
+              saveBlob(
+                new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' }),
+                'z-history.json',
+              )
+            }
+          >
+            Download JSON
+          </Button>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -256,14 +311,24 @@ export function History() {
           onChange={(e) => setQ(e.target.value)}
           className="w-[400px] max-w-full"
         />
-        <Select aria-label="Time range" value={range} onChange={(e) => set({ range: e.target.value })} className="w-[160px]">
+        <Select
+          aria-label="Time range"
+          value={range}
+          onChange={(e) => set({ range: e.target.value })}
+          className="w-[160px]"
+        >
           {Object.entries(RANGES).map(([k, v]) => (
             <option key={k} value={k}>
               {v.label}
             </option>
           ))}
         </Select>
-        <Select aria-label="Event type" value={type} onChange={(e) => set({ type: e.target.value === 'all' ? undefined : e.target.value })} className="w-[180px]">
+        <Select
+          aria-label="Event type"
+          value={type}
+          onChange={(e) => set({ type: e.target.value === 'all' ? undefined : e.target.value })}
+          className="w-[180px]"
+        >
           <option value="all">All types</option>
           {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
             <option key={k} value={k}>
@@ -271,12 +336,18 @@ export function History() {
             </option>
           ))}
         </Select>
-        {!canReadAll && <span className="self-center text-meta text-text-3">You see the events about you; auditors and admins see everything.</span>}
+        {!canReadAll && (
+          <span className="self-center text-meta text-text-3">
+            You see the events about you; auditors and admins see everything.
+          </span>
+        )}
       </div>
       <QueryState query={audit} what="History" endpoint="GET /audit">
         {() =>
           events.length === 0 ? (
-            <EmptyState icon="history" title="No event in this range">Every API mutation, approval, tool call and denied action lands here, hash-chained.</EmptyState>
+            <EmptyState icon="history" title="No event in this range">
+              Every API mutation, approval, tool call and denied action lands here, hash-chained.
+            </EmptyState>
           ) : (
             <div className="flex flex-wrap items-start gap-6">
               <div className="min-w-0 flex-[999_1_640px] overflow-x-auto">
@@ -299,19 +370,37 @@ export function History() {
                           key={e.seq}
                           tabIndex={0}
                           aria-selected={isSel}
-                          onClick={() => void navigate({ to: '/history', search: { ...search, seq: e.seq }, replace: true })}
+                          onClick={() =>
+                            void navigate({
+                              to: '/history',
+                              search: { ...search, seq: e.seq },
+                              replace: true,
+                            })
+                          }
                           onKeyDown={(ev) => {
-                            if (ev.key === 'Enter') void navigate({ to: '/history', search: { ...search, seq: e.seq }, replace: true })
+                            if (ev.key === 'Enter')
+                              void navigate({
+                                to: '/history',
+                                search: { ...search, seq: e.seq },
+                                replace: true,
+                              })
                           }}
                           className={`cursor-pointer border-b border-line align-top ${isSel ? 'bg-raised' : 'hover:bg-panel'}`}
                         >
-                          <td className="px-3 py-[var(--cell-y)] font-mono text-[12.5px] whitespace-nowrap" title={dateTime(e.ts)}>
+                          <td
+                            className="px-3 py-[var(--cell-y)] font-mono text-[12.5px] whitespace-nowrap"
+                            title={dateTime(e.ts)}
+                          >
                             {clock(e.ts, true)}
                           </td>
                           <td className="py-[var(--cell-y)] pr-3">{actorLabel(e.actor)}</td>
-                          <td className={`py-[var(--cell-y)] pr-3 ${CATEGORY_TONE[cat] ?? ''}`}>{CATEGORY_LABEL[cat]}</td>
+                          <td className={`py-[var(--cell-y)] pr-3 ${CATEGORY_TONE[cat] ?? ''}`}>
+                            {CATEGORY_LABEL[cat]}
+                          </td>
                           <td className="py-[var(--cell-y)] pr-3">{describe(e)}</td>
-                          <td className="py-[var(--cell-y)] pr-3 font-mono text-[12.5px] break-all">{e.target_id ? `${e.target_type}/${e.target_id.slice(0, 18)}` : e.target_type}</td>
+                          <td className="py-[var(--cell-y)] pr-3 font-mono text-[12.5px] break-all">
+                            {e.target_id ? `${e.target_type}/${e.target_id.slice(0, 18)}` : e.target_type}
+                          </td>
                         </tr>
                       )
                     })}
@@ -323,7 +412,9 @@ export function History() {
                   </Button>
                 )}
               </div>
-              <div className="w-full flex-[1_1_320px] lg:max-w-[340px]">{selected && <Detail e={selected} />}</div>
+              <div className="w-full flex-[1_1_320px] lg:max-w-[340px]">
+                {selected && <Detail e={selected} />}
+              </div>
             </div>
           )
         }

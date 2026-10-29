@@ -16,7 +16,8 @@ import { Spinner } from './ui'
 function LazyDiff({ id }: { id: string }) {
   const q = useArtifactText(id)
   if (q.isPending) return <Spinner label="Loading diff" />
-  if (q.error) return <div className="text-meta text-text-3">The diff is not available ({q.error.message}).</div>
+  if (q.error)
+    return <div className="text-meta text-text-3">The diff is not available ({q.error.message}).</div>
   return <DiffViewer diff={q.data} showFileHeader={false} maxHeight={360} />
 }
 
@@ -50,7 +51,9 @@ function Terminal({ item }: { item: Extract<TimelineItem, { kind: 'terminal' }> 
         <span className="text-text-3">$</span>
         <span className="min-w-0 truncate">{t.command}</span>
         {t.exit_code !== null && t.exit_code !== undefined && (
-          <span className={`text-xs ${t.exit_code === 0 ? 'text-text-3' : 'text-err'}`}>exit {t.exit_code}</span>
+          <span className={`text-xs ${t.exit_code === 0 ? 'text-text-3' : 'text-err'}`}>
+            exit {t.exit_code}
+          </span>
         )}
       </div>
       {t.output_tail && (
@@ -101,7 +104,15 @@ export function TimelineRow({
       break
     case 'question': {
       const q = timeline.questions.get(item.questionId)
-      body = q ? <QuestionCard id={q.id} text={q.text} options={q.options} answer={q.answer} answeredBy={q.answeredBy} /> : null
+      body = q ? (
+        <QuestionCard
+          id={q.id}
+          text={q.text}
+          options={q.options}
+          answer={q.answer}
+          answeredBy={q.answeredBy}
+        />
+      ) : null
       break
     }
     case 'action': {
@@ -124,7 +135,11 @@ export function TimelineRow({
               Review
             </Link>
           ) : (
-            <span className={`text-meta ${st.tone === 'ok' ? 'text-ok' : st.tone === 'err' ? 'text-err' : 'text-text-2'}`}>{st.label}</span>
+            <span
+              className={`text-meta ${st.tone === 'ok' ? 'text-ok' : st.tone === 'err' ? 'text-err' : 'text-text-2'}`}
+            >
+              {st.label}
+            </span>
           )}
         </div>
       )
@@ -134,7 +149,9 @@ export function TimelineRow({
       body =
         item.message.role === 'user' ? (
           <div className="flex flex-col gap-0.5">
-            <span className="text-meta text-text-3">{item.message.by ? `${item.message.by} guided the agent` : 'You guided the agent'}</span>
+            <span className="text-meta text-text-3">
+              {item.message.by ? `${item.message.by} guided the agent` : 'You guided the agent'}
+            </span>
             <span className="whitespace-pre-wrap">“{item.message.text}”</span>
           </div>
         ) : item.message.role === 'system' ? (
@@ -172,7 +189,8 @@ export function TimelineRow({
     case 'subagent':
       body = (
         <span>
-          <span className="font-mono text-[12.5px] text-text-2">spawn_subagent</span> {agents.label(item.sub.agent)}
+          <span className="font-mono text-[12.5px] text-text-2">spawn_subagent</span>{' '}
+          {agents.label(item.sub.agent)}
           <span className="text-text-3"> · {item.sub.input_summary}</span>
         </span>
       )
@@ -198,20 +216,30 @@ export function TimelineRow({
         <span className="text-text-2">
           Data class raised <span className="font-mono text-text">{item.change.from}</span> →{' '}
           <span className="font-mono text-text">{item.change.to}</span>
-          <span className="text-text-3"> · {item.change.cause.replace(/_/g, ' ')}{item.change.to >= 'C2' ? ' · internal models only from now on' : ''}</span>
+          <span className="text-text-3">
+            {' '}
+            · {item.change.cause.replace(/_/g, ' ')}
+            {item.change.to >= 'C2' ? ' · internal models only from now on' : ''}
+          </span>
         </span>
       )
       break
     case 'judge':
       body = (
         <div className="flex flex-col gap-0.5">
-          <span className={`flex items-center gap-2 font-medium ${item.judge.verdict === 'blocked' ? 'text-err' : 'text-wait'}`}>
+          <span
+            className={`flex items-center gap-2 font-medium ${item.judge.verdict === 'blocked' ? 'text-err' : 'text-wait'}`}
+          >
             <Icon name="ban" size={14} />
-            {item.judge.verdict === 'blocked' ? 'Judge blocked' : 'Judge flagged'} {item.judge.subject.replace(/_/g, ' ')}
+            {item.judge.verdict === 'blocked' ? 'Judge blocked' : 'Judge flagged'}{' '}
+            {item.judge.subject.replace(/_/g, ' ')}
           </span>
           <span className="text-text-2">
-            {item.judge.reason ?? 'Suspected prompt injection; the content was isolated and labelled untrusted.'}
-            {item.judge.categories?.length ? <span className="text-text-3"> · {item.judge.categories.join(', ')}</span> : null}
+            {item.judge.reason ??
+              'Suspected prompt injection; the content was isolated and labelled untrusted.'}
+            {item.judge.categories?.length ? (
+              <span className="text-text-3"> · {item.judge.categories.join(', ')}</span>
+            ) : null}
           </span>
         </div>
       )
@@ -237,7 +265,10 @@ export function TimelineRow({
   }
   if (!body) return null
   return (
-    <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-x-4 border-b border-line py-[var(--cell-y)]" data-seq={item.seq}>
+    <div
+      className="grid grid-cols-[52px_minmax(0,1fr)] gap-x-4 border-b border-line py-[var(--cell-y)]"
+      data-seq={item.seq}
+    >
       <span className="pt-px font-mono text-xs text-text-3">{clock(item.ts)}</span>
       <div className="flex min-w-0 flex-col gap-1">
         {showAgent && item.agent && <span className="text-sm text-text-3">{agents.label(item.agent)}</span>}
@@ -306,7 +337,12 @@ export function EventTimeline({
     )
   }
   return (
-    <div role="log" aria-label="Activity" aria-live="polite" style={{ height: v.getTotalSize(), position: 'relative' }}>
+    <div
+      role="log"
+      aria-label="Activity"
+      aria-live="polite"
+      style={{ height: v.getTotalSize(), position: 'relative' }}
+    >
       {v.getVirtualItems().map((row) => {
         const it = items[row.index]
         if (!it) return null
@@ -315,7 +351,13 @@ export function EventTimeline({
             key={row.key}
             data-index={row.index}
             ref={v.measureElement}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${row.start}px)` }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${row.start}px)`,
+            }}
           >
             <TimelineRow item={it} timeline={timeline} agents={agents} showAgent={multiAgent} />
           </div>

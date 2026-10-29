@@ -37,7 +37,11 @@ function priorityTone(p?: string): 'err' | 'wait' | undefined {
 }
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`flex flex-col gap-3 rounded-panel border border-line bg-panel px-5 py-4 ${className}`}>{children}</div>
+  return (
+    <div className={`flex flex-col gap-3 rounded-panel border border-line bg-panel px-5 py-4 ${className}`}>
+      {children}
+    </div>
+  )
 }
 
 function DiffBody({ p }: { p: DiffPreview }) {
@@ -72,7 +76,9 @@ function DiffBody({ p }: { p: DiffPreview }) {
       ) : q.isPending && p.patch_artifact ? (
         <Skeleton className="h-40" />
       ) : (
-        <div className="text-meta text-text-3">The patch is not available{q.error ? ` (${q.error.message})` : ''}.</div>
+        <div className="text-meta text-text-3">
+          The patch is not available{q.error ? ` (${q.error.message})` : ''}.
+        </div>
       )}
     </div>
   )
@@ -90,7 +96,13 @@ function IssueBody({ p }: { p: IssuePreview }) {
       </div>
       <div className="flex flex-wrap items-baseline gap-3">
         <span className="text-[15px] font-medium">{p.title}</span>
-        {p.priority && <span className={`text-meta ${tone === 'err' ? 'text-err' : tone === 'wait' ? 'text-wait' : 'text-text-2'}`}>{p.priority} priority</span>}
+        {p.priority && (
+          <span
+            className={`text-meta ${tone === 'err' ? 'text-err' : tone === 'wait' ? 'text-wait' : 'text-text-2'}`}
+          >
+            {p.priority} priority
+          </span>
+        )}
       </div>
       {p.description && <Markdown className="text-text-2">{p.description}</Markdown>}
       <DefList
@@ -98,8 +110,27 @@ function IssueBody({ p }: { p: IssuePreview }) {
         rows={[
           ['Assignee', p.assignee ?? 'Unassigned'],
           ['Due', p.due_date ?? '—'],
-          ['Labels', p.labels?.length ? <span className="flex flex-wrap gap-1.5">{p.labels.map((l) => <Chip key={l}>{l}</Chip>)}</span> : '—'],
-          ...Object.entries(p.fields ?? {}).map(([k, v]) => [k, <span key={k} className="font-mono text-[12.5px]">{value(v)}</span>] as [string, React.ReactNode]),
+          [
+            'Labels',
+            p.labels?.length ? (
+              <span className="flex flex-wrap gap-1.5">
+                {p.labels.map((l) => (
+                  <Chip key={l}>{l}</Chip>
+                ))}
+              </span>
+            ) : (
+              '—'
+            ),
+          ],
+          ...Object.entries(p.fields ?? {}).map(
+            ([k, v]) =>
+              [
+                k,
+                <span key={k} className="font-mono text-[12.5px]">
+                  {value(v)}
+                </span>,
+              ] as [string, React.ReactNode],
+          ),
         ]}
       />
     </Section>
@@ -154,7 +185,12 @@ function MailBody({ p }: { p: MailPreview }) {
           ['From', p.from ?? 'you'],
           ['To', p.to.join(', ')],
           ...(p.cc?.length ? [['Cc', p.cc.join(', ')] as [string, string]] : []),
-          ['Subject', <span key="s" className="font-medium">{p.subject}</span>],
+          [
+            'Subject',
+            <span key="s" className="font-medium">
+              {p.subject}
+            </span>,
+          ],
           ...(p.in_reply_to ? [['In reply to', p.in_reply_to] as [string, string]] : []),
         ]}
       />
@@ -209,17 +245,32 @@ function FileBody({ p }: { p: FilePreview }) {
         <Icon name="file" size={18} className="text-text-3" />
         <div className="flex flex-col">
           <span className="font-medium">{p.name}</span>
-          <span className="text-meta text-text-3">{p.size !== undefined ? bytes(p.size) : 'size unknown'}</span>
+          <span className="text-meta text-text-3">
+            {p.size !== undefined ? bytes(p.size) : 'size unknown'}
+          </span>
         </div>
       </div>
-      <DefList className="text-ui" rows={[['Destination', <span key="d" className="font-mono text-[12.5px]">{p.destination}</span>]]} />
+      <DefList
+        className="text-ui"
+        rows={[
+          [
+            'Destination',
+            <span key="d" className="font-mono text-[12.5px]">
+              {p.destination}
+            </span>,
+          ],
+        ]}
+      />
     </Section>
   )
 }
 
 export function JsonView({ data, className = '' }: { data: unknown; className?: string }) {
   return (
-    <pre tabIndex={0} className={`scrollbar-thin m-0 max-h-[520px] overflow-auto rounded-panel border border-line bg-code px-4 py-3 font-mono text-xs leading-[1.65] text-text-2 ${className}`}>
+    <pre
+      tabIndex={0}
+      className={`scrollbar-thin m-0 max-h-[520px] overflow-auto rounded-panel border border-line bg-code px-4 py-3 font-mono text-xs leading-[1.65] text-text-2 ${className}`}
+    >
       {JSON.stringify(data, null, 2)}
     </pre>
   )

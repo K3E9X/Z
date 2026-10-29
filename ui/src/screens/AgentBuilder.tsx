@@ -15,7 +15,11 @@ import { initials, titleCase } from '@/lib/format'
 type Way = 'describe' | 'template' | 'duplicate'
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 39)
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 39)
 }
 
 /** Agent builder (docs/09 §5): describe → drafted profile → edit → create; or from a template, or by duplicating. */
@@ -69,16 +73,50 @@ export function AgentBuilder() {
       if (way === 'duplicate') {
         const src = list.find((a) => a.id === source || a.name === source)
         if (!src) throw new Error('Choose the agent to duplicate')
-        id = (await unwrap(api.POST('/agents/{id}/duplicate', { params: { path: { id: src.id } }, body: { display_name: name, handle, avatar } }))).id
+        id = (
+          await unwrap(
+            api.POST('/agents/{id}/duplicate', {
+              params: { path: { id: src.id } },
+              body: { display_name: name, handle, avatar },
+            }),
+          )
+        ).id
       } else if (way === 'template' || !profile) {
         const tpl = list.find((a) => a.id === source || a.name === source)
         if (!tpl?.name) throw new Error('Choose a template')
-        id = (await unwrap(api.POST('/agents', { body: { template: tpl.template ?? tpl.name, display_name: name, handle, avatar, ...(team ? { owner_team: team } : {}) } }))).id
+        id = (
+          await unwrap(
+            api.POST('/agents', {
+              body: {
+                template: tpl.template ?? tpl.name,
+                display_name: name,
+                handle,
+                avatar,
+                ...(team ? { owner_team: team } : {}),
+              },
+            }),
+          )
+        ).id
       } else {
-        id = (await unwrap(api.POST('/agents', { body: { ...profile, name: profile.name ?? slug(name), display_name: name, handle, avatar } as never }))).id
+        id = (
+          await unwrap(
+            api.POST('/agents', {
+              body: {
+                ...profile,
+                name: profile.name ?? slug(name),
+                display_name: name,
+                handle,
+                avatar,
+              } as never,
+            }),
+          )
+        ).id
       }
       await qc.invalidateQueries({ queryKey: qk.agents })
-      toast.ok(`${name} (@${handle}) is ready`, { label: 'Give it a mission', run: () => void navigate({ to: '/missions/new', search: { agent: handle } }) })
+      toast.ok(`${name} (@${handle}) is ready`, {
+        label: 'Give it a mission',
+        run: () => void navigate({ to: '/missions/new', search: { agent: handle } }),
+      })
       void navigate({ to: '/agents', search: { agent: id } })
     } catch (e) {
       toast.error(e, 'Agent not created')
@@ -90,14 +128,20 @@ export function AgentBuilder() {
   if (!canWrite) {
     return (
       <main className="mx-auto w-full max-w-[860px] px-10 py-12">
-        <PageTitle title="New agent" lead="Creating agents needs the agents:write permission (builder role)." />
+        <PageTitle
+          title="New agent"
+          lead="Creating agents needs the agents:write permission (builder role)."
+        />
       </main>
     )
   }
   const sourceAgent = list.find((a) => a.id === source || a.name === source)
   return (
     <main className="mx-auto flex w-full max-w-[900px] flex-col gap-8 px-10 pt-12 pb-16 max-md:px-5">
-      <PageTitle title="New agent" lead="Agents are named by your team. Start from a template, duplicate one you trust, or describe the agent you need." />
+      <PageTitle
+        title="New agent"
+        lead="Agents are named by your team. Start from a template, duplicate one you trust, or describe the agent you need."
+      />
       <Tabs<Way>
         label="How to start"
         value={way}
@@ -113,10 +157,28 @@ export function AgentBuilder() {
       />
       {way === 'describe' && (
         <section aria-label="Describe the agent" className="flex flex-col gap-3">
-          <Field label="Describe the agent you need" hint="What it looks after, which tools it reads, what it may propose, how it should talk.">
-            {(id, d) => <Textarea id={id} aria-describedby={d} rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="An agent that watches our Jira SECOPS backlog, finds stale tickets and proposes owners and deadlines from the CMDB. Concise, in English." />}
+          <Field
+            label="Describe the agent you need"
+            hint="What it looks after, which tools it reads, what it may propose, how it should talk."
+          >
+            {(id, d) => (
+              <Textarea
+                id={id}
+                aria-describedby={d}
+                rows={5}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="An agent that watches our Jira SECOPS backlog, finds stale tickets and proposes owners and deadlines from the CMDB. Concise, in English."
+              />
+            )}
           </Field>
-          <Button variant="primary" className="self-start" busy={drafting === 'busy'} disabled={!description.trim()} onClick={() => void draft()}>
+          <Button
+            variant="primary"
+            className="self-start"
+            busy={drafting === 'busy'}
+            disabled={!description.trim()}
+            onClick={() => void draft()}
+          >
             Draft the profile
           </Button>
           {drafting === 'unavailable' && <NotServed what="The agent builder" endpoint="POST /agents/draft" />}
@@ -147,7 +209,9 @@ export function AgentBuilder() {
                 .filter((a) => (way === 'template' ? !a.template || a.template === a.name : true))
                 .map((a) => (
                   <option key={a.id} value={a.id}>
-                    {way === 'template' ? titleCase(a.template ?? a.name ?? '') : `${a.display_name} (@${a.handle})`}
+                    {way === 'template'
+                      ? titleCase(a.template ?? a.name ?? '')
+                      : `${a.display_name} (@${a.handle})`}
                   </option>
                 ))}
             </Select>
@@ -155,7 +219,10 @@ export function AgentBuilder() {
         </Field>
       )}
       {(way !== 'describe' || profile) && (
-        <section aria-label="Name and identity" className="flex flex-col gap-5 rounded-card border border-line bg-panel px-6 py-5">
+        <section
+          aria-label="Name and identity"
+          className="flex flex-col gap-5 rounded-card border border-line bg-panel px-6 py-5"
+        >
           <div className="flex items-center gap-4">
             <Avatar avatar={{ initials: initials(name || '?'), color }} name={name || '?'} size={48} />
             <div className="flex flex-col">
@@ -164,7 +231,12 @@ export function AgentBuilder() {
             </div>
             <label className="ml-auto flex items-center gap-2 text-meta text-text-2">
               Color
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-8 w-10 rounded-ctl border border-line-2 bg-transparent" />
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-8 w-10 rounded-ctl border border-line-2 bg-transparent"
+              />
             </label>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -181,8 +253,24 @@ export function AgentBuilder() {
                 />
               )}
             </Field>
-            <Field label="Handle" error={handle && !validHandle ? 'Lowercase, digits and dashes' : taken ? 'Already used in the organisation' : null}>
-              {(id) => <Input id={id} value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} className="font-mono" />}
+            <Field
+              label="Handle"
+              error={
+                handle && !validHandle
+                  ? 'Lowercase, digits and dashes'
+                  : taken
+                    ? 'Already used in the organisation'
+                    : null
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value.toLowerCase())}
+                  className="font-mono"
+                />
+              )}
             </Field>
             <Field label="Owner team">
               {(id) => (
@@ -199,32 +287,86 @@ export function AgentBuilder() {
           </div>
           {profile && way === 'describe' && (
             <div className="flex flex-col gap-4 border-t border-line pt-4">
-              <Field label="Role">{(id) => <Textarea id={id} rows={2} value={profile.role ?? ''} onChange={(e) => setProfile({ ...profile, role: e.target.value })} />}</Field>
-              <Field label="Instructions">{(id) => <Textarea id={id} rows={6} value={profile.instructions ?? ''} onChange={(e) => setProfile({ ...profile, instructions: e.target.value })} className="font-mono text-[12.5px]" />}</Field>
+              <Field label="Role">
+                {(id) => (
+                  <Textarea
+                    id={id}
+                    rows={2}
+                    value={profile.role ?? ''}
+                    onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+                  />
+                )}
+              </Field>
+              <Field label="Instructions">
+                {(id) => (
+                  <Textarea
+                    id={id}
+                    rows={6}
+                    value={profile.instructions ?? ''}
+                    onChange={(e) => setProfile({ ...profile, instructions: e.target.value })}
+                    className="font-mono text-[12.5px]"
+                  />
+                )}
+              </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Model">
                   {(id) => (
-                    <Select id={id} value={profile.model ?? 'z-fast'} onChange={(e) => setProfile({ ...profile, model: e.target.value })}>
+                    <Select
+                      id={id}
+                      value={profile.model ?? 'z-fast'}
+                      onChange={(e) => setProfile({ ...profile, model: e.target.value })}
+                    >
                       <option value="z-fast">z-fast</option>
                       <option value="z-heavy">z-heavy</option>
                     </Select>
                   )}
                 </Field>
-                <Field label="Tools" hint="Neutral names: read, terminal, gateway:<connector>.<resource>.* (reads only)">
-                  {(id, d) => <Input id={id} aria-describedby={d} value={(profile.tools ?? []).join(', ')} onChange={(e) => setProfile({ ...profile, tools: e.target.value.split(/[\s,]+/).filter(Boolean) })} className="font-mono text-sm" />}
+                <Field
+                  label="Tools"
+                  hint="Neutral names: read, terminal, gateway:<connector>.<resource>.* (reads only)"
+                >
+                  {(id, d) => (
+                    <Input
+                      id={id}
+                      aria-describedby={d}
+                      value={(profile.tools ?? []).join(', ')}
+                      onChange={(e) =>
+                        setProfile({ ...profile, tools: e.target.value.split(/[\s,]+/).filter(Boolean) })
+                      }
+                      className="font-mono text-sm"
+                    />
+                  )}
                 </Field>
               </div>
               <fieldset className="m-0 grid gap-2 border-none p-0 sm:grid-cols-2">
                 <legend className="mb-2 text-meta text-text-2">Skills</legend>
                 {(skills.data?.items ?? []).map((s) => (
-                  <Checkbox key={s.id} checked={(profile.skills ?? []).includes(s.name)} onChange={(v) => setProfile({ ...profile, skills: v ? [...(profile.skills ?? []), s.name] : (profile.skills ?? []).filter((x) => x !== s.name) })} label={<span className="font-mono text-[12.5px]">{s.name}</span>} description={s.description} />
+                  <Checkbox
+                    key={s.id}
+                    checked={(profile.skills ?? []).includes(s.name)}
+                    onChange={(v) =>
+                      setProfile({
+                        ...profile,
+                        skills: v
+                          ? [...(profile.skills ?? []), s.name]
+                          : (profile.skills ?? []).filter((x) => x !== s.name),
+                      })
+                    }
+                    label={<span className="font-mono text-[12.5px]">{s.name}</span>}
+                    description={s.description}
+                  />
                 ))}
               </fieldset>
             </div>
           )}
           <div className="flex justify-end gap-2">
             <Button onClick={() => window.history.back()}>Cancel</Button>
-            <Button variant="primary" busy={busy} disabled={!name.trim() || !validHandle || taken || (way !== 'describe' && !sourceAgent)} onClick={() => void create()}>
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!name.trim() || !validHandle || taken || (way !== 'describe' && !sourceAgent)}
+              onClick={() => void create()}
+            >
               Create {name || 'the agent'}
             </Button>
           </div>

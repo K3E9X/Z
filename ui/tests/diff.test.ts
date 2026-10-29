@@ -14,7 +14,11 @@ describe('parseUnified', () => {
   it('falls back line by line on an invalid patch, headers as meta, never as changes', () => {
     const files = parseUnified('--- a/x\n+++ b/x\n@@ -1,9 +1,9 @@\n ctx\n+new\n')
     const lines = files[0]?.hunks[0]?.lines ?? []
-    expect(lines.filter((l) => l.kind === 'meta').map((l) => l.text)).toEqual(['--- a/x', '+++ b/x', '@@ -1,9 +1,9 @@'])
+    expect(lines.filter((l) => l.kind === 'meta').map((l) => l.text)).toEqual([
+      '--- a/x',
+      '+++ b/x',
+      '@@ -1,9 +1,9 @@',
+    ])
     expect(files[0]?.added).toBe(1)
     expect(files[0]?.removed).toBe(0)
   })

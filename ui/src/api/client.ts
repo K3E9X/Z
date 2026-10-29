@@ -14,7 +14,10 @@ export function setCsrfToken(token: string | null | undefined): void {
   csrfFromMe = token ?? null
 }
 
-export function readCookie(name: string, cookie: string = typeof document === 'undefined' ? '' : document.cookie) {
+export function readCookie(
+  name: string,
+  cookie: string = typeof document === 'undefined' ? '' : document.cookie,
+) {
   for (const part of cookie.split(';')) {
     const [k, ...rest] = part.trim().split('=')
     if (k === name) return decodeURIComponent(rest.join('='))
@@ -104,7 +107,12 @@ export async function rawFetch(path: string, init: RequestInit = {}): Promise<Re
   }
   let res: Response
   try {
-    res = await fetch(`${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}${path}`, { ...init, method, headers, credentials: 'same-origin' })
+    res = await fetch(`${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}${path}`, {
+      ...init,
+      method,
+      headers,
+      credentials: 'same-origin',
+    })
   } catch (e) {
     const err = new ApiError(0, {
       type: 'urn:z:problem:unavailable',

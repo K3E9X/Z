@@ -37,7 +37,8 @@ export function UserMenu({ onClose, className = '' }: { onClose: () => void; cla
     }
   }, [onClose])
 
-  const item = 'flex w-full items-center gap-2.5 rounded-ctl px-2.5 py-1.5 text-left hover:bg-raised focus-visible:bg-raised'
+  const item =
+    'flex w-full items-center gap-2.5 rounded-ctl px-2.5 py-1.5 text-left hover:bg-raised focus-visible:bg-raised'
   return (
     <div
       ref={ref}

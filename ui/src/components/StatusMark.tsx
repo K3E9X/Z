@@ -20,11 +20,24 @@ export function StatusMark({
 }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`} data-tone={tone}>
-      <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" focusable="false" className={`flex-none ${tone === 'run' ? 'animate-zspin' : ''}`}>
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        focusable="false"
+        className={`flex-none ${tone === 'run' ? 'animate-zspin' : ''}`}
+      >
         {tone === 'run' && (
           <>
             <circle cx="8" cy="8" r="6" fill="none" stroke="var(--line-2)" strokeWidth="2" />
-            <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="var(--run)" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d="M8 2a6 6 0 0 1 6 6"
+              fill="none"
+              stroke="var(--run)"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </>
         )}
         {tone === 'wait' && (
@@ -49,14 +62,34 @@ export function StatusMark({
         {tone === 'err' && (
           <>
             <circle cx="8" cy="8" r="7" fill="var(--err-bg)" />
-            <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" fill="none" stroke="var(--err)" strokeWidth="1.6" strokeLinecap="round" />
+            <path
+              d="M5.5 5.5l5 5M10.5 5.5l-5 5"
+              fill="none"
+              stroke="var(--err)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
           </>
         )}
-        {tone === 'idle' && <circle cx="8" cy="8" r="6" fill="none" stroke="var(--text-3)" strokeWidth="1.6" />}
+        {tone === 'idle' && (
+          <circle cx="8" cy="8" r="6" fill="none" stroke="var(--text-3)" strokeWidth="1.6" />
+        )}
         {tone === 'budget' && (
           <>
-            <path d="M2.5 11a5.5 5.5 0 1 1 11 0" fill="none" stroke="var(--line-2)" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M2.5 11a5.5 5.5 0 0 1 11 0" fill="none" stroke="var(--err)" strokeWidth="1.8" strokeLinecap="round" />
+            <path
+              d="M2.5 11a5.5 5.5 0 1 1 11 0"
+              fill="none"
+              stroke="var(--line-2)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <path
+              d="M2.5 11a5.5 5.5 0 0 1 11 0"
+              fill="none"
+              stroke="var(--err)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
             <path d="M8 11l3-3.5" stroke="var(--err)" strokeWidth="1.6" strokeLinecap="round" />
           </>
         )}
@@ -67,7 +100,15 @@ export function StatusMark({
 }
 
 /** The 6 px dot used inline (header indicator, KPI values, health cells). Pair it with text. */
-export function Dot({ tone, pulse = false, className = '' }: { tone: Tone; pulse?: boolean; className?: string }) {
+export function Dot({
+  tone,
+  pulse = false,
+  className = '',
+}: {
+  tone: Tone
+  pulse?: boolean
+  className?: string
+}) {
   const bg: Record<Tone, string> = {
     run: 'bg-run',
     wait: 'bg-wait',
@@ -88,7 +129,15 @@ export function Dot({ tone, pulse = false, className = '' }: { tone: Tone; pulse
 }
 
 /** Dot + label, colored (e.g. "● Healthy"). */
-export function StatusText({ tone, label, className = '' }: { tone: Tone; label: string; className?: string }) {
+export function StatusText({
+  tone,
+  label,
+  className = '',
+}: {
+  tone: Tone
+  label: string
+  className?: string
+}) {
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <Dot tone={tone} />

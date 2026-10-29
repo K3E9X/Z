@@ -37,16 +37,26 @@ export function ToolCallItem({
       >
         <span className="font-mono text-[12.5px] text-text-2">{name}</span>
         <span className="min-w-0 truncate text-text-2">{argSummary(call.args)}</span>
-        {hasArgs && <Icon name={open ? 'chevronDown' : 'chevronRight'} size={11} className="flex-none self-center text-text-3" />}
+        {hasArgs && (
+          <Icon
+            name={open ? 'chevronDown' : 'chevronRight'}
+            size={11}
+            className="flex-none self-center text-text-3"
+          />
+        )}
       </button>
       {result ? (
         <div className="flex flex-wrap items-baseline gap-x-2">
           {!result.ok && <span className="font-medium text-err">Failed:</span>}
           <span className={result.ok ? '' : 'text-text-2'}>{result.summary}</span>
           {result.judge !== 'clean' && (
-            <span className={`inline-flex items-center gap-1 rounded-[5px] px-1.5 text-sm ${result.judge === 'blocked' ? 'bg-err-bg text-err' : 'bg-wait-bg text-wait'}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-[5px] px-1.5 text-sm ${result.judge === 'blocked' ? 'bg-err-bg text-err' : 'bg-wait-bg text-wait'}`}
+            >
               <Icon name="ban" size={11} />
-              {result.judge === 'blocked' ? 'Blocked by the judge' : 'Judge: possible injection, content isolated'}
+              {result.judge === 'blocked'
+                ? 'Blocked by the judge'
+                : 'Judge: possible injection, content isolated'}
             </span>
           )}
           <span className="font-mono text-xs text-text-3">{ms(result.duration_ms)}</span>

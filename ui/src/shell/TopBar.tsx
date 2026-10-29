@@ -23,7 +23,14 @@ export function GatewayIndicator() {
       </Link>
     )
   }
-  const tone = d.health.status === 'healthy' ? 'ok' : d.health.status === 'down' ? 'err' : d.health.status === 'unknown' ? 'idle' : 'wait'
+  const tone =
+    d.health.status === 'healthy'
+      ? 'ok'
+      : d.health.status === 'down'
+        ? 'err'
+        : d.health.status === 'unknown'
+          ? 'idle'
+          : 'wait'
   const parts = ['inferX', `${compactNumber(d.health.tokens_today)} tokens today`]
   if (d.budgetPct !== null) parts.push(`${percent(d.budgetPct)} of budget`)
   return (
@@ -70,7 +77,9 @@ function Notifications() {
         className="relative flex h-8 w-8 items-center justify-center rounded-btn text-text-2 hover:bg-raised hover:text-text"
       >
         <Icon name="bell" size={16} />
-        {count > 0 && <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-wait" aria-hidden="true" />}
+        {count > 0 && (
+          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-wait" aria-hidden="true" />
+        )}
       </button>
       {open && (
         <div className="absolute top-full right-0 z-40 mt-1 w-[360px] rounded-panel border border-line-2 bg-raised p-1.5">
@@ -95,7 +104,9 @@ function Notifications() {
               </Link>
             )
           })}
-          {count === 0 && <div className="px-2.5 pb-2 text-meta text-text-3">Nothing is waiting. Agents will ask here.</div>}
+          {count === 0 && (
+            <div className="px-2.5 pb-2 text-meta text-text-3">Nothing is waiting. Agents will ask here.</div>
+          )}
           <Link
             to="/review"
             onClick={() => {
@@ -123,7 +134,10 @@ export function TopBar({ crumbs, right }: { crumbs: Crumb[]; right?: ReactNode }
                 {c.label}
               </Link>
             ) : (
-              <span className={i === crumbs.length - 1 ? 'text-text' : ''} aria-current={i === crumbs.length - 1 ? 'page' : undefined}>
+              <span
+                className={i === crumbs.length - 1 ? 'text-text' : ''}
+                aria-current={i === crumbs.length - 1 ? 'page' : undefined}
+              >
                 {c.label}
               </span>
             )}

@@ -40,8 +40,12 @@ export function QuestionCard({
   }
 
   return (
-    <div className={`flex flex-col gap-2.5 rounded-panel ${done ? 'border border-line bg-panel' : 'bg-wait-bg'} ${compact ? 'p-3' : 'px-4 py-3.5'}`}>
-      <div className={`text-meta font-medium ${done ? 'text-text-3' : 'text-wait'}`}>{done ? 'Question answered' : 'Question for you'}</div>
+    <div
+      className={`flex flex-col gap-2.5 rounded-panel ${done ? 'border border-line bg-panel' : 'bg-wait-bg'} ${compact ? 'p-3' : 'px-4 py-3.5'}`}
+    >
+      <div className={`text-meta font-medium ${done ? 'text-text-3' : 'text-wait'}`}>
+        {done ? 'Question answered' : 'Question for you'}
+      </div>
       <p className="m-0 leading-[1.55] whitespace-pre-wrap">{text}</p>
       {done ? (
         <div className="text-meta text-text-2">
@@ -88,7 +92,12 @@ export function QuestionCard({
               placeholder={options.length ? 'Or answer in your own words' : 'Your answer'}
               className="min-h-[32px] flex-1 bg-bg"
             />
-            <Button type="submit" size="sm" disabled={!free.trim()} busy={busy === free.trim() && !!free.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!free.trim()}
+              busy={busy === free.trim() && !!free.trim()}
+            >
               Send
             </Button>
           </form>

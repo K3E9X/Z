@@ -19,7 +19,9 @@ import { StepUpCancelled, useStepUp } from '@/shell/stepup'
 function RoleChip({ r }: { r: EffectiveRole }) {
   const manual = r.source === 'manual'
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] border px-2 text-sm ${manual ? 'border-transparent bg-wait-bg text-wait' : 'border-line-2'}`}>
+    <span
+      className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] border px-2 text-sm ${manual ? 'border-transparent bg-wait-bg text-wait' : 'border-line-2'}`}
+    >
       <span className="font-medium">{r.role}</span>
       <span className={manual ? '' : 'text-text-3'}>
         {manual ? 'manual' : 'GitLab group'}
@@ -51,10 +53,24 @@ function AddRole({ user, open, onClose }: { user: User; open: boolean; onClose: 
     setBusy(true)
     try {
       const expires = days > 0 ? new Date(Date.now() + days * 86400_000).toISOString() : null
-      await stepUp.run(() => unwrap(api.POST('/admin/role-bindings', { body: { subject: `user:${user.id}`, role, scope, expires_at: expires, ...(reason ? { reason } : {}) } })), {
-        what: 'Granting a role',
-        detail: `${user.username} · ${role} · ${scope}${expires ? ` · until ${shortDate(expires)}` : ''}`,
-      })
+      await stepUp.run(
+        () =>
+          unwrap(
+            api.POST('/admin/role-bindings', {
+              body: {
+                subject: `user:${user.id}`,
+                role,
+                scope,
+                expires_at: expires,
+                ...(reason ? { reason } : {}),
+              },
+            }),
+          ),
+        {
+          what: 'Granting a role',
+          detail: `${user.username} · ${role} · ${scope}${expires ? ` · until ${shortDate(expires)}` : ''}`,
+        },
+      )
       await qc.invalidateQueries({ queryKey: ['admin'] })
       toast.ok(`${role} granted to ${user.name}`)
       onClose()
@@ -116,7 +132,16 @@ function AddRole({ user, open, onClose }: { user: User; open: boolean; onClose: 
             </Select>
           )}
         </Field>
-        <Field label="Reason">{(id) => <Input id={id} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Covering for the on-call approver" />}</Field>
+        <Field label="Reason">
+          {(id) => (
+            <Input
+              id={id}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Covering for the on-call approver"
+            />
+          )}
+        </Field>
       </div>
     </Dialog>
   )
@@ -124,11 +149,19 @@ function AddRole({ user, open, onClose }: { user: User; open: boolean; onClose: 
 
 export function WhoCan({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [perm, setPerm] = useState<PermissionName>('actions:approve')
-  const q = useQuery({ queryKey: qk.admin.whoCan(perm), queryFn: () => unwrap(api.GET('/admin/who-can', { params: { query: { permission: perm } } })), enabled: open })
+  const q = useQuery({
+    queryKey: qk.admin.whoCan(perm),
+    queryFn: () => unwrap(api.GET('/admin/who-can', { params: { query: { permission: perm } } })),
+    enabled: open,
+  })
   return (
     <Dialog open={open} onClose={onClose} title="Who can…?" width={620}>
       <div className="flex flex-col gap-4">
-        <Select aria-label="Permission" value={perm} onChange={(e) => setPerm(e.target.value as PermissionName)}>
+        <Select
+          aria-label="Permission"
+          value={perm}
+          onChange={(e) => setPerm(e.target.value as PermissionName)}
+        >
           {(Object.keys(PERMISSIONS) as PermissionName[]).map((p) => (
             <option key={p} value={p}>
               {p} · {PERMISSIONS[p]}
@@ -157,12 +190,28 @@ export function WhoCan({ open, onClose }: { open: boolean; onClose: () => void }
 
 function UserPanel({ id }: { id: string }) {
   const me = useCurrentMe()
-  const q = useQuery({ queryKey: qk.admin.user(id), queryFn: () => unwrap(api.GET('/admin/users/{id}', { params: { path: { id } } })) })
-  const bindings = useQuery({ queryKey: qk.admin.bindings({ subject: `user:${id}` }), queryFn: () => unwrap(api.GET('/admin/role-bindings', { params: { query: { subject: `user:${id}` } } })) })
-  const sessions = useQuery({ queryKey: [...qk.admin.sessions, id], queryFn: () => unwrap(api.GET('/admin/sessions', { params: { query: { user: id, limit: 20 } } })) })
-  const tokens = useQuery({ queryKey: [...qk.admin.tokens, id], queryFn: () => unwrap(api.GET('/admin/tokens', { params: { query: { user: id, limit: 20 } } })) })
+  const q = useQuery({
+    queryKey: qk.admin.user(id),
+    queryFn: () => unwrap(api.GET('/admin/users/{id}', { params: { path: { id } } })),
+  })
+  const bindings = useQuery({
+    queryKey: qk.admin.bindings({ subject: `user:${id}` }),
+    queryFn: () => unwrap(api.GET('/admin/role-bindings', { params: { query: { subject: `user:${id}` } } })),
+  })
+  const sessions = useQuery({
+    queryKey: [...qk.admin.sessions, id],
+    queryFn: () => unwrap(api.GET('/admin/sessions', { params: { query: { user: id, limit: 20 } } })),
+  })
+  const tokens = useQuery({
+    queryKey: [...qk.admin.tokens, id],
+    queryFn: () => unwrap(api.GET('/admin/tokens', { params: { query: { user: id, limit: 20 } } })),
+  })
   const u = q.data
-  const activity = useQuery({ queryKey: ['audit', 'actor', u?.username], enabled: !!u, queryFn: () => unwrap(api.GET('/audit', { params: { query: { actor: u?.username ?? '', limit: 5 } } })) })
+  const activity = useQuery({
+    queryKey: ['audit', 'actor', u?.username],
+    enabled: !!u,
+    queryFn: () => unwrap(api.GET('/audit', { params: { query: { actor: u?.username ?? '', limit: 5 } } })),
+  })
   const qc = useQueryClient()
   const toast = useToast()
   const stepUp = useStepUp()
@@ -183,7 +232,10 @@ function UserPanel({ id }: { id: string }) {
     }
   }
   return (
-    <aside aria-label={`${u.name} details`} className="flex flex-col rounded-card border border-line bg-panel">
+    <aside
+      aria-label={`${u.name} details`}
+      className="flex flex-col rounded-card border border-line bg-panel"
+    >
       <div className="flex items-center gap-3 border-b border-line px-5 py-4">
         <Avatar name={u.name || u.username} size={36} />
         <div className="flex min-w-0 flex-col">
@@ -195,14 +247,23 @@ function UserPanel({ id }: { id: string }) {
       </div>
       <section aria-label="Effective roles" className="flex flex-col gap-2.5 border-b border-line px-5 py-4">
         <h3 className="m-0 text-meta font-normal text-text-3">Effective roles</h3>
-        {u.effective_roles.length === 0 && <span className="text-meta text-text-3">None: {u.local_kind ? 'local account with fixed limits' : 'no mapped group'}.</span>}
+        {u.effective_roles.length === 0 && (
+          <span className="text-meta text-text-3">
+            None: {u.local_kind ? 'local account with fixed limits' : 'no mapped group'}.
+          </span>
+        )}
         {u.effective_roles.map((r, i) => {
-          const binding = (bindings.data ?? []).find((b) => b.role === r.role && b.scope === r.scope && b.source === 'manual')
+          const binding = (bindings.data ?? []).find(
+            (b) => b.role === r.role && b.scope === r.scope && b.source === 'manual',
+          )
           return (
             <div key={i} className="grid grid-cols-[80px_1fr] gap-2 text-ui">
               <span className="font-medium">{r.role}</span>
               <span className="text-text-2">
-                {r.scope === 'org' ? 'org' : r.scope.replace('team:', 'team ')} · {r.source === 'gitlab' ? `from GitLab group ${r.via ?? ''}` : `manual${r.via ? `, granted by ${r.via}` : ''}`}
+                {r.scope === 'org' ? 'org' : r.scope.replace('team:', 'team ')} ·{' '}
+                {r.source === 'gitlab'
+                  ? `from GitLab group ${r.via ?? ''}`
+                  : `manual${r.via ? `, granted by ${r.via}` : ''}`}
                 {r.expires_at ? `, expires ${shortDate(r.expires_at)}` : ''}
                 {binding && (
                   <>
@@ -211,7 +272,19 @@ function UserPanel({ id }: { id: string }) {
                       type="button"
                       className="text-text-2 underline underline-offset-2"
                       disabled={busy === binding.id}
-                      onClick={() => void run(binding.id, 'Revoking a role', () => unwrap(api.DELETE('/admin/role-bindings/{id}', { params: { path: { id: binding.id } } })), `${r.role} revoked`)}
+                      onClick={() =>
+                        void run(
+                          binding.id,
+                          'Revoking a role',
+                          () =>
+                            unwrap(
+                              api.DELETE('/admin/role-bindings/{id}', {
+                                params: { path: { id: binding.id } },
+                              }),
+                            ),
+                          `${r.role} revoked`,
+                        )
+                      }
                     >
                       revoke
                     </button>
@@ -222,13 +295,17 @@ function UserPanel({ id }: { id: string }) {
           )
         })}
       </section>
-      <section aria-label="Sessions and tokens" className="flex flex-col gap-2 border-b border-line px-5 py-4 text-ui">
+      <section
+        aria-label="Sessions and tokens"
+        className="flex flex-col gap-2 border-b border-line px-5 py-4 text-ui"
+      >
         <h3 className="m-0 text-meta font-normal text-text-3">Sessions and tokens</h3>
         {(sessions.data?.items ?? []).map((s) => (
           <div key={s.id} className="grid grid-cols-[48px_1fr] gap-2">
             <span className="text-text-3">{s.kind === 'web' ? 'Web' : 'CLI'}</span>
             <span>
-              {s.device ?? s.user_agent?.slice(0, 40) ?? 'unknown'} · {s.ip ?? ''} · seen {relative(s.last_seen_at)}
+              {s.device ?? s.user_agent?.slice(0, 40) ?? 'unknown'} · {s.ip ?? ''} · seen{' '}
+              {relative(s.last_seen_at)}
               {s.step_up_at ? ` · step-up ${relative(s.step_up_at)}` : ''}
             </span>
           </div>
@@ -237,21 +314,34 @@ function UserPanel({ id }: { id: string }) {
           <div key={t.id} className="grid grid-cols-[48px_1fr] gap-2">
             <span className="text-text-3">Token</span>
             <span>
-              {t.name} · <span className="font-mono">{t.scopes.join(', ')}</span> · expires {shortDate(t.expires_at)}
+              {t.name} · <span className="font-mono">{t.scopes.join(', ')}</span> · expires{' '}
+              {shortDate(t.expires_at)}
             </span>
           </div>
         ))}
-        {(sessions.data?.items ?? []).length + (tokens.data?.items ?? []).length === 0 && <span className="text-meta text-text-3">No active session or token.</span>}
+        {(sessions.data?.items ?? []).length + (tokens.data?.items ?? []).length === 0 && (
+          <span className="text-meta text-text-3">No active session or token.</span>
+        )}
       </section>
-      <section aria-label="Recent activity" className="flex flex-col gap-1.5 border-b border-line px-5 py-4 text-ui">
+      <section
+        aria-label="Recent activity"
+        className="flex flex-col gap-1.5 border-b border-line px-5 py-4 text-ui"
+      >
         <h3 className="m-0 text-meta font-normal text-text-3">Recent activity</h3>
         {(activity.data?.items ?? []).map((e) => (
           <div key={e.seq}>
-            <span className="font-mono text-text-3">{clock(e.ts)}</span> {e.action.replace(/[._]/g, ' ')} {e.target_id ? <span className="text-text-3">· {e.target_type}</span> : null}
+            <span className="font-mono text-text-3">{clock(e.ts)}</span> {e.action.replace(/[._]/g, ' ')}{' '}
+            {e.target_id ? <span className="text-text-3">· {e.target_type}</span> : null}
           </div>
         ))}
-        {(activity.data?.items ?? []).length === 0 && <span className="text-meta text-text-3">Nothing recorded yet.</span>}
-        <Link to="/history" search={{ q: u.username }} className="mt-1 text-meta text-text-2 underline underline-offset-2">
+        {(activity.data?.items ?? []).length === 0 && (
+          <span className="text-meta text-text-3">Nothing recorded yet.</span>
+        )}
+        <Link
+          to="/history"
+          search={{ q: u.username }}
+          className="mt-1 text-meta text-text-2 underline underline-offset-2"
+        >
           Full audit trail
         </Link>
       </section>
@@ -259,15 +349,61 @@ function UserPanel({ id }: { id: string }) {
         <Button size="sm" onClick={() => setAdding(true)}>
           Add a role
         </Button>
-        <Button size="sm" busy={busy === 'revoke'} onClick={() => void run('revoke', 'Revoking all sessions', () => unwrap(api.POST('/admin/users/{id}/revoke-sessions', { params: { path: { id } }, body: {} })), 'Sessions and CLI tokens revoked')}>
+        <Button
+          size="sm"
+          busy={busy === 'revoke'}
+          onClick={() =>
+            void run(
+              'revoke',
+              'Revoking all sessions',
+              () =>
+                unwrap(api.POST('/admin/users/{id}/revoke-sessions', { params: { path: { id } }, body: {} })),
+              'Sessions and CLI tokens revoked',
+            )
+          }
+        >
           Revoke sessions
         </Button>
         {u.status === 'active' ? (
-          <Button size="sm" variant="danger" disabled={self} title={self ? 'You cannot suspend yourself' : undefined} busy={busy === 'suspend'} onClick={() => void run('suspend', 'Suspending a user', () => unwrap(api.PATCH('/admin/users/{id}', { params: { path: { id } }, body: { action: 'suspend' } })), `${u.name} suspended`)}>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={self}
+            title={self ? 'You cannot suspend yourself' : undefined}
+            busy={busy === 'suspend'}
+            onClick={() =>
+              void run(
+                'suspend',
+                'Suspending a user',
+                () =>
+                  unwrap(
+                    api.PATCH('/admin/users/{id}', { params: { path: { id } }, body: { action: 'suspend' } }),
+                  ),
+                `${u.name} suspended`,
+              )
+            }
+          >
             Suspend
           </Button>
         ) : (
-          <Button size="sm" busy={busy === 'reactivate'} onClick={() => void run('reactivate', 'Reactivating a user', () => unwrap(api.PATCH('/admin/users/{id}', { params: { path: { id } }, body: { action: 'reactivate' } })), `${u.name} reactivated`)}>
+          <Button
+            size="sm"
+            busy={busy === 'reactivate'}
+            onClick={() =>
+              void run(
+                'reactivate',
+                'Reactivating a user',
+                () =>
+                  unwrap(
+                    api.PATCH('/admin/users/{id}', {
+                      params: { path: { id } },
+                      body: { action: 'reactivate' },
+                    }),
+                  ),
+                `${u.name} reactivated`,
+              )
+            }
+          >
             Reactivate
           </Button>
         )}
@@ -285,7 +421,11 @@ export function UsersTab() {
   const [source, setSource] = useState('')
   const [team, setTeam] = useState('')
   const [whoCan, setWhoCan] = useState(false)
-  const users = useQuery({ queryKey: qk.admin.users({ role }), queryFn: () => unwrap(api.GET('/admin/users', { params: { query: { limit: 200, ...(role ? { role } : {}) } } })) })
+  const users = useQuery({
+    queryKey: qk.admin.users({ role }),
+    queryFn: () =>
+      unwrap(api.GET('/admin/users', { params: { query: { limit: 200, ...(role ? { role } : {}) } } })),
+  })
   const teams = useTeams()
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -297,7 +437,8 @@ export function UsersTab() {
     )
   }, [users.data, q, source, team])
   const selected = search.user && list.some((u) => u.id === search.user) ? search.user : (list[0]?.id ?? null)
-  const select = (id: string) => void navigate({ to: '/admin', search: { tab: 'users', user: id }, replace: true })
+  const select = (id: string) =>
+    void navigate({ to: '/admin', search: { tab: 'users', user: id }, replace: true })
   useHotkeys({
     j: () => {
       const i = list.findIndex((u) => u.id === selected)
@@ -313,8 +454,20 @@ export function UsersTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Input data-search aria-label="Search people" placeholder="Search people" value={q} onChange={(e) => setQ(e.target.value)} className="w-[360px] max-w-full" />
-        <Select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} className="w-[140px]">
+        <Input
+          data-search
+          aria-label="Search people"
+          placeholder="Search people"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="w-[360px] max-w-full"
+        />
+        <Select
+          aria-label="Role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="w-[140px]"
+        >
           <option value="">Role: any</option>
           {['viewer', 'operator', 'approver', 'builder', 'auditor', 'admin'].map((r) => (
             <option key={r} value={r}>
@@ -322,12 +475,22 @@ export function UsersTab() {
             </option>
           ))}
         </Select>
-        <Select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value)} className="w-[160px]">
+        <Select
+          aria-label="Source"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          className="w-[160px]"
+        >
           <option value="">Source: any</option>
           <option value="gitlab">GitLab group</option>
           <option value="manual">Manual</option>
         </Select>
-        <Select aria-label="Team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-[160px]">
+        <Select
+          aria-label="Team"
+          value={team}
+          onChange={(e) => setTeam(e.target.value)}
+          className="w-[160px]"
+        >
           <option value="">Team: any</option>
           {(teams.data ?? []).map((t) => (
             <option key={t.id} value={t.id}>
@@ -341,7 +504,9 @@ export function UsersTab() {
       <QueryState query={users} what="Users" endpoint="GET /admin/users">
         {() =>
           list.length === 0 ? (
-            <EmptyState icon="user" title="Nobody matches">People appear here at their first GitLab sign-in.</EmptyState>
+            <EmptyState icon="user" title="Nobody matches">
+              People appear here at their first GitLab sign-in.
+            </EmptyState>
           ) : (
             <div className="flex flex-wrap items-start gap-6">
               <div className="min-w-0 flex-[999_1_640px] overflow-x-auto">
@@ -382,10 +547,18 @@ export function UsersTab() {
                           <td className="pr-3 pl-2.5">{u.teams.map((t) => t.name).join(', ') || '—'}</td>
                           <td className="pr-3 pl-2.5">
                             <div className="flex flex-col items-start gap-1 py-1">
-                              {u.effective_roles.length ? u.effective_roles.map((r, i) => <RoleChip key={i} r={r} />) : <span className="text-meta text-text-3">{u.local_kind ? `local · ${u.local_kind}` : 'none'}</span>}
+                              {u.effective_roles.length ? (
+                                u.effective_roles.map((r, i) => <RoleChip key={i} r={r} />)
+                              ) : (
+                                <span className="text-meta text-text-3">
+                                  {u.local_kind ? `local · ${u.local_kind}` : 'none'}
+                                </span>
+                              )}
                             </div>
                           </td>
-                          <td className="pr-3 pl-2.5">{u.last_login_at ? relative(u.last_login_at) : 'never'}</td>
+                          <td className="pr-3 pl-2.5">
+                            {u.last_login_at ? relative(u.last_login_at) : 'never'}
+                          </td>
                           <td className="pr-3 pl-2.5">{u.mfa_enforced ? 'Enforced' : '—'}</td>
                           <td className="pr-3 pl-2.5">
                             <span className="flex items-center gap-1.5">
@@ -399,7 +572,9 @@ export function UsersTab() {
                   </tbody>
                 </table>
               </div>
-              <div className="w-full flex-[1_1_320px] lg:max-w-[360px]">{selected && <UserPanel key={selected} id={selected} />}</div>
+              <div className="w-full flex-[1_1_320px] lg:max-w-[360px]">
+                {selected && <UserPanel key={selected} id={selected} />}
+              </div>
             </div>
           )
         }

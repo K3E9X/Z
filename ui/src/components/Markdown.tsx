@@ -8,13 +8,20 @@ import remarkGfm from 'remark-gfm'
  */
 const components: Components = {
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-2">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="underline underline-offset-2"
+    >
       {children}
     </a>
   ),
   img: ({ alt }) => <span className="text-text-3">[image{alt ? `: ${alt}` : ''}]</span>,
   code: ({ children, className }) => (
-    <code className={`rounded-[4px] bg-code px-1 py-px font-mono text-[0.92em] ${className ?? ''}`}>{children}</code>
+    <code className={`rounded-[4px] bg-code px-1 py-px font-mono text-[0.92em] ${className ?? ''}`}>
+      {children}
+    </code>
   ),
   pre: ({ children }) => (
     <pre className="scrollbar-thin overflow-x-auto rounded-btn border border-line bg-code p-3 font-mono text-[12px] leading-[1.6] [&_code]:bg-transparent [&_code]:p-0">
@@ -35,7 +42,12 @@ export function Markdown({ children, className = '' }: { children: string; class
     <div
       className={`zmd flex flex-col gap-2 leading-[1.55] [&_h1]:m-0 [&_h1]:text-[17px] [&_h1]:font-semibold [&_h2]:m-0 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:m-0 [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:m-0 [&_ol]:pl-5 [&_p]:m-0 [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:m-0 [&_blockquote]:border-l-2 [&_blockquote]:border-line-2 [&_blockquote]:pl-3 [&_blockquote]:text-text-2 ${className}`}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={defaultUrlTransform} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+        urlTransform={defaultUrlTransform}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>

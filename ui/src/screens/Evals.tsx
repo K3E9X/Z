@@ -17,18 +17,37 @@ function score(r: EvalRun): string {
 }
 
 function RunDetail({ id }: { id: string }) {
-  const q = useQuery({ queryKey: qk.evalRun(id), queryFn: () => unwrap(api.GET('/evals/{run_id}', { params: { path: { run_id: id } } })), refetchInterval: (query) => (query.state.data && ['queued', 'running'].includes(query.state.data.status) ? 3000 : false) })
-  if (!q.data) return q.error ? <QueryState query={q} what="This eval run" endpoint="GET /evals/{run_id}">{() => null}</QueryState> : <Skeleton className="h-60" />
+  const q = useQuery({
+    queryKey: qk.evalRun(id),
+    queryFn: () => unwrap(api.GET('/evals/{run_id}', { params: { path: { run_id: id } } })),
+    refetchInterval: (query) =>
+      query.state.data && ['queued', 'running'].includes(query.state.data.status) ? 3000 : false,
+  })
+  if (!q.data)
+    return q.error ? (
+      <QueryState query={q} what="This eval run" endpoint="GET /evals/{run_id}">
+        {() => null}
+      </QueryState>
+    ) : (
+      <Skeleton className="h-60" />
+    )
   const r = q.data
   return (
-    <section aria-label="Eval run" className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-5">
+    <section
+      aria-label="Eval run"
+      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-5"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="m-0 text-[15px] font-semibold">
           {r.target}@{r.target_version} on <span className="font-mono">{r.model}</span>
         </h2>
-        <span className={`text-meta ${r.passed ? 'text-ok' : r.passed === false ? 'text-err' : 'text-text-3'}`}>
+        <span
+          className={`text-meta ${r.passed ? 'text-ok' : r.passed === false ? 'text-err' : 'text-text-3'}`}
+        >
           {r.status} · {score(r)}
-          {r.scores?.rubric_avg !== null && r.scores?.rubric_avg !== undefined ? ` · rubric ${r.scores.rubric_avg.toFixed(2)} / 2` : ''}
+          {r.scores?.rubric_avg !== null && r.scores?.rubric_avg !== undefined
+            ? ` · rubric ${r.scores.rubric_avg.toFixed(2)} / 2`
+            : ''}
           {r.scores ? ` · ${compactNumber(r.scores.tokens)} tokens` : ''}
         </span>
       </div>
@@ -46,7 +65,9 @@ function RunDetail({ id }: { id: string }) {
             {r.cases.map((c) => (
               <tr key={c.id} className="border-b border-line align-top">
                 <td className="py-2.5 pr-3 font-mono text-[12.5px]">{c.id}</td>
-                <td className={`py-2.5 pr-3 ${c.passed ? 'text-ok' : 'text-err'}`}>{c.passed ? 'pass' : 'fail'}</td>
+                <td className={`py-2.5 pr-3 ${c.passed ? 'text-ok' : 'text-err'}`}>
+                  {c.passed ? 'pass' : 'fail'}
+                </td>
                 <td className="py-2.5 pr-3">
                   <ul className="m-0 list-none p-0">
                     {c.checks.map((k, i) => (
@@ -95,7 +116,10 @@ export function Evals() {
   const runs = useEvalRuns(target || undefined)
   const [models, setModels] = useState<string[]>(['z-fast', 'z-heavy'])
   const [busy, setBusy] = useState(false)
-  const list = useMemo(() => [...(runs.data?.items ?? [])].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)), [runs.data])
+  const list = useMemo(
+    () => [...(runs.data?.items ?? [])].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
+    [runs.data],
+  )
   const byModel = new Map<string, EvalRun[]>()
   for (const r of list) byModel.set(r.model, [...(byModel.get(r.model) ?? []), r])
   const run = async () => {
@@ -107,18 +131,28 @@ export function Evals() {
       const first = started[0]
       if (first) void navigate({ to: '/evals', search: { target, run: first.id } })
     } catch (e) {
-      toast.error(e, isNotServed(e) ? 'Evals are not available on this server yet' : 'Could not start the evals')
+      toast.error(
+        e,
+        isNotServed(e) ? 'Evals are not available on this server yet' : 'Could not start the evals',
+      )
     } finally {
       setBusy(false)
     }
   }
   return (
     <main className="flex w-full max-w-[1320px] flex-col gap-7 px-[72px] pt-11 pb-14 max-lg:px-8 max-md:px-5">
-      <PageTitle title="Evals" lead="Each agent and skill has a suite of cases with deterministic checks and a judged rubric. Runs compare models and gate every learning proposal." />
+      <PageTitle
+        title="Evals"
+        lead="Each agent and skill has a suite of cases with deterministic checks and a judged rubric. Runs compare models and gate every learning proposal."
+      />
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1.5 text-meta text-text-2">
           Target
-          <Select value={target} onChange={(e) => void navigate({ to: '/evals', search: { target: e.target.value } })} className="w-[260px]">
+          <Select
+            value={target}
+            onChange={(e) => void navigate({ to: '/evals', search: { target: e.target.value } })}
+            className="w-[260px]"
+          >
             <optgroup label="Agents">
               {(agents.data?.items ?? []).map((a) => (
                 <option key={a.id} value={a.name}>
@@ -138,9 +172,19 @@ export function Evals() {
         {canRun && (
           <div className="flex items-center gap-4">
             {['z-fast', 'z-heavy'].map((m) => (
-              <Checkbox key={m} checked={models.includes(m)} onChange={(v) => setModels(v ? [...models, m] : models.filter((x) => x !== m))} label={<span className="font-mono">{m}</span>} />
+              <Checkbox
+                key={m}
+                checked={models.includes(m)}
+                onChange={(v) => setModels(v ? [...models, m] : models.filter((x) => x !== m))}
+                label={<span className="font-mono">{m}</span>}
+              />
             ))}
-            <Button variant="primary" busy={busy} disabled={!target || models.length === 0} onClick={() => void run()}>
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!target || models.length === 0}
+              onClick={() => void run()}
+            >
               Run evals
             </Button>
           </div>
@@ -149,17 +193,30 @@ export function Evals() {
       <QueryState query={runs} what="Eval runs" endpoint="GET /evals">
         {() =>
           list.length === 0 ? (
-            <EmptyState icon="chart" title="No run yet for this target">Run the suite to see the score by model.</EmptyState>
+            <EmptyState icon="chart" title="No run yet for this target">
+              Run the suite to see the score by model.
+            </EmptyState>
           ) : (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
-              <section aria-label="Score history" className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-5">
+              <section
+                aria-label="Score history"
+                className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-5"
+              >
                 <h2 className="m-0 text-[15px] font-semibold">Score history by model</h2>
                 <Legend items={[...byModel.keys()].map((m) => ({ label: m }))} />
                 {[...byModel.entries()].map(([m, rs]) => (
                   <div key={m} className="flex items-center gap-4">
                     <span className="w-20 font-mono">{m}</span>
-                    <Sparkline values={rs.map((r) => (r.scores ? r.scores.cases_passed / Math.max(1, r.scores.cases_total) : 0))} label={`${m} pass rate over ${rs.length} runs`} width={160} />
-                    <span className="font-mono text-[12.5px]">{score(rs[rs.length - 1] ?? rs[0] ?? ({} as EvalRun))}</span>
+                    <Sparkline
+                      values={rs.map((r) =>
+                        r.scores ? r.scores.cases_passed / Math.max(1, r.scores.cases_total) : 0,
+                      )}
+                      label={`${m} pass rate over ${rs.length} runs`}
+                      width={160}
+                    />
+                    <span className="font-mono text-[12.5px]">
+                      {score(rs[rs.length - 1] ?? rs[0] ?? ({} as EvalRun))}
+                    </span>
                   </div>
                 ))}
                 <ul className="m-0 flex list-none flex-col p-0">
@@ -172,7 +229,11 @@ export function Evals() {
                         className={`flex w-full items-center gap-3 rounded-ctl px-2 py-2 text-left ${search.run === r.id ? 'bg-raised' : 'hover:bg-raised'}`}
                       >
                         <span className="w-20 font-mono">{r.model}</span>
-                        <span className={r.passed ? 'text-ok' : r.passed === false ? 'text-err' : 'text-text-2'}>{score(r)}</span>
+                        <span
+                          className={r.passed ? 'text-ok' : r.passed === false ? 'text-err' : 'text-text-2'}
+                        >
+                          {score(r)}
+                        </span>
                         <span className="ml-auto text-meta text-text-3">
                           v{r.target_version} · {relative(r.created_at)}
                         </span>
@@ -181,7 +242,11 @@ export function Evals() {
                   ))}
                 </ul>
               </section>
-              {search.run ? <RunDetail id={search.run} /> : list.at(-1) ? <RunDetail id={list.at(-1)?.id ?? ''} /> : null}
+              {search.run ? (
+                <RunDetail id={search.run} />
+              ) : list.at(-1) ? (
+                <RunDetail id={list.at(-1)?.id ?? ''} />
+              ) : null}
             </div>
           )
         }

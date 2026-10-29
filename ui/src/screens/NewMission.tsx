@@ -4,9 +4,21 @@ import { useMemo, useRef, useState } from 'react'
 import { api, rawFetch, unwrap } from '@/api/client'
 import { isNotServed } from '@/api/problem'
 import { useAgents, useConnectors, usePlaybooks, useTriggers } from '@/api/queries'
-import { toContractPlan, type DataClass, type DraftPlan, type Mission, type PlanStep, type Playbook } from '@/api/types'
+import {
+  toContractPlan,
+  type DataClass,
+  type DraftPlan,
+  type Mission,
+  type PlanStep,
+  type Playbook,
+} from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { MentionTextarea, parseMentions, type MentionHandle, type MentionOption } from '@/components/MentionTextarea'
+import {
+  MentionTextarea,
+  parseMentions,
+  type MentionHandle,
+  type MentionOption,
+} from '@/components/MentionTextarea'
 import { defaultsFor, SchemaForm, validate, type FormValue, type JsonSchema } from '@/components/SchemaForm'
 import { stepTitle } from '@/components/PlanChecklist'
 import { NotServed } from '@/components/states'
@@ -22,7 +34,11 @@ type Mode = 'plan_first' | 'propose' | 'read_only'
 type When = 'now' | 'schedule' | 'event'
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60)
 }
 
 /** A playbook whose name words appear in the prompt, or whose connectors are all mentioned. */
@@ -39,13 +55,28 @@ function matchPlaybook(prompt: string, connectors: string[], playbooks: Playbook
   return best?.pb ?? null
 }
 
-function StepRow({ i, step, agentLabel, model, inputs }: { i: number; step: PlanStep; agentLabel: (s?: string) => string; model?: string; inputs?: FormValue }) {
+function StepRow({
+  i,
+  step,
+  agentLabel,
+  model,
+  inputs,
+}: {
+  i: number
+  step: PlanStep
+  agentLabel: (s?: string) => string
+  model?: string
+  inputs?: FormValue
+}) {
   const writes = step.writes ?? []
   const connector = writes[0]?.split('.')[0]
   const right = writes.length
     ? { text: `${connector ?? ''} · approved write`, tone: 'text-wait' }
     : step.fanout
-      ? { text: `${step.fanout.concurrency ? `${step.fanout.concurrency} in parallel` : 'fan-out'} × ${step.model ?? model ?? 'agent model'}`, tone: 'text-text-3' }
+      ? {
+          text: `${step.fanout.concurrency ? `${step.fanout.concurrency} in parallel` : 'fan-out'} × ${step.model ?? model ?? 'agent model'}`,
+          tone: 'text-text-3',
+        }
       : { text: `${agentLabel(step.agent)} · read`, tone: 'text-text-3' }
   return (
     <li className="grid grid-cols-[40px_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-3.5">
@@ -95,19 +126,35 @@ export function NewMission() {
   const playbook = pbList.find((p) => p.name === playbookName || p.id === playbookName) ?? null
   const options = useMemo<MentionOption[]>(
     () => [
-      ...(agents.data?.items ?? []).map((a) => ({ trigger: '@' as const, insert: a.handle ?? a.name ?? a.id, label: a.display_name ?? a.name ?? a.id, hint: a.role ? undefined : undefined, avatar: a.avatar ?? null })),
-      ...(connectors.data ?? []).map((c) => ({ trigger: '#' as const, insert: c.name, label: c.display_name, hint: c.review_status === 'approved' ? undefined : 'not reviewed' })),
+      ...(agents.data?.items ?? []).map((a) => ({
+        trigger: '@' as const,
+        insert: a.handle ?? a.name ?? a.id,
+        label: a.display_name ?? a.name ?? a.id,
+        hint: a.role ? undefined : undefined,
+        avatar: a.avatar ?? null,
+      })),
+      ...(connectors.data ?? []).map((c) => ({
+        trigger: '#' as const,
+        insert: c.name,
+        label: c.display_name,
+        hint: c.review_status === 'approved' ? undefined : 'not reviewed',
+      })),
     ],
     [agents.data, connectors.data],
   )
   const mentions = parseMentions(prompt, options)
   const mentionedAgents = mentions.filter((m) => m.trigger === '@')
   const mentionedConnectors = mentions.filter((m) => m.trigger === '#')
-  const agentSlugs = mentionedAgents.map((m) => (agents.data?.items ?? []).find((a) => a.handle === m.insert)?.name ?? m.insert)
+  const agentSlugs = mentionedAgents.map(
+    (m) => (agents.data?.items ?? []).find((a) => a.handle === m.insert)?.name ?? m.insert,
+  )
   const connectorSlugs = mentionedConnectors.map((m) => m.insert)
-  const suggested = draft?.suggested_playbook ? (pbList.find((p) => p.name === draft.suggested_playbook) ?? null) : matchPlaybook(prompt, connectorSlugs, pbList)
+  const suggested = draft?.suggested_playbook
+    ? (pbList.find((p) => p.name === draft.suggested_playbook) ?? null)
+    : matchPlaybook(prompt, connectorSlugs, pbList)
   const agentModel = (s?: string) => (agents.data?.items ?? []).find((a) => a.name === s)?.model
-  const agentLabel = (s?: string) => (agents.data?.items ?? []).find((a) => a.name === s)?.display_name ?? s ?? 'agent'
+  const agentLabel = (s?: string) =>
+    (agents.data?.items ?? []).find((a) => a.name === s)?.display_name ?? s ?? 'agent'
   const schema = playbook?.inputs?.schema as JsonSchema | undefined
   const formValue = inputs ?? defaultsFor(schema)
   const steps: PlanStep[] | null = plan ?? (playbook ? (playbook.steps ?? []) : null)
@@ -134,10 +181,15 @@ export function NewMission() {
     if (!prompt.trim()) return
     setDraftState('busy')
     try {
-      const d = await unwrap(api.POST('/missions/draft-plan', { body: { prompt, agents: agentSlugs, connectors: connectorSlugs } }))
+      const d = await unwrap(
+        api.POST('/missions/draft-plan', {
+          body: { prompt, agents: agentSlugs, connectors: connectorSlugs },
+        }),
+      )
       setDraft(d)
       setPlan(d.plan.steps.map((s) => ({ ...s })))
-      if (d.estimated_tokens) setBudget(Math.max(budget, Math.ceil((d.estimated_tokens * 1.5) / 100_000) * 100_000))
+      if (d.estimated_tokens)
+        setBudget(Math.max(budget, Math.ceil((d.estimated_tokens * 1.5) / 100_000) * 100_000))
       setDraftState('idle')
     } catch (e) {
       if (isNotServed(e)) setDraftState('unavailable')
@@ -198,11 +250,20 @@ export function NewMission() {
         mission = await unwrap(
           api.POST('/playbooks/{id}/run', {
             params: { path: { id: playbook.id } },
-            body: { inputs: formValue, data_class: dataClass, plan_first: needStage, budget: budgetBody, ...(prompt.trim() ? { title: prompt.trim().slice(0, 120) } : {}) },
+            body: {
+              inputs: formValue,
+              data_class: dataClass,
+              plan_first: needStage,
+              budget: budgetBody,
+              ...(prompt.trim() ? { title: prompt.trim().slice(0, 120) } : {}),
+            },
           }),
         )
       } else {
-        const p = steps && steps.length ? normalizePlan(model ? steps.map((s) => ({ ...s, model })) : steps) : undefined
+        const p =
+          steps && steps.length
+            ? normalizePlan(model ? steps.map((s) => ({ ...s, model })) : steps)
+            : undefined
         mission = await unwrap(
           api.POST('/missions', {
             body: {
@@ -222,19 +283,29 @@ export function NewMission() {
       }
       if (files.length) await upload(mission.id)
       if (files.length && !planFirst) {
-        mission = await unwrap(api.POST('/missions/{id}/start', { params: { path: { id: mission.id } }, body: {} }))
+        mission = await unwrap(
+          api.POST('/missions/{id}/start', { params: { path: { id: mission.id } }, body: {} }),
+        )
       }
       if (saveAs && canSavePlaybook) {
         try {
           await unwrap(
             api.POST('/missions/{id}/save-as-playbook', {
               params: { path: { id: mission.id } },
-              body: { name: slug(saveName || prompt).slice(0, 60) || 'my-playbook', description: prompt.trim().slice(0, 300) },
+              body: {
+                name: slug(saveName || prompt).slice(0, 60) || 'my-playbook',
+                description: prompt.trim().slice(0, 300),
+              },
             }),
           )
           toast.ok('Saved as a playbook')
         } catch (e) {
-          toast.error(e, isNotServed(e) ? 'Save as playbook is not available on this server yet' : 'Not saved as a playbook')
+          toast.error(
+            e,
+            isNotServed(e)
+              ? 'Save as playbook is not available on this server yet'
+              : 'Not saved as a playbook',
+          )
         }
       }
       await qc.invalidateQueries({ queryKey: ['missions'] })
@@ -250,7 +321,9 @@ export function NewMission() {
     return (
       <main className="mx-auto w-full max-w-[820px] px-10 py-14">
         <h1 className="m-0 font-display-face text-display">What should Z do?</h1>
-        <p className="text-text-2">Starting missions needs the missions:start permission. Ask an admin to add you to an operator group.</p>
+        <p className="text-text-2">
+          Starting missions needs the missions:start permission. Ask an admin to add you to an operator group.
+        </p>
       </main>
     )
   }
@@ -296,7 +369,12 @@ export function NewMission() {
                 <Chip key={`f${f.name}`}>
                   <Icon name="paperclip" size={11} />
                   {f.name} <span className="text-text-3">{bytes(f.size)}</span>
-                  <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((x) => x !== f))} className="text-text-3 hover:text-text">
+                  <button
+                    type="button"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={() => setFiles(files.filter((x) => x !== f))}
+                    className="text-text-3 hover:text-text"
+                  >
                     <Icon name="x" size={11} />
                   </button>
                 </Chip>
@@ -304,15 +382,24 @@ export function NewMission() {
               {playbook ? (
                 <Chip tone="run">
                   <span className="opacity-70">playbook</span> {playbookTitle(playbook.name)}
-                  <button type="button" aria-label="Do not use the playbook" onClick={() => choosePlaybook(null)}>
+                  <button
+                    type="button"
+                    aria-label="Do not use the playbook"
+                    onClick={() => choosePlaybook(null)}
+                  >
                     <Icon name="x" size={11} />
                   </button>
                 </Chip>
               ) : (
                 suggested && (
-                  <button type="button" onClick={() => choosePlaybook(suggested.name ?? null)} className="rounded-[6px]">
+                  <button
+                    type="button"
+                    onClick={() => choosePlaybook(suggested.name ?? null)}
+                    className="rounded-[6px]"
+                  >
                     <Chip>
-                      <span className="text-text-3">matches playbook</span> {playbookTitle(suggested.name)} · use it
+                      <span className="text-text-3">matches playbook</span> {playbookTitle(suggested.name)} ·
+                      use it
                     </Chip>
                   </button>
                 )
@@ -332,19 +419,37 @@ export function NewMission() {
               e.target.value = ''
             }}
           />
-          <button type="button" aria-label="Attach files" title="Attach files (they land in the workspace, after the judge scan)" onClick={() => fileInput.current?.click()} className="flex h-8 w-8 items-center justify-center rounded-btn text-text-2 hover:bg-raised">
+          <button
+            type="button"
+            aria-label="Attach files"
+            title="Attach files (they land in the workspace, after the judge scan)"
+            onClick={() => fileInput.current?.click()}
+            className="flex h-8 w-8 items-center justify-center rounded-btn text-text-2 hover:bg-raised"
+          >
             <Icon name="paperclip" size={15} />
           </button>
-          <button type="button" onClick={() => composer.current?.insertTrigger('@')} className="flex h-8 items-center gap-1 rounded-btn px-2.5 text-text-2 hover:bg-raised">
+          <button
+            type="button"
+            onClick={() => composer.current?.insertTrigger('@')}
+            className="flex h-8 items-center gap-1 rounded-btn px-2.5 text-text-2 hover:bg-raised"
+          >
             @ Agent
           </button>
-          <button type="button" onClick={() => composer.current?.insertTrigger('#')} className="flex h-8 items-center gap-1 rounded-btn px-2.5 text-text-2 hover:bg-raised">
+          <button
+            type="button"
+            onClick={() => composer.current?.insertTrigger('#')}
+            className="flex h-8 items-center gap-1 rounded-btn px-2.5 text-text-2 hover:bg-raised"
+          >
             # Tool
           </button>
           <div className="flex-1" />
           <label className="flex items-center gap-2 text-meta text-text-2">
             Playbook
-            <Select value={playbook?.name ?? ''} onChange={(e) => choosePlaybook(e.target.value || null)} className="h-8 w-[200px]">
+            <Select
+              value={playbook?.name ?? ''}
+              onChange={(e) => choosePlaybook(e.target.value || null)}
+              className="h-8 w-[200px]"
+            >
               <option value="">None (free-form)</option>
               {pbList.map((p) => (
                 <option key={p.id} value={p.name}>
@@ -361,7 +466,14 @@ export function NewMission() {
               <option value="z-fast">z-fast</option>
             </Select>
           </label>
-          <Button variant="primary" size="sm" kbd={`${MOD}↵`} busy={draftState === 'busy'} onClick={() => void draftPlan()} disabled={!prompt.trim() && !playbook}>
+          <Button
+            variant="primary"
+            size="sm"
+            kbd={`${MOD}↵`}
+            busy={draftState === 'busy'}
+            onClick={() => void draftPlan()}
+            disabled={!prompt.trim() && !playbook}
+          >
             {plan ? 'Redraft the plan' : 'Draft the plan'}
           </Button>
         </div>
@@ -392,10 +504,25 @@ export function NewMission() {
         <div className="flex flex-col gap-3">
           <NotServed what="Plan drafting" endpoint="POST /missions/draft-plan" />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => setPlan([{ id: 'step-1', title: prompt.split('\n')[0]?.slice(0, 80) ?? 'Step 1', agent: agentSlugs[0] ?? 'orchestrator', prompt, depends_on: [] }])}>
+            <Button
+              size="sm"
+              onClick={() =>
+                setPlan([
+                  {
+                    id: 'step-1',
+                    title: prompt.split('\n')[0]?.slice(0, 80) ?? 'Step 1',
+                    agent: agentSlugs[0] ?? 'orchestrator',
+                    prompt,
+                    depends_on: [],
+                  },
+                ])
+              }
+            >
               Write the plan myself
             </Button>
-            <span className="self-center text-meta text-text-3">or start now: the Orchestrator drafts the plan as its first step.</span>
+            <span className="self-center text-meta text-text-3">
+              or start now: the Orchestrator drafts the plan as its first step.
+            </span>
           </div>
         </div>
       )}
@@ -409,7 +536,9 @@ export function NewMission() {
               </h2>
               <span className="font-mono text-sm text-text-3">
                 {steps.length} {steps.length === 1 ? 'step' : 'steps'}
-                {writes.length ? ` · ${writes.length} ${writes.length === 1 ? 'kind of write' : 'kinds of writes'} to approve` : ' · read only'}
+                {writes.length
+                  ? ` · ${writes.length} ${writes.length === 1 ? 'kind of write' : 'kinds of writes'} to approve`
+                  : ' · read only'}
                 {draft?.estimated_tokens ? ` · ~${compactNumber(draft.estimated_tokens)} tokens` : ''}
               </span>
             </div>
@@ -431,7 +560,14 @@ export function NewMission() {
           ) : (
             <ol className="m-0 list-none p-0">
               {steps.map((s, i) => (
-                <StepRow key={`${s.id ?? ''}${i}`} i={i} step={s} agentLabel={agentLabel} model={model || agentModel(s.agent)} inputs={formValue} />
+                <StepRow
+                  key={`${s.id ?? ''}${i}`}
+                  i={i}
+                  step={s}
+                  agentLabel={agentLabel}
+                  model={model || agentModel(s.agent)}
+                  inputs={formValue}
+                />
               ))}
             </ol>
           )}
@@ -441,14 +577,39 @@ export function NewMission() {
       <section aria-label="Options" className="grid gap-8 sm:grid-cols-3">
         <fieldset className="m-0 flex flex-col gap-2.5 border-none p-0">
           <legend className="mb-2.5 text-meta text-text-2">Autonomy</legend>
-          <Radio name="mode" value="plan_first" current={mode} onChange={setMode} label="Show me the plan before it runs" />
+          <Radio
+            name="mode"
+            value="plan_first"
+            current={mode}
+            onChange={setMode}
+            label="Show me the plan before it runs"
+          />
           <Radio name="mode" value="propose" current={mode} onChange={setMode} label="Ask me before writes" />
           <Radio name="mode" value="read_only" current={mode} onChange={setMode} label="Read only" />
         </fieldset>
         <fieldset className="m-0 flex flex-col gap-2.5 border-none p-0">
           <legend className="mb-2.5 text-meta text-text-2">When</legend>
           <Radio name="when" value="now" current={when} onChange={setWhen} label="Now" />
-          <Radio name="when" value="schedule" current={when} onChange={setWhen} disabled={!playbook || !triggersServed} label={<span className="flex flex-wrap items-center gap-2">On a schedule {when === 'schedule' && <Input aria-label="Cron expression" value={cron} onChange={(e) => setCron(e.target.value)} className="h-7 w-[120px] font-mono text-sm" />}</span>} />
+          <Radio
+            name="when"
+            value="schedule"
+            current={when}
+            onChange={setWhen}
+            disabled={!playbook || !triggersServed}
+            label={
+              <span className="flex flex-wrap items-center gap-2">
+                On a schedule{' '}
+                {when === 'schedule' && (
+                  <Input
+                    aria-label="Cron expression"
+                    value={cron}
+                    onChange={(e) => setCron(e.target.value)}
+                    className="h-7 w-[120px] font-mono text-sm"
+                  />
+                )}
+              </span>
+            }
+          />
           <Radio
             name="when"
             value="event"
@@ -459,7 +620,12 @@ export function NewMission() {
               <span className="flex flex-wrap items-center gap-2">
                 On every new event
                 {when === 'event' && (
-                  <Select aria-label="Event source" value={eventKind} onChange={(e) => setEventKind(e.target.value as 'jira' | 'gitlab' | 'webhook')} className="h-7 w-[110px] text-sm">
+                  <Select
+                    aria-label="Event source"
+                    value={eventKind}
+                    onChange={(e) => setEventKind(e.target.value as 'jira' | 'gitlab' | 'webhook')}
+                    className="h-7 w-[110px] text-sm"
+                  >
                     <option value="jira">Jira</option>
                     <option value="gitlab">GitLab</option>
                     <option value="webhook">Webhook</option>
@@ -471,7 +637,9 @@ export function NewMission() {
           {!playbook ? (
             <span className="text-sm text-text-3">Schedules and events need a playbook.</span>
           ) : (
-            !triggersServed && <span className="text-sm text-text-3">Triggers are not available on this server yet.</span>
+            !triggersServed && (
+              <span className="text-sm text-text-3">Triggers are not available on this server yet.</span>
+            )
           )}
         </fieldset>
         <div className="flex flex-col gap-2.5">
@@ -479,27 +647,49 @@ export function NewMission() {
           <label className="flex items-center justify-between gap-3 whitespace-nowrap">
             Budget
             <span className="flex items-center gap-1.5">
-              <Input type="number" min={10_000} step={100_000} value={budget} onChange={(e) => setBudget(Number(e.target.value))} className="h-7 w-[120px] text-right font-mono" aria-label="Token budget" />
+              <Input
+                type="number"
+                min={10_000}
+                step={100_000}
+                value={budget}
+                onChange={(e) => setBudget(Number(e.target.value))}
+                className="h-7 w-[120px] text-right font-mono"
+                aria-label="Token budget"
+              />
               <span className="text-meta text-text-3">tokens</span>
             </span>
           </label>
           <label className="flex items-center justify-between gap-3 whitespace-nowrap">
             Max duration
             <span className="flex items-center gap-1.5">
-              <Input type="number" min={1} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="h-7 w-[80px] text-right font-mono" aria-label="Max duration in minutes" />
+              <Input
+                type="number"
+                min={1}
+                value={minutes}
+                onChange={(e) => setMinutes(Number(e.target.value))}
+                className="h-7 w-[80px] text-right font-mono"
+                aria-label="Max duration in minutes"
+              />
               <span className="text-meta text-text-3">min</span>
             </span>
           </label>
           <label className="flex items-center justify-between gap-3 whitespace-nowrap">
             Data class
-            <Select value={dataClass} onChange={(e) => setDataClass(e.target.value as DataClass)} className="h-7 w-[172px] text-sm" aria-label="Data class">
+            <Select
+              value={dataClass}
+              onChange={(e) => setDataClass(e.target.value as DataClass)}
+              className="h-7 w-[172px] text-sm"
+              aria-label="Data class"
+            >
               <option value="C0">C0 public</option>
               <option value="C1">C1 internal</option>
               <option value="C2">C2 confidential</option>
               <option value="C3">C3 restricted</option>
             </Select>
           </label>
-          <span className="text-sm text-text-3">The class only goes up during the mission; C2 and above stay on internal models.</span>
+          <span className="text-sm text-text-3">
+            The class only goes up during the mission; C2 and above stay on internal models.
+          </span>
         </div>
       </section>
 
@@ -507,7 +697,15 @@ export function NewMission() {
         {canSavePlaybook && (
           <div className="flex flex-wrap items-center gap-2.5">
             <Checkbox checked={saveAs} onChange={setSaveAs} label="Save as a playbook" />
-            {saveAs && <Input aria-label="Playbook name" placeholder="playbook-name" value={saveName} onChange={(e) => setSaveName(slug(e.target.value))} className="h-7 w-[200px] font-mono text-sm" />}
+            {saveAs && (
+              <Input
+                aria-label="Playbook name"
+                placeholder="playbook-name"
+                value={saveName}
+                onChange={(e) => setSaveName(slug(e.target.value))}
+                className="h-7 w-[200px] font-mono text-sm"
+              />
+            )}
           </div>
         )}
         <div className="flex-1" />
@@ -515,7 +713,11 @@ export function NewMission() {
           Cancel
         </Button>
         <Button size="lg" variant="primary" busy={busy} onClick={() => void start()}>
-          {when !== 'now' && playbook ? 'Create the trigger' : mode === 'plan_first' ? 'Create and review the plan' : 'Start mission'}
+          {when !== 'now' && playbook
+            ? 'Create the trigger'
+            : mode === 'plan_first'
+              ? 'Create and review the plan'
+              : 'Start mission'}
         </Button>
       </div>
     </main>

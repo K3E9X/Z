@@ -81,7 +81,10 @@ export function StepUpProvider({ children, maxAgeS = 300 }: { children: ReactNod
     [ask, me, maxAgeS],
   )
 
-  const local = me?.user.local_kind === 'bootstrap' || me?.user.local_kind === 'test' || me?.user.local_kind === 'breakglass'
+  const local =
+    me?.user.local_kind === 'bootstrap' ||
+    me?.user.local_kind === 'test' ||
+    me?.user.local_kind === 'breakglass'
   const breakglass = me?.user.local_kind === 'breakglass'
 
   const confirm = async () => {
@@ -139,8 +142,8 @@ export function StepUpProvider({ children, maxAgeS = 300 }: { children: ReactNod
           >
             <p className="m-0 text-text-2">
               {pending.ctx.what} needs a fresh sign-in
-              {local ? ' with your local account password' : ' with GitLab'} (less than {Math.round(maxAgeS / 60)} minutes
-              old).
+              {local ? ' with your local account password' : ' with GitLab'} (less than{' '}
+              {Math.round(maxAgeS / 60)} minutes old).
             </p>
             {pending.ctx.detail && (
               <div
@@ -191,7 +194,13 @@ export function StepUpProvider({ children, maxAgeS = 300 }: { children: ReactNod
             )}
             <div className="grid grid-cols-2 gap-2">
               <Button onClick={cancel}>Cancel</Button>
-              <Button type="submit" variant="primary" busy={busy} autoFocus={!local} data-autofocus={!local ? true : undefined}>
+              <Button
+                type="submit"
+                variant="primary"
+                busy={busy}
+                autoFocus={!local}
+                data-autofocus={!local ? true : undefined}
+              >
                 Re-authenticate
               </Button>
             </div>

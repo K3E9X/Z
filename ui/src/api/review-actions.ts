@@ -170,7 +170,10 @@ export function useReviewActions() {
       const snap = removeFromReview(qc, new Set([questionId]))
       try {
         const res = await unwrap(
-          api.POST('/questions/{id}/answer', { params: { path: { id: questionId } }, body: { answer: text } }),
+          api.POST('/questions/{id}/answer', {
+            params: { path: { id: questionId } },
+            body: { answer: text },
+          }),
         )
         toast.ok('Answer sent. The agent continues.')
         return res

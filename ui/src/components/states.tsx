@@ -20,7 +20,10 @@ export function NotServed({
 }) {
   if (compact) {
     return (
-      <span className={`inline-flex items-center gap-1.5 text-meta text-text-3 ${className}`} title={endpoint}>
+      <span
+        className={`inline-flex items-center gap-1.5 text-meta text-text-3 ${className}`}
+        title={endpoint}
+      >
         <Icon name="ban" size={12} />
         Not available on this server yet
       </span>
@@ -36,16 +39,27 @@ export function NotServed({
         {what}: not available on this server yet
       </div>
       <div className="text-meta text-text-3">
-        This z-server does not serve <code className="font-mono text-text-2">{endpoint}</code>. The screen fills in as
-        soon as it does; nothing here is estimated.
+        This z-server does not serve <code className="font-mono text-text-2">{endpoint}</code>. The screen
+        fills in as soon as it does; nothing here is estimated.
       </div>
     </div>
   )
 }
 
-export function Forbidden({ permission, what, className = '' }: { permission?: string; what?: string; className?: string }) {
+export function Forbidden({
+  permission,
+  what,
+  className = '',
+}: {
+  permission?: string
+  what?: string
+  className?: string
+}) {
   return (
-    <div role="note" className={`flex flex-col gap-1.5 rounded-panel border border-line px-5 py-4 ${className}`}>
+    <div
+      role="note"
+      className={`flex flex-col gap-1.5 rounded-panel border border-line px-5 py-4 ${className}`}
+    >
       <div className="flex items-center gap-2 font-medium">
         <Icon name="lock" size={14} className="text-text-3" />
         {what ? `You cannot see ${what}` : 'Not allowed'}
@@ -53,8 +67,8 @@ export function Forbidden({ permission, what, className = '' }: { permission?: s
       <div className="text-meta text-text-3">
         {permission ? (
           <>
-            This needs the <code className="font-mono text-text-2">{permission}</code> permission. Your roles come from
-            your GitLab groups; ask an admin if you need it.
+            This needs the <code className="font-mono text-text-2">{permission}</code> permission. Your roles
+            come from your GitLab groups; ask an admin if you need it.
           </>
         ) : (
           'Your roles do not include this. Ask an admin if you need it.'
@@ -66,7 +80,10 @@ export function Forbidden({ permission, what, className = '' }: { permission?: s
 
 export function ErrorState({ error, className = '' }: { error: unknown; className?: string }) {
   return (
-    <div role="alert" className={`flex flex-col gap-1 rounded-panel border border-line bg-err-bg px-5 py-4 ${className}`}>
+    <div
+      role="alert"
+      className={`flex flex-col gap-1 rounded-panel border border-line bg-err-bg px-5 py-4 ${className}`}
+    >
       <div className="flex items-center gap-2 font-medium text-err">
         <Icon name="x" size={14} />
         {isApiError(error) ? error.problem.title : 'Something went wrong'}

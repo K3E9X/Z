@@ -43,14 +43,27 @@ function statusTone(a: Agent): 'run' | 'wait' | 'idle' | 'ok' {
 
 const AUTONOMY: Record<string, string> = { propose: 'writes need approval', read_only: 'read only' }
 
-function Roster({ agents, selected, onSelect }: { agents: Agent[]; selected: string | null; onSelect: (id: string) => void }) {
+function Roster({
+  agents,
+  selected,
+  onSelect,
+}: {
+  agents: Agent[]
+  selected: string | null
+  onSelect: (id: string) => void
+}) {
   const canWrite = useCan('agents:write')
   const working = agents.filter((a) => a.status === 'working')
   const available = agents.filter((a) => a.status !== 'working')
   const row = (a: Agent) => {
     const tone = statusTone(a)
     const template = templateName(a)
-    const sub = a.status === 'working' ? `${a.current_missions?.length ?? 0} ${a.current_missions?.length === 1 ? 'mission' : 'missions'} running` : a.status === 'disabled' ? 'disabled' : 'idle'
+    const sub =
+      a.status === 'working'
+        ? `${a.current_missions?.length ?? 0} ${a.current_missions?.length === 1 ? 'mission' : 'missions'} running`
+        : a.status === 'disabled'
+          ? 'disabled'
+          : 'idle'
     return (
       <li key={a.id}>
         <button
@@ -63,7 +76,9 @@ function Roster({ agents, selected, onSelect }: { agents: Agent[]; selected: str
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate">
               <span className="font-medium">{a.display_name}</span>
-              {template.toLowerCase() !== (a.display_name ?? '').toLowerCase() && <span className="text-text-2"> · {template}</span>}
+              {template.toLowerCase() !== (a.display_name ?? '').toLowerCase() && (
+                <span className="text-text-2"> · {template}</span>
+              )}
             </span>
             <span className="truncate text-meta text-text-3">{sub}</span>
           </span>
@@ -73,11 +88,17 @@ function Roster({ agents, selected, onSelect }: { agents: Agent[]; selected: str
     )
   }
   return (
-    <aside aria-label="Agents" className="flex w-full flex-col gap-4 border-line px-3.5 pt-6 pb-6 md:w-[300px] md:flex-none md:border-r">
+    <aside
+      aria-label="Agents"
+      className="flex w-full flex-col gap-4 border-line px-3.5 pt-6 pb-6 md:w-[300px] md:flex-none md:border-r"
+    >
       <div className="flex items-center justify-between px-2">
         <h1 className="m-0 text-xl font-semibold">Agents</h1>
         {canWrite && (
-          <Link to="/agents/new" className="flex h-8 items-center rounded-btn border border-line-2 px-3 no-underline hover:bg-raised">
+          <Link
+            to="/agents/new"
+            className="flex h-8 items-center rounded-btn border border-line-2 px-3 no-underline hover:bg-raised"
+          >
             New agent
           </Link>
         )}
@@ -96,7 +117,17 @@ function Roster({ agents, selected, onSelect }: { agents: Agent[]; selected: str
   )
 }
 
-function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'rename' | 'duplicate'; open: boolean; onClose: (newId?: string) => void }) {
+function NameDialog({
+  agent,
+  mode,
+  open,
+  onClose,
+}: {
+  agent: Agent
+  mode: 'rename' | 'duplicate'
+  open: boolean
+  onClose: (newId?: string) => void
+}) {
   const [name, setName] = useState(mode === 'rename' ? (agent.display_name ?? '') : '')
   const [handle, setHandle] = useState(mode === 'rename' ? (agent.handle ?? '') : '')
   const [color, setColor] = useState(agent.avatar?.color ?? '#5DBE8A')
@@ -111,13 +142,23 @@ function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'renam
     const avatar = { initials: initials(name), color }
     try {
       if (mode === 'rename') {
-        await unwrap(api.PATCH('/agents/{id}', { params: { path: { id: agent.id } }, body: { display_name: name, handle, avatar } }))
+        await unwrap(
+          api.PATCH('/agents/{id}', {
+            params: { path: { id: agent.id } },
+            body: { display_name: name, handle, avatar },
+          }),
+        )
         toast.ok(`Renamed to ${name} (@${handle}). History is kept.`)
         await qc.invalidateQueries({ queryKey: qk.agents })
         await qc.invalidateQueries({ queryKey: qk.agent(agent.id) })
         onClose()
       } else {
-        const created = await unwrap(api.POST('/agents/{id}/duplicate', { params: { path: { id: agent.id } }, body: { display_name: name, handle, avatar } }))
+        const created = await unwrap(
+          api.POST('/agents/{id}/duplicate', {
+            params: { path: { id: agent.id } },
+            body: { display_name: name, handle, avatar },
+          }),
+        )
         toast.ok(`${name} created from ${agent.display_name}`)
         await qc.invalidateQueries({ queryKey: qk.agents })
         onClose(created.id)
@@ -133,11 +174,20 @@ function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'renam
       open={open}
       onClose={() => onClose()}
       title={mode === 'rename' ? `Rename ${agent.display_name}` : `Duplicate ${agent.display_name}`}
-      eyebrow={mode === 'rename' ? 'The stable name, skills, tools and history stay the same' : 'Same profile, skills and tools; a new name, handle and avatar'}
+      eyebrow={
+        mode === 'rename'
+          ? 'The stable name, skills, tools and history stay the same'
+          : 'Same profile, skills and tools; a new name, handle and avatar'
+      }
       footer={
         <>
           <Button onClick={() => onClose()}>Cancel</Button>
-          <Button variant="primary" busy={busy} disabled={!name.trim() || !validHandle} onClick={() => void save()}>
+          <Button
+            variant="primary"
+            busy={busy}
+            disabled={!name.trim() || !validHandle}
+            onClick={() => void save()}
+          >
             {mode === 'rename' ? 'Rename' : 'Duplicate'}
           </Button>
         </>
@@ -148,7 +198,12 @@ function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'renam
           <Avatar avatar={{ initials: initials(name || '?'), color }} name={name || '?'} size={44} />
           <label className="flex items-center gap-2 text-meta text-text-2">
             Color
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-8 w-10 rounded-ctl border border-line-2 bg-transparent" />
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-8 w-10 rounded-ctl border border-line-2 bg-transparent"
+            />
           </label>
         </div>
         <Field label="Name your team uses" hint="Free text, e.g. Atlas, Vega, Nova">
@@ -161,16 +216,32 @@ function NameDialog({ agent, mode, open, onClose }: { agent: Agent; mode: 'renam
               data-autofocus
               onChange={(e) => {
                 setName(e.target.value)
-                if (mode === 'duplicate' || !handle) setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+                if (mode === 'duplicate' || !handle)
+                  setHandle(
+                    e.target.value
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/^-|-$/g, ''),
+                  )
               }}
             />
           )}
         </Field>
-        <Field label="Handle" hint="For @mentions in the web app, the CLI and chat. Unique in the organisation." error={handle && !validHandle ? 'Lowercase letters, digits and dashes, 2 to 39 characters' : null}>
+        <Field
+          label="Handle"
+          hint="For @mentions in the web app, the CLI and chat. Unique in the organisation."
+          error={handle && !validHandle ? 'Lowercase letters, digits and dashes, 2 to 39 characters' : null}
+        >
           {(id, d) => (
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-text-3">@</span>
-              <Input id={id} aria-describedby={d} value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} className="font-mono" />
+              <Input
+                id={id}
+                aria-describedby={d}
+                value={handle}
+                onChange={(e) => setHandle(e.target.value.toLowerCase())}
+                className="font-mono"
+              />
             </div>
           )}
         </Field>
@@ -222,14 +293,36 @@ function ProfileTab({ agent }: { agent: Agent }) {
     const limits = draft.limits ?? { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
     return (
       <div className="flex max-w-[760px] flex-col gap-4 py-6">
-        <Field label="Role">{(id) => <Textarea id={id} rows={2} value={draft.role ?? ''} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />}</Field>
+        <Field label="Role">
+          {(id) => (
+            <Textarea
+              id={id}
+              rows={2}
+              value={draft.role ?? ''}
+              onChange={(e) => setDraft({ ...draft, role: e.target.value })}
+            />
+          )}
+        </Field>
         <Field label="Instructions" hint="Markdown. Short, numbered steps work best with open-weight models.">
-          {(id, d) => <Textarea id={id} aria-describedby={d} rows={8} value={draft.instructions ?? ''} onChange={(e) => setDraft({ ...draft, instructions: e.target.value })} className="font-mono text-[12.5px]" />}
+          {(id, d) => (
+            <Textarea
+              id={id}
+              aria-describedby={d}
+              rows={8}
+              value={draft.instructions ?? ''}
+              onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
+              className="font-mono text-[12.5px]"
+            />
+          )}
         </Field>
         <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Model">
             {(id) => (
-              <Select id={id} value={draft.model ?? ''} onChange={(e) => setDraft({ ...draft, model: e.target.value })}>
+              <Select
+                id={id}
+                value={draft.model ?? ''}
+                onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+              >
                 <option value="z-fast">z-fast</option>
                 <option value="z-heavy">z-heavy</option>
               </Select>
@@ -237,7 +330,11 @@ function ProfileTab({ agent }: { agent: Agent }) {
           </Field>
           <Field label="Escalate to">
             {(id) => (
-              <Select id={id} value={draft.escalate_model ?? ''} onChange={(e) => setDraft({ ...draft, escalate_model: e.target.value })}>
+              <Select
+                id={id}
+                value={draft.escalate_model ?? ''}
+                onChange={(e) => setDraft({ ...draft, escalate_model: e.target.value })}
+              >
                 <option value="z-heavy">z-heavy</option>
                 <option value="z-fast">z-fast</option>
               </Select>
@@ -245,7 +342,11 @@ function ProfileTab({ agent }: { agent: Agent }) {
           </Field>
           <Field label="Autonomy">
             {(id) => (
-              <Select id={id} value={draft.autonomy ?? 'propose'} onChange={(e) => setDraft({ ...draft, autonomy: e.target.value as 'propose' | 'read_only' })}>
+              <Select
+                id={id}
+                value={draft.autonomy ?? 'propose'}
+                onChange={(e) => setDraft({ ...draft, autonomy: e.target.value as 'propose' | 'read_only' })}
+              >
                 <option value="propose">Propose writes</option>
                 <option value="read_only">Read only</option>
               </Select>
@@ -253,7 +354,13 @@ function ProfileTab({ agent }: { agent: Agent }) {
           </Field>
           <Field label="Tone">
             {(id) => (
-              <Select id={id} value={draft.persona?.tone ?? 'concise'} onChange={(e) => setDraft({ ...draft, persona: { ...draft.persona, tone: e.target.value as 'concise' } })}>
+              <Select
+                id={id}
+                value={draft.persona?.tone ?? 'concise'}
+                onChange={(e) =>
+                  setDraft({ ...draft, persona: { ...draft.persona, tone: e.target.value as 'concise' } })
+                }
+              >
                 <option value="concise">Concise</option>
                 <option value="detailed">Detailed</option>
                 <option value="friendly">Friendly</option>
@@ -263,9 +370,42 @@ function ProfileTab({ agent }: { agent: Agent }) {
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Max steps">{(id) => <Input id={id} type="number" value={limits.max_steps} onChange={(e) => setDraft({ ...draft, limits: { ...limits, max_steps: Number(e.target.value) } })} />}</Field>
-          <Field label="Max tokens">{(id) => <Input id={id} type="number" value={limits.max_tokens} onChange={(e) => setDraft({ ...draft, limits: { ...limits, max_tokens: Number(e.target.value) } })} />}</Field>
-          <Field label="Timeout (s)">{(id) => <Input id={id} type="number" value={limits.timeout_s} onChange={(e) => setDraft({ ...draft, limits: { ...limits, timeout_s: Number(e.target.value) } })} />}</Field>
+          <Field label="Max steps">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                value={limits.max_steps}
+                onChange={(e) =>
+                  setDraft({ ...draft, limits: { ...limits, max_steps: Number(e.target.value) } })
+                }
+              />
+            )}
+          </Field>
+          <Field label="Max tokens">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                value={limits.max_tokens}
+                onChange={(e) =>
+                  setDraft({ ...draft, limits: { ...limits, max_tokens: Number(e.target.value) } })
+                }
+              />
+            )}
+          </Field>
+          <Field label="Timeout (s)">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                value={limits.timeout_s}
+                onChange={(e) =>
+                  setDraft({ ...draft, limits: { ...limits, timeout_s: Number(e.target.value) } })
+                }
+              />
+            )}
+          </Field>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setEditing(false)}>Cancel</Button>
@@ -280,18 +420,39 @@ function ProfileTab({ agent }: { agent: Agent }) {
     <div className="flex max-w-[820px] flex-col gap-6 py-6">
       <section className="flex flex-col gap-2">
         <h3 className="m-0 text-meta font-normal text-text-3">Instructions</h3>
-        {agent.instructions ? <Markdown>{agent.instructions}</Markdown> : <span className="text-text-3">None</span>}
+        {agent.instructions ? (
+          <Markdown>{agent.instructions}</Markdown>
+        ) : (
+          <span className="text-text-3">None</span>
+        )}
       </section>
       <DefList
         className="text-ui"
         rows={[
           ['Persona', `${agent.persona?.tone ?? 'concise'} · ${agent.persona?.language ?? 'en'}`],
-          ['Escalates to', <span key="e" className="font-mono">{agent.escalate_model ?? '—'}</span>],
-          ['Limits', <span key="l" className="font-mono">{agent.limits ? `${agent.limits.max_steps} steps · ${compactNumber(agent.limits.max_tokens)} tokens · ${humanDuration(agent.limits.timeout_s)}` : '—'}</span>],
+          [
+            'Escalates to',
+            <span key="e" className="font-mono">
+              {agent.escalate_model ?? '—'}
+            </span>,
+          ],
+          [
+            'Limits',
+            <span key="l" className="font-mono">
+              {agent.limits
+                ? `${agent.limits.max_steps} steps · ${compactNumber(agent.limits.max_tokens)} tokens · ${humanDuration(agent.limits.timeout_s)}`
+                : '—'}
+            </span>,
+          ],
           ['Visibility', agent.visibility ?? 'team'],
           ['Owner team', agent.owner_team ?? '—'],
           ['Pack', agent.pack ?? '—'],
-          ['Stable name', <span key="n" className="font-mono">{agent.name}</span>],
+          [
+            'Stable name',
+            <span key="n" className="font-mono">
+              {agent.name}
+            </span>,
+          ],
           ['Updated', relative(agent.updated_at)],
         ]}
       />
@@ -314,7 +475,12 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const rollback = async (v: string) => {
     setBusy(v)
     try {
-      await unwrap(api.POST('/skills/{id}/rollback', { params: { path: { id } }, body: { to_version: v, reason: 'Rolled back from the web app' } }))
+      await unwrap(
+        api.POST('/skills/{id}/rollback', {
+          params: { path: { id } },
+          body: { to_version: v, reason: 'Rolled back from the web app' },
+        }),
+      )
       await qc.invalidateQueries({ queryKey: qk.skill(id) })
       await qc.invalidateQueries({ queryKey: qk.skillVersions(id) })
       await qc.invalidateQueries({ queryKey: ['skills'] })
@@ -326,7 +492,13 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     }
   }
   return (
-    <Dialog open onClose={onClose} title={skill.data?.name ?? 'Skill'} eyebrow={skill.data ? `${skill.data.origin} · v${skill.data.version}` : undefined} width={860}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={skill.data?.name ?? 'Skill'}
+      eyebrow={skill.data ? `${skill.data.origin} · v${skill.data.version}` : undefined}
+      width={860}
+    >
       {!skill.data ? (
         <Skeleton className="h-60" />
       ) : (
@@ -337,7 +509,9 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
               <Markdown>{skill.data.content}</Markdown>
             </div>
           ) : (
-            <div className="text-meta text-text-3">The SKILL.md content is not included in this response.</div>
+            <div className="text-meta text-text-3">
+              The SKILL.md content is not included in this response.
+            </div>
           )}
           <section aria-label="Versions">
             <h3 className="m-0 mb-2 text-meta font-normal text-text-3">Versions</h3>
@@ -356,7 +530,11 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                         <span className="text-meta text-ok">current</span>
                       ) : (
                         canWrite && (
-                          <Button size="xs" busy={busy === v.version} onClick={() => void rollback(v.version)}>
+                          <Button
+                            size="xs"
+                            busy={busy === v.version}
+                            onClick={() => void rollback(v.version)}
+                          >
                             Roll back to {v.version}
                           </Button>
                         )
@@ -374,14 +552,36 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 }
 
 function lastChange(s: Skill): { text: string; sub?: React.ReactNode; tone?: 'wait' } {
-  if (s.pending_proposal_id) return { text: 'Improvement proposed', sub: <Link to="/learning" search={{ proposal: s.pending_proposal_id }}>see the proposal</Link>, tone: 'wait' }
+  if (s.pending_proposal_id)
+    return {
+      text: 'Improvement proposed',
+      sub: (
+        <Link to="/learning" search={{ proposal: s.pending_proposal_id }}>
+          see the proposal
+        </Link>
+      ),
+      tone: 'wait',
+    }
   const c = s.last_change
   if (!c) return { text: '—' }
   const when = relative(c.at)
-  if (c.kind === 'learned') return { text: `Improved ${when}`, sub: c.proposal_id ? <Link to="/learning" search={{ proposal: c.proposal_id }}>by learning{c.by ? `, approved by ${c.by}` : ''}</Link> : 'by learning' }
+  if (c.kind === 'learned')
+    return {
+      text: `Improved ${when}`,
+      sub: c.proposal_id ? (
+        <Link to="/learning" search={{ proposal: c.proposal_id }}>
+          by learning{c.by ? `, approved by ${c.by}` : ''}
+        </Link>
+      ) : (
+        'by learning'
+      ),
+    }
   if (c.kind === 'rolled_back') return { text: `Rolled back ${when}`, sub: c.by ?? undefined }
   if (c.kind === 'edited') return { text: `Edited ${when}`, sub: c.by ?? undefined }
-  return { text: `Created ${when}`, sub: c.by?.startsWith('pack:') ? `from the ${c.by.slice(5)} pack` : (c.by ?? undefined) }
+  return {
+    text: `Created ${when}`,
+    sub: c.by?.startsWith('pack:') ? `from the ${c.by.slice(5)} pack` : (c.by ?? undefined),
+  }
 }
 
 function SkillsTab({ agent }: { agent: Agent }) {
@@ -392,7 +592,9 @@ function SkillsTab({ agent }: { agent: Agent }) {
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const active = new Set(agent.skills ?? [])
-  const list = (all.data?.items ?? []).filter((s) => active.has(s.name) || s.agents.includes(agent.name ?? ''))
+  const list = (all.data?.items ?? []).filter(
+    (s) => active.has(s.name) || s.agents.includes(agent.name ?? ''),
+  )
   const others = (all.data?.items ?? []).filter((s) => !active.has(s.name))
   const setSkills = async (skills: string[]) => {
     try {
@@ -407,7 +609,9 @@ function SkillsTab({ agent }: { agent: Agent }) {
   return (
     <div className="flex flex-col gap-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="m-0 text-text-2">Skills are versioned SKILL.md files. The agent loads the ones that fit the mission.</p>
+        <p className="m-0 text-text-2">
+          Skills are versioned SKILL.md files. The agent loads the ones that fit the mission.
+        </p>
         {canWrite && (
           <div className="flex gap-2">
             <Button size="sm" disabled title="POST /skills is not in the contract yet">
@@ -422,7 +626,9 @@ function SkillsTab({ agent }: { agent: Agent }) {
       <QueryState query={all} what="Skills" endpoint="GET /skills">
         {() =>
           list.length === 0 ? (
-            <EmptyState title="No skill yet">Add skills from a pack, or let the learning loop propose them.</EmptyState>
+            <EmptyState title="No skill yet">
+              Add skills from a pack, or let the learning loop propose them.
+            </EmptyState>
           ) : (
             <div className="overflow-x-auto rounded-card border border-line bg-panel">
               <table className="w-full min-w-[680px] border-collapse">
@@ -441,17 +647,31 @@ function SkillsTab({ agent }: { agent: Agent }) {
                     return (
                       <tr key={s.id} className="border-b border-line last:border-b-0">
                         <td className="px-5 py-3.5">
-                          <button type="button" onClick={() => setOpen(s.id)} className="flex flex-col text-left">
+                          <button
+                            type="button"
+                            onClick={() => setOpen(s.id)}
+                            className="flex flex-col text-left"
+                          >
                             <span className="font-mono text-[12.5px]">{s.name}</span>
                             <span className="text-meta text-text-2">{s.description}</span>
                           </button>
                         </td>
-                        <td className="pr-4">{s.origin === 'pack' ? `${titleCase(s.pack ?? 'pack')} pack` : s.origin === 'learned' ? 'Learned' : 'Team'}</td>
+                        <td className="pr-4">
+                          {s.origin === 'pack'
+                            ? `${titleCase(s.pack ?? 'pack')} pack`
+                            : s.origin === 'learned'
+                              ? 'Learned'
+                              : 'Team'}
+                        </td>
                         <td className="pr-4 font-mono">{s.version}</td>
                         <td className="pr-4">
                           <div className="flex flex-col">
                             <span className={lc.tone === 'wait' ? 'text-wait' : ''}>{lc.text}</span>
-                            {lc.sub && <span className="text-meta text-text-3 [&_a]:text-text-3 [&_a]:underline [&_a]:underline-offset-2">{lc.sub}</span>}
+                            {lc.sub && (
+                              <span className="text-meta text-text-3 [&_a]:text-text-3 [&_a]:underline [&_a]:underline-offset-2">
+                                {lc.sub}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="pr-5 text-right">
@@ -461,7 +681,13 @@ function SkillsTab({ agent }: { agent: Agent }) {
                             checked={active.has(s.name)}
                             disabled={!canWrite}
                             aria-label={`${s.name} active for ${agent.display_name}`}
-                            onChange={(e) => void setSkills(e.target.checked ? [...active, s.name] : [...active].filter((x) => x !== s.name))}
+                            onChange={(e) =>
+                              void setSkills(
+                                e.target.checked
+                                  ? [...active, s.name]
+                                  : [...active].filter((x) => x !== s.name),
+                              )
+                            }
                           />
                         </td>
                       </tr>
@@ -493,7 +719,9 @@ function SkillsTab({ agent }: { agent: Agent }) {
               </Button>
             </li>
           ))}
-          {others.length === 0 && <li className="text-meta text-text-3">Every known skill is already active.</li>}
+          {others.length === 0 && (
+            <li className="text-meta text-text-3">Every known skill is already active.</li>
+          )}
         </ul>
       </Dialog>
     </div>
@@ -502,8 +730,12 @@ function SkillsTab({ agent }: { agent: Agent }) {
 
 function ToolsTab({ agent }: { agent: Agent }) {
   const describe = (t: string): string => {
-    if (t === '@read' || t === 'gateway:@read') return 'Every exposed read operation of the connectors attached to the mission'
-    if (t.startsWith('gateway:')) return t.endsWith('.*') ? 'Read operations matching this glob, through the tool gateway' : 'One operation through the tool gateway'
+    if (t === '@read' || t === 'gateway:@read')
+      return 'Every exposed read operation of the connectors attached to the mission'
+    if (t.startsWith('gateway:'))
+      return t.endsWith('.*')
+        ? 'Read operations matching this glob, through the tool gateway'
+        : 'One operation through the tool gateway'
     const local: Record<string, string> = {
       read: 'Read files in /workspace',
       edit: 'Edit files in /workspace',
@@ -526,8 +758,8 @@ function ToolsTab({ agent }: { agent: Agent }) {
         ))}
       </ul>
       <p className="m-0 text-meta text-text-3">
-        Built-ins are implicit: ask_human, search_memory, report_objective, and propose_action for the writes of the current step. An agent never lists write
-        operations; writes are proposals you approve.
+        Built-ins are implicit: ask_human, search_memory, report_objective, and propose_action for the writes
+        of the current step. An agent never lists write operations; writes are proposals you approve.
       </p>
     </div>
   )
@@ -543,8 +775,14 @@ function MemoryTab({ agent }: { agent: Agent }) {
           ['Facts per step', String(agent.memory?.top_k ?? 8)],
         ]}
       />
-      <NotServed what="Browsing memory facts" endpoint="a memory facts endpoint (none in contracts/openapi.yaml yet)" />
-      <p className="m-0 text-meta text-text-3">Facts are approved through Learning; C3 content never enters memory. Each fact shows its source and approver.</p>
+      <NotServed
+        what="Browsing memory facts"
+        endpoint="a memory facts endpoint (none in contracts/openapi.yaml yet)"
+      />
+      <p className="m-0 text-meta text-text-3">
+        Facts are approved through Learning; C3 content never enters memory. Each fact shows its source and
+        approver.
+      </p>
     </div>
   )
 }
@@ -555,13 +793,16 @@ function EvalsTab({ agent }: { agent: Agent }) {
     <div className="flex flex-col gap-4 py-6">
       {agent.evals_summary && (
         <div className="text-ui">
-          Last run: {agent.evals_summary.passed} of {agent.evals_summary.total} cases pass{agent.evals_summary.model ? ` on ${agent.evals_summary.model}` : ''}.
+          Last run: {agent.evals_summary.passed} of {agent.evals_summary.total} cases pass
+          {agent.evals_summary.model ? ` on ${agent.evals_summary.model}` : ''}.
         </div>
       )}
       <QueryState query={runs} what="Eval runs" endpoint="GET /evals">
         {() =>
           (runs.data?.items ?? []).length === 0 ? (
-            <EmptyState title="No eval run yet">Run the agent's suite from Evals to compare models.</EmptyState>
+            <EmptyState title="No eval run yet">
+              Run the agent's suite from Evals to compare models.
+            </EmptyState>
           ) : (
             <ul className="m-0 list-none p-0">
               {(runs.data?.items ?? []).map((r) => (
@@ -598,17 +839,35 @@ function VersionsTab({ agent }: { agent: Agent }) {
               const prev = list[i + 1]
               return (
                 <li key={ver.version} className="border-b border-line py-3">
-                  <button type="button" className="flex w-full items-center gap-4 text-left" onClick={() => setOpen(open === ver.version ? null : ver.version)} aria-expanded={open === ver.version}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-4 text-left"
+                    onClick={() => setOpen(open === ver.version ? null : ver.version)}
+                    aria-expanded={open === ver.version}
+                  >
                     <span className="w-16 font-mono">{ver.version}</span>
-                    <span className="flex-1">{ver.change_note ?? (i === list.length - 1 ? 'First version' : 'Profile changed')}</span>
+                    <span className="flex-1">
+                      {ver.change_note ?? (i === list.length - 1 ? 'First version' : 'Profile changed')}
+                    </span>
                     <span className="text-meta text-text-3">
                       {ver.created_by ?? 'system'} · {relative(ver.created_at)}
                     </span>
-                    <Icon name={open === ver.version ? 'chevronDown' : 'chevronRight'} size={12} className="text-text-3" />
+                    <Icon
+                      name={open === ver.version ? 'chevronDown' : 'chevronRight'}
+                      size={12}
+                      className="text-text-3"
+                    />
                   </button>
                   {open === ver.version && (
                     <div className="pt-3">
-                      <DiffViewer files={diffTexts('agent.yaml', prev ? JSON.stringify(prev.profile, null, 2) : '', JSON.stringify(ver.profile, null, 2))} maxHeight={420} />
+                      <DiffViewer
+                        files={diffTexts(
+                          'agent.yaml',
+                          prev ? JSON.stringify(prev.profile, null, 2) : '',
+                          JSON.stringify(ver.profile, null, 2),
+                        )}
+                        maxHeight={420}
+                      />
                     </div>
                   )}
                 </li>
@@ -630,19 +889,40 @@ function AgentDetail({ id }: { id: string }) {
   const objectives = useObjectives(id)
   const assignments = useAssignments(id)
   const [dialog, setDialog] = useState<'rename' | 'duplicate' | null>(null)
-  const tab = (['profile', 'objectives', 'skills', 'tools', 'memory', 'evals', 'versions'].includes(search.tab ?? '') ? search.tab : 'skills') as Tab
-  if (!q.data) return <div className="flex-1 p-10">{q.error ? <QueryState query={q} what="This agent" endpoint="GET /agents/{id}">{() => null}</QueryState> : <Skeleton className="h-60" />}</div>
+  const tab = (
+    ['profile', 'objectives', 'skills', 'tools', 'memory', 'evals', 'versions'].includes(search.tab ?? '')
+      ? search.tab
+      : 'skills'
+  ) as Tab
+  if (!q.data)
+    return (
+      <div className="flex-1 p-10">
+        {q.error ? (
+          <QueryState query={q} what="This agent" endpoint="GET /agents/{id}">
+            {() => null}
+          </QueryState>
+        ) : (
+          <Skeleton className="h-60" />
+        )}
+      </div>
+    )
   const a = q.data
-  const atRisk = (objectives.data ?? []).filter((o) => o.status === 'at_risk' || o.status === 'off_track').length
+  const atRisk = (objectives.data ?? []).filter(
+    (o) => o.status === 'at_risk' || o.status === 'off_track',
+  ).length
   return (
-    <section aria-label={a.display_name ?? a.name ?? 'Agent'} className="flex min-w-0 flex-1 flex-col px-9 pt-6 pb-10 max-md:px-5">
+    <section
+      aria-label={a.display_name ?? a.name ?? 'Agent'}
+      className="flex min-w-0 flex-1 flex-col px-9 pt-6 pb-10 max-md:px-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
           <h2 className="m-0 flex flex-wrap items-baseline gap-x-3">
             <span className="font-display-face text-[38px] leading-none">{a.display_name}</span>
             <span className="font-mono text-[15px] text-text-2">
               @{a.handle}
-              {templateName(a).toLowerCase() !== (a.display_name ?? '').toLowerCase() && ` · ${templateName(a)}`}
+              {templateName(a).toLowerCase() !== (a.display_name ?? '').toLowerCase() &&
+                ` · ${templateName(a)}`}
             </span>
           </h2>
           <p className="m-0 max-w-[560px] text-text-2">{a.role}</p>
@@ -655,7 +935,10 @@ function AgentDetail({ id }: { id: string }) {
             </>
           )}
           {canStart && (
-            <Button variant="primary" onClick={() => void navigate({ to: '/missions/new', search: { agent: a.handle } })}>
+            <Button
+              variant="primary"
+              onClick={() => void navigate({ to: '/missions/new', search: { agent: a.handle } })}
+            >
               Give it a mission
             </Button>
           )}
@@ -672,11 +955,15 @@ function AgentDetail({ id }: { id: string }) {
           <span className="text-text-3">Version</span> <span className="font-mono">v{a.version}</span>
         </span>
         <span>
-          <span className="text-text-3">Evals</span> {a.evals_summary ? `${a.evals_summary.passed} of ${a.evals_summary.total} cases pass` : 'not run yet'}
+          <span className="text-text-3">Evals</span>{' '}
+          {a.evals_summary
+            ? `${a.evals_summary.passed} of ${a.evals_summary.total} cases pass`
+            : 'not run yet'}
         </span>
         {assignments.data && assignments.data.length > 0 && (
           <span>
-            <span className="text-text-3">Looks after</span> {assignments.data.map((x) => x.object_ref).join(', ')}
+            <span className="text-text-3">Looks after</span>{' '}
+            {assignments.data.map((x) => x.object_ref).join(', ')}
           </span>
         )}
       </div>
@@ -687,7 +974,11 @@ function AgentDetail({ id }: { id: string }) {
         onChange={(t) => void navigate({ to: '/agents', search: { agent: id, tab: t }, replace: true })}
         items={[
           { id: 'profile', label: 'Profile' },
-          { id: 'objectives', label: 'Objectives', badge: atRisk ? <span className="font-mono text-sm text-wait">{atRisk} at risk</span> : undefined },
+          {
+            id: 'objectives',
+            label: 'Objectives',
+            badge: atRisk ? <span className="font-mono text-sm text-wait">{atRisk} at risk</span> : undefined,
+          },
           { id: 'skills', label: 'Skills' },
           { id: 'tools', label: 'Tools' },
           { id: 'memory', label: 'Memory' },
@@ -723,10 +1014,18 @@ export function Agents() {
   const navigate = useNavigate()
   const list = useMemo(() => {
     const items = [...(q.data?.items ?? [])]
-    return items.sort((x, y) => Number(y.status === 'working') - Number(x.status === 'working') || (x.display_name ?? '').localeCompare(y.display_name ?? ''))
+    return items.sort(
+      (x, y) =>
+        Number(y.status === 'working') - Number(x.status === 'working') ||
+        (x.display_name ?? '').localeCompare(y.display_name ?? ''),
+    )
   }, [q.data])
-  const selected = search.agent && list.some((a) => a.id === search.agent || a.name === search.agent) ? (list.find((a) => a.id === search.agent || a.name === search.agent)?.id ?? null) : (list[0]?.id ?? null)
-  const select = (id: string) => void navigate({ to: '/agents', search: { agent: id, tab: search.tab }, replace: true })
+  const selected =
+    search.agent && list.some((a) => a.id === search.agent || a.name === search.agent)
+      ? (list.find((a) => a.id === search.agent || a.name === search.agent)?.id ?? null)
+      : (list[0]?.id ?? null)
+  const select = (id: string) =>
+    void navigate({ to: '/agents', search: { agent: id, tab: search.tab }, replace: true })
   useHotkeys({
     j: () => {
       const i = list.findIndex((a) => a.id === selected)

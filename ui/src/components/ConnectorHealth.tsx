@@ -25,19 +25,30 @@ export function ConnectorHealth({ connector }: { connector: Connector }) {
         </span>
       )
     case 'degraded':
-      return <Pill tone="wait">Degraded{h.error_rate ? ` · ${(h.error_rate * 100).toFixed(1)}% errors` : ''}</Pill>
+      return (
+        <Pill tone="wait">Degraded{h.error_rate ? ` · ${(h.error_rate * 100).toFixed(1)}% errors` : ''}</Pill>
+      )
     case 'token_expiring': {
-      const exp = connector.credentials?.map((c) => c.expires_at).filter(Boolean).sort()[0]
+      const exp = connector.credentials
+        ?.map((c) => c.expires_at)
+        .filter(Boolean)
+        .sort()[0]
       return <Pill tone="wait">Token expires {exp ? relative(exp).replace(/^in /, 'in ') : 'soon'}</Pill>
     }
     case 'unreachable':
-      return <Pill tone="err">Unreachable{h.last_success_at ? ` since ${clock(h.checked_at ?? h.last_success_at)}` : ''}</Pill>
+      return (
+        <Pill tone="err">
+          Unreachable{h.last_success_at ? ` since ${clock(h.checked_at ?? h.last_success_at)}` : ''}
+        </Pill>
+      )
   }
 }
 
 function Pill({ tone, children }: { tone: 'wait' | 'err'; children: React.ReactNode }) {
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] px-2 ${tone === 'wait' ? 'bg-wait-bg text-wait' : 'bg-err-bg text-err'}`}>
+    <span
+      className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] px-2 ${tone === 'wait' ? 'bg-wait-bg text-wait' : 'bg-err-bg text-err'}`}
+    >
       <Dot tone={tone} />
       {children}
     </span>

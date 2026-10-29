@@ -9,11 +9,23 @@ import { useToast } from '@/components/toast'
 import { planSteps } from '@/lib/mission'
 
 function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'step'
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'step'
+  )
 }
 
 /** Inline editor for plan steps: title, agent, prompt, writes; add, remove and reorder. */
-export function PlanStepsEditor({ steps, onChange }: { steps: PlanStep[]; onChange: (s: PlanStep[]) => void }) {
+export function PlanStepsEditor({
+  steps,
+  onChange,
+}: {
+  steps: PlanStep[]
+  onChange: (s: PlanStep[]) => void
+}) {
   const agents = useAgents()
   const list = agents.data?.items ?? []
   const set = (i: number, patch: Partial<PlanStep>) => {
@@ -29,7 +41,10 @@ export function PlanStepsEditor({ steps, onChange }: { steps: PlanStep[]; onChan
   return (
     <ol className="m-0 flex list-none flex-col gap-3 p-0">
       {steps.map((s, i) => (
-        <li key={`${s.id ?? 'new'}-${i}`} className="flex flex-col gap-2.5 rounded-panel border border-line p-3.5">
+        <li
+          key={`${s.id ?? 'new'}-${i}`}
+          className="flex flex-col gap-2.5 rounded-panel border border-line p-3.5"
+        >
           <div className="flex items-center gap-2">
             <span className="w-6 font-mono text-sm text-text-3">{String(i + 1).padStart(2, '0')}</span>
             <Input
@@ -56,9 +71,19 @@ export function PlanStepsEditor({ steps, onChange }: { steps: PlanStep[]; onChan
                 </option>
               ))}
             </Select>
-            <IconButton icon="chevronDown" label="Move down" disabled={i === steps.length - 1} onClick={() => move(i, 1)} className="rotate-0" />
+            <IconButton
+              icon="chevronDown"
+              label="Move down"
+              disabled={i === steps.length - 1}
+              onClick={() => move(i, 1)}
+              className="rotate-0"
+            />
             <IconButton icon="arrowUp" label="Move up" disabled={i === 0} onClick={() => move(i, -1)} />
-            <IconButton icon="x" label={`Remove step ${i + 1}`} onClick={() => onChange(steps.filter((_, j) => j !== i))} />
+            <IconButton
+              icon="x"
+              label={`Remove step ${i + 1}`}
+              onClick={() => onChange(steps.filter((_, j) => j !== i))}
+            />
           </div>
           <Textarea
             aria-label={`Step ${i + 1} instructions`}
@@ -86,7 +111,16 @@ export function PlanStepsEditor({ steps, onChange }: { steps: PlanStep[]; onChan
           icon="plus"
           onClick={() => {
             const title = `Step ${steps.length + 1}`
-            onChange([...steps, { id: slugify(title), title, agent: steps[steps.length - 1]?.agent ?? '', prompt: '', depends_on: steps.length ? [steps[steps.length - 1]?.id ?? ''] : [] }])
+            onChange([
+              ...steps,
+              {
+                id: slugify(title),
+                title,
+                agent: steps[steps.length - 1]?.agent ?? '',
+                prompt: '',
+                depends_on: steps.length ? [steps[steps.length - 1]?.id ?? ''] : [],
+              },
+            ])
           }}
         >
           Add a step
@@ -112,7 +146,15 @@ export function normalizePlan(steps: PlanStep[], base?: MissionPlan | null): Mis
   return { ...(base ?? {}), steps: fixed, writes }
 }
 
-export function PlanEditor({ mission, open, onClose }: { mission: Mission; open: boolean; onClose: () => void }) {
+export function PlanEditor({
+  mission,
+  open,
+  onClose,
+}: {
+  mission: Mission
+  open: boolean
+  onClose: () => void
+}) {
   const [steps, setSteps] = useState<PlanStep[]>(() => planSteps(mission).map((s) => ({ ...s })))
   const [busy, setBusy] = useState(false)
   const qc = useQueryClient()
@@ -121,7 +163,12 @@ export function PlanEditor({ mission, open, onClose }: { mission: Mission; open:
     setBusy(true)
     try {
       const plan = normalizePlan(steps, mission.plan)
-      await unwrap(api.PATCH('/missions/{id}/plan', { params: { path: { id: mission.id } }, body: { plan: toContractPlan(plan) } }))
+      await unwrap(
+        api.PATCH('/missions/{id}/plan', {
+          params: { path: { id: mission.id } },
+          body: { plan: toContractPlan(plan) },
+        }),
+      )
       await qc.invalidateQueries({ queryKey: qk.mission(mission.id) })
       toast.ok('Plan saved')
       onClose()

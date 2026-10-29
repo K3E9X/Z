@@ -69,7 +69,13 @@ describe('SchemaForm', () => {
     await user.type(screen.getByLabelText(/Limit/), '8')
     await user.click(screen.getByLabelText(/Dry run/))
     await user.type(screen.getByLabelText(/Repos/), 'api, billing')
-    expect(last).toEqual({ product: 'infra-boutiques', min_severity: 'high', limit: 8, dry_run: true, repos: ['api', 'billing'] })
+    expect(last).toEqual({
+      product: 'infra-boutiques',
+      min_severity: 'high',
+      limit: 8,
+      dry_run: true,
+      repos: ['api', 'billing'],
+    })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
@@ -81,10 +87,14 @@ describe('StackedBars', () => {
   ]
   it('summarises the chart for screen readers', () => {
     render(<StackedBars title="Tokens by model" labels={['08:00', '09:00', '10:00']} series={series} />)
-    expect(screen.getByRole('img', { name: /Tokens by model: z-heavy 600, z-fast 150; peak 350 at 10:00/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /Tokens by model: z-heavy 600, z-fast 150; peak 350 at 10:00/ }),
+    ).toBeInTheDocument()
   })
   it('has a table view with totals', () => {
-    render(<StackedBars title="Tokens by model" labels={['08:00', '09:00', '10:00']} series={series} showTable />)
+    render(
+      <StackedBars title="Tokens by model" labels={['08:00', '09:00', '10:00']} series={series} showTable />,
+    )
     expect(screen.getByRole('table', { name: 'Tokens by model' })).toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(4)
     expect(screen.getByText('350')).toBeInTheDocument()
@@ -101,7 +111,9 @@ describe('@agent and #connector completion', () => {
   it('finds the token being typed and the mentions in a text', () => {
     expect(activeToken('triage with @ve', 15)).toEqual({ trigger: '@', query: 've', start: 12 })
     expect(activeToken('mail me@x', 9)).toBeNull()
-    expect(parseMentions('Ask @atlas to open #jira tickets, then @vega.', options).map((o) => o.insert)).toEqual(['atlas', 'jira', 'vega'])
+    expect(
+      parseMentions('Ask @atlas to open #jira tickets, then @vega.', options).map((o) => o.insert),
+    ).toEqual(['atlas', 'jira', 'vega'])
   })
   it('completes with the keyboard', async () => {
     const user = userEvent.setup()

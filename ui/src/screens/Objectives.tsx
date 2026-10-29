@@ -23,13 +23,22 @@ const STATUS = {
 type ObjectiveWithId = Objective & { id?: string }
 
 function History({ id, target }: { id: string; target: number }) {
-  const h = useQuery({ queryKey: qk.objectiveHistory(id), queryFn: () => unwrap(api.GET('/objectives/{id}/history', { params: { path: { id } } })) })
+  const h = useQuery({
+    queryKey: qk.objectiveHistory(id),
+    queryFn: () => unwrap(api.GET('/objectives/{id}/history', { params: { path: { id } } })),
+  })
   const values = (h.data ?? []).map((c) => c.value).reverse()
   const last = h.data?.[0]
   return (
     <div className="flex items-center gap-3">
-      <Sparkline values={values} label={`Trend: ${values.join(', ')} against target ${target}`} target={target} />
-      <span className="text-meta text-text-3">{last ? `checked ${relative(last.ts)}` : 'not checked yet'}</span>
+      <Sparkline
+        values={values}
+        label={`Trend: ${values.join(', ')} against target ${target}`}
+        target={target}
+      />
+      <span className="text-meta text-text-3">
+        {last ? `checked ${relative(last.ts)}` : 'not checked yet'}
+      </span>
     </div>
   )
 }
@@ -60,11 +69,23 @@ function ObjectiveRow({ o }: { o: ObjectiveWithId }) {
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-medium">{o.title}</span>
           <span className="text-meta text-text-3">
-            {o.metric.source === 'z' ? o.metric.query : o.metric.operation} · target {o.metric.direction === 'down' ? '≤' : '≥'} {o.metric.target} · {typeof o.cadence === 'string' ? <span className="font-mono">{o.cadence}</span> : `on ${o.cadence.event}`} ·{' '}
-            {o.mode === 'auto_start_read_only' ? 'starts read-only missions itself' : 'suggests missions'}
-            {o.budget_per_period ? ` · ${compactNumber(o.budget_per_period.tokens)} tokens / ${o.budget_per_period.period}` : ''}
+            {o.metric.source === 'z' ? o.metric.query : o.metric.operation} · target{' '}
+            {o.metric.direction === 'down' ? '≤' : '≥'} {o.metric.target} ·{' '}
+            {typeof o.cadence === 'string' ? (
+              <span className="font-mono">{o.cadence}</span>
+            ) : (
+              `on ${o.cadence.event}`
+            )}{' '}
+            · {o.mode === 'auto_start_read_only' ? 'starts read-only missions itself' : 'suggests missions'}
+            {o.budget_per_period
+              ? ` · ${compactNumber(o.budget_per_period.tokens)} tokens / ${o.budget_per_period.period}`
+              : ''}
           </span>
-          {(o.allowed_playbooks ?? []).length > 0 && <span className="text-meta text-text-3">Playbooks: {(o.allowed_playbooks ?? []).map(playbookTitle).join(', ')}</span>}
+          {(o.allowed_playbooks ?? []).length > 0 && (
+            <span className="text-meta text-text-3">
+              Playbooks: {(o.allowed_playbooks ?? []).map(playbookTitle).join(', ')}
+            </span>
+          )}
         </div>
         <StatusText tone={st.tone} label={st.label} />
       </div>
@@ -75,9 +96,31 @@ function ObjectiveRow({ o }: { o: ObjectiveWithId }) {
           <>
             <label className="flex items-center gap-2 text-meta text-text-2">
               Active
-              <Toggle checked={o.status !== 'paused'} disabled={busy} label={`${o.title} active`} onChange={(v) => void run(() => unwrap(api.PATCH('/objectives/{id}', { params: { path: { id } }, body: { paused: !v } })), v ? 'Resumed' : 'Paused')} />
+              <Toggle
+                checked={o.status !== 'paused'}
+                disabled={busy}
+                label={`${o.title} active`}
+                onChange={(v) =>
+                  void run(
+                    () =>
+                      unwrap(
+                        api.PATCH('/objectives/{id}', { params: { path: { id } }, body: { paused: !v } }),
+                      ),
+                    v ? 'Resumed' : 'Paused',
+                  )
+                }
+              />
             </label>
-            <Button size="xs" busy={busy} onClick={() => void run(() => unwrap(api.POST('/objectives/{id}/evaluate', { params: { path: { id } }, body: {} })), 'Checked now')}>
+            <Button
+              size="xs"
+              busy={busy}
+              onClick={() =>
+                void run(
+                  () => unwrap(api.POST('/objectives/{id}/evaluate', { params: { path: { id } }, body: {} })),
+                  'Checked now',
+                )
+              }
+            >
               Check now
             </Button>
           </>
@@ -144,12 +187,25 @@ function CreateDialog({ agent, open, onClose }: { agent: Agent; open: boolean; o
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Title" className="sm:col-span-2">
-          {(id) => <Input id={id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Critical findings triaged within 48 hours" />}
+          {(id) => (
+            <Input
+              id={id}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Critical findings triaged within 48 hours"
+            />
+          )}
         </Field>
         <Field label="Metric (built-in)">
           {(id) => (
             <Select id={id} value={query} onChange={(e) => setQuery(e.target.value)}>
-              {['untriaged_findings', 'open_proposals', 'stale_tickets', 'overdue_tickets', 'mission_failures'].map((q) => (
+              {[
+                'untriaged_findings',
+                'open_proposals',
+                'stale_tickets',
+                'overdue_tickets',
+                'mission_failures',
+              ].map((q) => (
                 <option key={q} value={q}>
                   {q.replace(/_/g, ' ')}
                 </option>
@@ -158,26 +214,56 @@ function CreateDialog({ agent, open, onClose }: { agent: Agent; open: boolean; o
           )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Target">{(id) => <Input id={id} type="number" value={target} onChange={(e) => setTarget(Number(e.target.value))} />}</Field>
+          <Field label="Target">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                value={target}
+                onChange={(e) => setTarget(Number(e.target.value))}
+              />
+            )}
+          </Field>
           <Field label="Direction">
             {(id) => (
-              <Select id={id} value={direction} onChange={(e) => setDirection(e.target.value as 'down' | 'up')}>
+              <Select
+                id={id}
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as 'down' | 'up')}
+              >
                 <option value="down">down</option>
                 <option value="up">up</option>
               </Select>
             )}
           </Field>
         </div>
-        <Field label="Cadence (cron)">{(id) => <Input id={id} value={cadence} onChange={(e) => setCadence(e.target.value)} className="font-mono" />}</Field>
+        <Field label="Cadence (cron)">
+          {(id) => (
+            <Input
+              id={id}
+              value={cadence}
+              onChange={(e) => setCadence(e.target.value)}
+              className="font-mono"
+            />
+          )}
+        </Field>
         <Field label="Mode">
           {(id) => (
-            <Select id={id} value={mode} onChange={(e) => setMode(e.target.value as 'suggest' | 'auto_start_read_only')}>
+            <Select
+              id={id}
+              value={mode}
+              onChange={(e) => setMode(e.target.value as 'suggest' | 'auto_start_read_only')}
+            >
               <option value="suggest">Suggest missions</option>
               <option value="auto_start_read_only">Start read-only missions</option>
             </Select>
           )}
         </Field>
-        <Field label="Budget per day (tokens)">{(id) => <Input id={id} type="number" value={tokens} onChange={(e) => setTokens(Number(e.target.value))} />}</Field>
+        <Field label="Budget per day (tokens)">
+          {(id) => (
+            <Input id={id} type="number" value={tokens} onChange={(e) => setTokens(Number(e.target.value))} />
+          )}
+        </Field>
         <Field label="Allowed playbook">
           {(id) => (
             <Select id={id} value={pb} onChange={(e) => setPb(e.target.value)}>
@@ -203,7 +289,10 @@ export function ObjectivesPanel({ agent }: { agent: Agent }) {
   return (
     <div className="flex flex-col gap-3 py-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="m-0 text-text-2">Standing goals. On their cadence the agent measures them, explains the gap and proposes missions; writes still need approval.</p>
+        <p className="m-0 text-text-2">
+          Standing goals. On their cadence the agent measures them, explains the gap and proposes missions;
+          writes still need approval.
+        </p>
         {canWrite && (
           <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
             New objective
@@ -213,7 +302,9 @@ export function ObjectivesPanel({ agent }: { agent: Agent }) {
       <QueryState query={q} what="Objectives" endpoint="GET /agents/{id}/objectives">
         {() =>
           (q.data ?? []).length === 0 ? (
-            <EmptyState icon="target" title="No objective yet">For example: critical findings triaged within 48 hours, or no dependency older than 90 days.</EmptyState>
+            <EmptyState icon="target" title="No objective yet">
+              For example: critical findings triaged within 48 hours, or no dependency older than 90 days.
+            </EmptyState>
           ) : (
             <ul className="m-0 list-none p-0">
               {(q.data ?? []).map((o, i) => (

@@ -14,10 +14,12 @@ export function describeCron(expr: string | undefined | null): string {
   }
   if (time && /^\d+$/.test(dom) && mon === '*' && dow === '*') {
     const d = Number(dom)
-    const suffix = d === 1 || d === 21 || d === 31 ? 'st' : d === 2 || d === 22 ? 'nd' : d === 3 || d === 23 ? 'rd' : 'th'
+    const suffix =
+      d === 1 || d === 21 || d === 31 ? 'st' : d === 2 || d === 22 ? 'nd' : d === 3 || d === 23 ? 'rd' : 'th'
     return `${d}${suffix} of every month, ${time}`
   }
-  if (m === '0' && /^\*\/\d+$/.test(h) && dom === '*' && mon === '*' && dow === '*') return `Every ${h.slice(2)} hours`
+  if (m === '0' && /^\*\/\d+$/.test(h) && dom === '*' && mon === '*' && dow === '*')
+    return `Every ${h.slice(2)} hours`
   if (m === '0' && h === '*' && dom === '*' && mon === '*' && dow === '*') return 'Every hour'
   return expr
 }

@@ -46,7 +46,11 @@ export class SseParser {
         this.event = ''
         return null
       }
-      const msg: SseMessage = { id: this.id ?? this.lastId, event: this.event || 'message', data: this.data.join('\n') }
+      const msg: SseMessage = {
+        id: this.id ?? this.lastId,
+        event: this.event || 'message',
+        data: this.data.join('\n'),
+      }
       this.data = []
       this.event = ''
       this.id = null
@@ -99,7 +103,8 @@ export interface StreamHandle {
 }
 
 export function openStream(opts: StreamOptions): StreamHandle {
-  const fetchImpl = opts.fetchImpl ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
+  const fetchImpl =
+    opts.fetchImpl ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
   const stallMs = opts.stallMs ?? 45_000
   const maxDelay = opts.maxDelayMs ?? 30_000
   let lastId: string | null = opts.lastEventId ?? null

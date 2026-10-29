@@ -18,7 +18,8 @@ export function Avatar({
 }) {
   const { effectiveTheme } = usePrefs()
   const text = (avatar?.initials ?? toInitials(name)).slice(0, 2)
-  const color = avatar?.color && isSafeColor(avatar.color) ? readable(avatar.color, effectiveTheme === 'day') : undefined
+  const color =
+    avatar?.color && isSafeColor(avatar.color) ? readable(avatar.color, effectiveTheme === 'day') : undefined
   return (
     <span
       aria-hidden="true"
@@ -38,7 +39,13 @@ export function Avatar({
 /** Keep the chosen color unless it would vanish on the theme background (WCAG contrast). */
 export function readable(hex: string, light: boolean): string | undefined {
   const h = hex.replace('#', '')
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6)
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h.slice(0, 6)
   const [r, g, b] = [0, 2, 4].map((i) => {
     const c = parseInt(full.slice(i, i + 2), 16) / 255
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
@@ -69,7 +76,8 @@ export function useAgentIndex(): AgentIndex {
       if (a.name) bySlug.set(a.name, a)
       bySlug.set(a.id, a)
     }
-    const get = (slug: string | null | undefined) => (slug ? bySlug.get(slug.replace(/^@/, '').split('@')[0] ?? slug) : undefined)
+    const get = (slug: string | null | undefined) =>
+      slug ? bySlug.get(slug.replace(/^@/, '').split('@')[0] ?? slug) : undefined
     return {
       bySlug,
       get,

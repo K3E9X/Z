@@ -14,7 +14,15 @@ export interface Kpi {
 }
 
 /** A row of hairline-separated cells (Mission control, Inference, Learning loop). */
-export function KpiStrip({ items, className = '', minWidth = 150 }: { items: Kpi[]; className?: string; minWidth?: number }) {
+export function KpiStrip({
+  items,
+  className = '',
+  minWidth = 150,
+}: {
+  items: Kpi[]
+  className?: string
+  minWidth?: number
+}) {
   return (
     <div
       role="list"
@@ -27,7 +35,10 @@ export function KpiStrip({ items, className = '', minWidth = 150 }: { items: Kpi
             <span className="text-meta text-text-2">{k.label}</span>
             <span className="flex flex-col gap-1">
               {k.unavailable ? (
-                <span className="text-[19px] leading-[1.3] text-text-3" title="Not available on this server yet">
+                <span
+                  className="text-[19px] leading-[1.3] text-text-3"
+                  title="Not available on this server yet"
+                >
                   —
                 </span>
               ) : (
@@ -36,7 +47,9 @@ export function KpiStrip({ items, className = '', minWidth = 150 }: { items: Kpi
                   {k.value}
                 </span>
               )}
-              <span className="text-meta text-text-3">{k.unavailable ? 'Not available on this server yet' : k.sub}</span>
+              <span className="text-meta text-text-3">
+                {k.unavailable ? 'Not available on this server yet' : k.sub}
+              </span>
             </span>
           </>
         )

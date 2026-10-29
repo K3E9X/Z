@@ -14,7 +14,10 @@ await page.keyboard.type('check whether it is actually exploitable, then open on
 await page.keyboard.press('Tab')
 await page.keyboard.type('ticket per owning team. Hand the triage to @vuln')
 await page.keyboard.press('Enter')
-await page.getByRole('button', { name: /matches playbook/ }).click().catch(() => undefined)
+await page
+  .getByRole('button', { name: /matches playbook/ })
+  .click()
+  .catch(() => undefined)
 await page.waitForTimeout(400)
 await page.getByRole('button', { name: /Draft the plan/ }).click()
 await page.waitForTimeout(800)

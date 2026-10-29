@@ -47,10 +47,16 @@ export function batchItems(action: ProposedAction): BatchItem[] {
     return {
       key,
       title,
-      detail: typeof it.description === 'string' ? it.description : typeof it.body === 'string' ? it.body : undefined,
+      detail:
+        typeof it.description === 'string'
+          ? it.description
+          : typeof it.body === 'string'
+            ? it.body
+            : undefined,
       meta: [it.team, it.owner, it.ref].filter((x) => typeof x === 'string').join(' · ') || undefined,
       tag: typeof it.priority === 'string' ? it.priority : undefined,
-      duplicateOf: typeof it.duplicate_of === 'string' ? it.duplicate_of : dup ? (dup.detail ?? 'a duplicate') : null,
+      duplicateOf:
+        typeof it.duplicate_of === 'string' ? it.duplicate_of : dup ? (dup.detail ?? 'a duplicate') : null,
     }
   })
 }
@@ -62,12 +68,24 @@ function verdict(a: ProposedAction): { text: string; tone: 'ok' | 'wait' | 'err'
   const failed = v.checks.filter((c) => !c.ok)
   const first = failed[0]
   return {
-    text: first ? `${first.name}${first.detail ? `: ${first.detail}` : ''}` : v.verdict === 'block' ? 'Blocked' : 'Warning',
+    text: first
+      ? `${first.name}${first.detail ? `: ${first.detail}` : ''}`
+      : v.verdict === 'block'
+        ? 'Blocked'
+        : 'Warning',
     tone: v.verdict === 'block' ? 'err' : 'wait',
   }
 }
 
-function RejectDialog({ open, onClose, onReject }: { open: boolean; onClose: () => void; onReject: (reason: string) => Promise<void> }) {
+function RejectDialog({
+  open,
+  onClose,
+  onReject,
+}: {
+  open: boolean
+  onClose: () => void
+  onReject: (reason: string) => Promise<void>
+}) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   return (
@@ -98,7 +116,9 @@ function RejectDialog({ open, onClose, onReject }: { open: boolean; onClose: () 
       }
     >
       <label className="flex flex-col gap-1.5">
-        <span className="text-meta text-text-2">Why? The agent gets the reason, and it becomes a learning signal.</span>
+        <span className="text-meta text-text-2">
+          Why? The agent gets the reason, and it becomes a learning signal.
+        </span>
         <Textarea
           rows={3}
           autoFocus
@@ -131,7 +151,9 @@ function EditDialog({
   const parsed = useMemo(() => {
     try {
       const v = JSON.parse(text) as unknown
-      return isObj(v) ? { ok: true as const, value: v } : { ok: false as const, error: 'The payload must be a JSON object.' }
+      return isObj(v)
+        ? { ok: true as const, value: v }
+        : { ok: false as const, error: 'The payload must be a JSON object.' }
     } catch (e) {
       return { ok: false as const, error: e instanceof Error ? e.message : 'Invalid JSON' }
     }
@@ -168,7 +190,8 @@ function EditDialog({
     >
       <div className="flex flex-col gap-3">
         <p className="m-0 text-meta text-text-2">
-          Editing supersedes this proposal with a new one that still needs approval. The difference is recorded as a learning signal.
+          Editing supersedes this proposal with a new one that still needs approval. The difference is
+          recorded as a learning signal.
         </p>
         <Textarea
           aria-label="Payload (JSON)"
@@ -221,10 +244,15 @@ export function ActionReview({
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const items = useMemo(() => batchItems(action), [action])
-  const [excluded, setExcluded] = useState<Set<string>>(() => new Set(items.filter((i) => i.duplicateOf).map((i) => i.key)))
+  const [excluded, setExcluded] = useState<Set<string>>(
+    () => new Set(items.filter((i) => i.duplicateOf).map((i) => i.key)),
+  )
   const pending = action.status === 'pending'
   const alreadyApproved = action.approvals.some((a) => a.by === me.user.username || a.by === me.user.id)
-  const fourEyesBlocked = !!action.four_eyes && !!mission && (mission.created_by === me.user.id || mission.created_by === me.user.username)
+  const fourEyesBlocked =
+    !!action.four_eyes &&
+    !!mission &&
+    (mission.created_by === me.user.id || mission.created_by === me.user.username)
   const disabledReason = !canApprove
     ? 'You need the actions:approve permission.'
     : alreadyApproved
@@ -236,7 +264,9 @@ export function ActionReview({
           : null
   const v = verdict(action)
   const count = items.length ? items.length - excluded.size : 1
-  const opShort = action.operation.startsWith(`${action.connector}.`) ? action.operation.slice(action.connector.length + 1) : action.operation
+  const opShort = action.operation.startsWith(`${action.connector}.`)
+    ? action.operation.slice(action.connector.length + 1)
+    : action.operation
 
   const approve = () => {
     if (disabledReason || busy) return
@@ -271,7 +301,12 @@ export function ActionReview({
         <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
           <div className="text-meta text-text-3">
             Mission “{mission?.title ?? action.mission_id}” ·{' '}
-            <Link to="/missions/$id" params={{ id: action.mission_id }} search={{ tab: 'reasoning' }} className="text-text-2 underline underline-offset-2">
+            <Link
+              to="/missions/$id"
+              params={{ id: action.mission_id }}
+              search={{ tab: 'reasoning' }}
+              className="text-text-2 underline underline-offset-2"
+            >
               see the reasoning
             </Link>
           </div>
@@ -284,10 +319,36 @@ export function ActionReview({
         <div className="flex max-w-[920px] flex-col gap-6 px-8 py-6">
           <dl className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line sm:grid-cols-4">
             {[
-              ['Runs as', <span key="r" className="font-mono text-[12.5px]">{action.runs_as.identity}</span>, action.runs_as.scope === 'user' ? 'your own account' : 'service account'],
-              ['Calls', <span key="c" className="font-mono text-[12.5px]">{opShort}{count > 1 ? ` × ${count}` : ''}</span>, action.connector],
-              ['Reversible', action.reversible ? 'Yes' : 'No, irreversible', action.class === 'destructive' ? 'destructive' : 'write'],
-              ['Judge', <span key="j" className={v.tone === 'ok' ? 'text-ok' : v.tone === 'err' ? 'text-err' : 'text-wait'}>{v.text}</span>, action.judge_verdict ? `${action.judge_verdict.checks.length} checks` : ''],
+              [
+                'Runs as',
+                <span key="r" className="font-mono text-[12.5px]">
+                  {action.runs_as.identity}
+                </span>,
+                action.runs_as.scope === 'user' ? 'your own account' : 'service account',
+              ],
+              [
+                'Calls',
+                <span key="c" className="font-mono text-[12.5px]">
+                  {opShort}
+                  {count > 1 ? ` × ${count}` : ''}
+                </span>,
+                action.connector,
+              ],
+              [
+                'Reversible',
+                action.reversible ? 'Yes' : 'No, irreversible',
+                action.class === 'destructive' ? 'destructive' : 'write',
+              ],
+              [
+                'Judge',
+                <span
+                  key="j"
+                  className={v.tone === 'ok' ? 'text-ok' : v.tone === 'err' ? 'text-err' : 'text-wait'}
+                >
+                  {v.text}
+                </span>,
+                action.judge_verdict ? `${action.judge_verdict.checks.length} checks` : '',
+              ],
             ].map(([k, val, sub], i) => (
               <div key={i} className="flex flex-col gap-1 bg-panel px-4 py-3.5">
                 <dt className="text-meta text-text-3">{k}</dt>
@@ -300,11 +361,15 @@ export function ActionReview({
           </dl>
 
           {action.class === 'destructive' && (
-            <div role="note" className="flex items-start gap-2.5 rounded-panel border border-err px-4 py-3 text-ui">
+            <div
+              role="note"
+              className="flex items-start gap-2.5 rounded-panel border border-err px-4 py-3 text-ui"
+            >
               <Icon name="ban" size={15} className="mt-[2px] text-err" />
               <span>
-                <span className="font-medium text-err">Destructive</span> · needs {action.required_approvals} different approvers ({action.approvals.length} of{' '}
-                {action.required_approvals} so far) and a fresh sign-in. It can only be approved in the Z app.
+                <span className="font-medium text-err">Destructive</span> · needs {action.required_approvals}{' '}
+                different approvers ({action.approvals.length} of {action.required_approvals} so far) and a
+                fresh sign-in. It can only be approved in the Z app.
               </span>
             </div>
           )}
@@ -326,7 +391,10 @@ export function ActionReview({
           )}
 
           {items.length > 0 ? (
-            <ul className="m-0 flex list-none flex-col border-t border-line p-0" aria-label="Items in this write">
+            <ul
+              className="m-0 flex list-none flex-col border-t border-line p-0"
+              aria-label="Items in this write"
+            >
               {items.map((it) => {
                 const off = excluded.has(it.key)
                 return (
@@ -348,10 +416,19 @@ export function ActionReview({
                     />
                     <div className="flex min-w-0 flex-col gap-1">
                       <div className="flex flex-wrap items-baseline gap-x-3">
-                        <span className={`font-medium ${off ? 'text-text-3 line-through' : ''}`}>{it.title}</span>
-                        {it.tag && !off && <span className={`text-meta ${priorityText(it.tag)}`}>{it.tag} priority</span>}
+                        <span className={`font-medium ${off ? 'text-text-3 line-through' : ''}`}>
+                          {it.title}
+                        </span>
+                        {it.tag && !off && (
+                          <span className={`text-meta ${priorityText(it.tag)}`}>{it.tag} priority</span>
+                        )}
                         {it.meta && !off && <span className="text-meta text-text-3">{it.meta}</span>}
-                        {it.duplicateOf && <span className="text-meta text-text-3">Duplicate of {it.duplicateOf}{off ? ', excluded by Z' : ''}</span>}
+                        {it.duplicateOf && (
+                          <span className="text-meta text-text-3">
+                            Duplicate of {it.duplicateOf}
+                            {off ? ', excluded by Z' : ''}
+                          </span>
+                        )}
                       </div>
                       {it.detail && !off && <p className="m-0 max-w-[620px] text-text-2">{it.detail}</p>}
                     </div>
@@ -365,7 +442,8 @@ export function ActionReview({
 
           {action.approvals.length > 0 && (
             <div className="text-meta text-text-2">
-              Approved by {action.approvals.map((a) => `${a.by}${a.step_up ? ' (re-authenticated)' : ''}`).join(', ')}
+              Approved by{' '}
+              {action.approvals.map((a) => `${a.by}${a.step_up ? ' (re-authenticated)' : ''}`).join(', ')}
             </div>
           )}
 
@@ -394,7 +472,10 @@ export function ActionReview({
         <span className="min-w-0 flex-1 text-meta text-text-2">
           {disabledReason ?? (
             <>
-              {items.length ? `${count} ${count === 1 ? 'item' : 'items'} will be written.` : previewSummary(action.preview)} Your decision also teaches the agent.
+              {items.length
+                ? `${count} ${count === 1 ? 'item' : 'items'} will be written.`
+                : previewSummary(action.preview)}{' '}
+              Your decision also teaches the agent.
             </>
           )}
         </span>
@@ -408,7 +489,13 @@ export function ActionReview({
             </Button>
           </>
         )}
-        <Button variant="primary" kbd={`${MOD}↵`} busy={busy} disabled={!!disabledReason || count === 0} onClick={approve}>
+        <Button
+          variant="primary"
+          kbd={`${MOD}↵`}
+          busy={busy}
+          disabled={!!disabledReason || count === 0}
+          onClick={approve}
+        >
           {action.class === 'destructive' ? 'Approve (step-up)' : 'Approve'}
         </Button>
       </div>

@@ -72,10 +72,33 @@ function useKpis(active: Mission[], finished: Mission[], now: number): Kpi[] {
     },
     {
       label: 'inferX',
-      value: h ? (h.status === 'healthy' ? 'Healthy' : h.status === 'degraded' ? 'Degraded' : h.status === 'down' ? 'Down' : 'Unknown') : '…',
-      tone: h ? (h.status === 'healthy' ? 'ok' : h.status === 'down' ? 'err' : h.status === 'degraded' ? 'wait' : 'idle') : undefined,
+      value: h
+        ? h.status === 'healthy'
+          ? 'Healthy'
+          : h.status === 'degraded'
+            ? 'Degraded'
+            : h.status === 'down'
+              ? 'Down'
+              : 'Unknown'
+        : '…',
+      tone: h
+        ? h.status === 'healthy'
+          ? 'ok'
+          : h.status === 'down'
+            ? 'err'
+            : h.status === 'degraded'
+              ? 'wait'
+              : 'idle'
+        : undefined,
       unavailable: isNotServed(health.error),
-      sub: h ? [fast?.ttft_p95_ms ? `p95 ${ms(fast.ttft_p95_ms)}` : null, tps ? `${compactNumber(tps)} tok/s` : null].filter(Boolean).join(' · ') || (h.gateway.ok ? 'Gateway reachable' : 'Gateway unreachable') : '',
+      sub: h
+        ? [
+            fast?.ttft_p95_ms ? `p95 ${ms(fast.ttft_p95_ms)}` : null,
+            tps ? `${compactNumber(tps)} tok/s` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || (h.gateway.ok ? 'Gateway reachable' : 'Gateway unreachable')
+        : '',
       to: '/inference',
     },
     {
@@ -87,10 +110,10 @@ function useKpis(active: Mission[], finished: Mission[], now: number): Kpi[] {
         : pending
           ? `${pending} waiting for exposure review`
           : expiring
-          ? `${plural(expiring, 'token')} expiring`
-          : degraded
-            ? `${degraded} degraded`
-            : 'All healthy',
+            ? `${plural(expiring, 'token')} expiring`
+            : degraded
+              ? `${degraded} degraded`
+              : 'All healthy',
       to: '/connectors',
     },
     {
@@ -136,7 +159,8 @@ function AgentRows({
           const st = missionStatus(m.status)
           const p = progress(m)
           const isSel = m.id === selected
-          const line = isSel && liveNow && m.status === 'running' ? { text: liveNow, tone: 'mono' as const } : nowLine(m)
+          const line =
+            isSel && liveNow && m.status === 'running' ? { text: liveNow, tone: 'mono' as const } : nowLine(m)
           return (
             <div
               key={m.id}
@@ -168,7 +192,12 @@ function AgentRows({
                 {line.text}
               </span>
               <span role="cell" className="flex items-center gap-2">
-                <ProgressBar value={p.done} max={p.total || 1} className="flex-1" label={`${p.done} of ${p.total}`} />
+                <ProgressBar
+                  value={p.done}
+                  max={p.total || 1}
+                  className="flex-1"
+                  label={`${p.done} of ${p.total}`}
+                />
                 <span className="font-mono text-xs text-text-2">
                   {p.done}/{p.total}
                 </span>
@@ -200,7 +229,15 @@ function AgentRows({
   )
 }
 
-function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: AgentIndex; onLiveNow?: (t: string | null) => void }) {
+function Preview({
+  mission,
+  agents,
+  onLiveNow,
+}: {
+  mission: Mission
+  agents: AgentIndex
+  onLiveNow?: (t: string | null) => void
+}) {
   const { timeline } = useMissionTimeline(mission.id)
   const qc = useQueryClient()
   const toast = useToast()
@@ -222,7 +259,11 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
         const lines = (it.term.output_tail ?? it.term.command).trim().split('\n').slice(-2)
         for (const l of lines.reverse()) out.push(it.term.exit_code ? { text: l, tone: 'err' } : { text: l })
       } else if (it.kind === 'tool' && it.result) {
-        out.push(it.result.ok ? { text: `${it.call.operation ?? it.call.tool}  ${it.result.summary}` } : { text: `${it.call.operation ?? it.call.tool}  ${it.result.summary}`, tone: 'err' })
+        out.push(
+          it.result.ok
+            ? { text: `${it.call.operation ?? it.call.tool}  ${it.result.summary}` }
+            : { text: `${it.call.operation ?? it.call.tool}  ${it.result.summary}`, tone: 'err' },
+        )
       } else if (it.kind === 'denied') {
         out.push({ text: `blocked  ${it.denied.what}`, tone: 'err' })
       }
@@ -233,7 +274,8 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
   const control = async (op: 'pause' | 'resume') => {
     setBusy(true)
     try {
-      if (op === 'pause') await unwrap(api.POST('/missions/{id}/pause', { params: { path: { id: mission.id } }, body: {} }))
+      if (op === 'pause')
+        await unwrap(api.POST('/missions/{id}/pause', { params: { path: { id: mission.id } }, body: {} }))
       else await unwrap(api.POST('/missions/{id}/resume', { params: { path: { id: mission.id } }, body: {} }))
       await qc.invalidateQueries({ queryKey: ['missions'] })
       toast.ok(op === 'pause' ? 'Paused after the current step' : 'Resumed')
@@ -245,10 +287,18 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
   }
 
   return (
-    <aside aria-label="Selected agent preview" className="flex min-w-0 flex-[1_1_320px] flex-col rounded-panel border border-line bg-panel">
+    <aside
+      aria-label="Selected agent preview"
+      className="flex min-w-0 flex-[1_1_320px] flex-col rounded-panel border border-line bg-panel"
+    >
       <div className="flex flex-col gap-1 border-b border-line px-[18px] py-4">
-        <div className={`flex items-center gap-2 text-sm ${st.tone === 'run' ? 'text-run' : st.tone === 'wait' ? 'text-wait' : 'text-text-3'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${st.tone === 'run' ? 'animate-zpulse bg-run' : st.tone === 'wait' ? 'bg-wait' : 'bg-text-3'}`} aria-hidden="true" />
+        <div
+          className={`flex items-center gap-2 text-sm ${st.tone === 'run' ? 'text-run' : st.tone === 'wait' ? 'text-wait' : 'text-text-3'}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${st.tone === 'run' ? 'animate-zpulse bg-run' : st.tone === 'wait' ? 'bg-wait' : 'bg-text-3'}`}
+            aria-hidden="true"
+          />
           {st.tone === 'run' ? 'Live' : st.label} · {agents.label(agent)}
         </div>
         <div className="text-[14.5px] font-medium">{mission.title}</div>
@@ -256,10 +306,15 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
       {steps.length > 0 ? (
         <PlanChecklist steps={steps} inputs={mission.inputs} className="px-[18px] py-3.5" />
       ) : (
-        <div className="px-[18px] py-3.5 text-meta text-text-3">The plan appears once the orchestrator drafts it.</div>
+        <div className="px-[18px] py-3.5 text-meta text-text-3">
+          The plan appears once the orchestrator drafts it.
+        </div>
       )}
       {tail.length > 0 && (
-        <pre aria-label="Recent output" className="mx-[18px] overflow-hidden rounded-btn border border-line bg-code px-3.5 py-3 font-mono text-xs leading-[1.7] text-text-2">
+        <pre
+          aria-label="Recent output"
+          className="mx-[18px] overflow-hidden rounded-btn border border-line bg-code px-3.5 py-3 font-mono text-xs leading-[1.7] text-text-2"
+        >
           {tail.map((l, i) => (
             <div key={i} title={l.text} className={`truncate ${l.tone === 'err' ? 'text-err' : ''}`}>
               {l.text}
@@ -305,14 +360,22 @@ export function MissionControl() {
   const activeList = useMemo(() => {
     const items = [...(active.data?.items ?? [])]
     // Recent activity first: waiting for you, then running by start time.
-    const rank = (m: Mission) => (m.status === 'waiting' ? 0 : m.status === 'running' ? 1 : m.status === 'paused' ? 2 : 3)
-    return items.sort((a, b) => rank(a) - rank(b) || Date.parse(b.started_at ?? b.created_at) - Date.parse(a.started_at ?? a.created_at))
+    const rank = (m: Mission) =>
+      m.status === 'waiting' ? 0 : m.status === 'running' ? 1 : m.status === 'paused' ? 2 : 3
+    return items.sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        Date.parse(b.started_at ?? b.created_at) - Date.parse(a.started_at ?? a.created_at),
+    )
   }, [active.data])
   const finishedList = useMemo(() => finished.data?.items ?? [], [finished.data])
   const minute = useNow(60_000)
   const kpis = useKpis(activeList, finishedList, minute)
 
-  const selectedId = search.selected && activeList.some((m) => m.id === search.selected) ? search.selected : (activeList[0]?.id ?? null)
+  const selectedId =
+    search.selected && activeList.some((m) => m.id === search.selected)
+      ? search.selected
+      : (activeList[0]?.id ?? null)
   const selected = activeList.find((m) => m.id === selectedId) ?? null
   const busyAgents = new Set(activeList.flatMap((m) => missionAgents(m)))
   const idle = (agentList.data?.items ?? [])
@@ -346,7 +409,9 @@ export function MissionControl() {
   const working = activeList.filter((m) => m.status === 'running' || m.status === 'waiting').length
   const waiting = counts?.all ?? 0
   const lead = `${countWord(working)} ${working === 1 ? 'mission is' : 'missions are'} running. ${
-    waiting === 0 ? 'Nothing is waiting for you.' : `${countWord(waiting)} ${waiting === 1 ? 'decision is' : 'decisions are'} waiting for you.`
+    waiting === 0
+      ? 'Nothing is waiting for you.'
+      : `${countWord(waiting)} ${waiting === 1 ? 'decision is' : 'decisions are'} waiting for you.`
   }`
 
   return (
@@ -380,9 +445,13 @@ export function MissionControl() {
                 <Skeleton className="h-10" />
               </div>
             ) : decisions.length === 0 ? (
-              <EmptyState title="No decision waiting">Writes and questions from agents land here first.</EmptyState>
+              <EmptyState title="No decision waiting">
+                Writes and questions from agents land here first.
+              </EmptyState>
             ) : (
-              decisions.slice(0, 4).map((it) => <DecisionRow key={reviewItemId(it)} item={it} agents={agents} />)
+              decisions
+                .slice(0, 4)
+                .map((it) => <DecisionRow key={reviewItemId(it)} item={it} agents={agents} />)
             )}
             {decisions.length > 4 && (
               <Link to="/review" className="block py-3 text-meta text-text-3 no-underline hover:text-text">
@@ -415,7 +484,11 @@ export function MissionControl() {
                   </Link>
                 }
               >
-                {idle.length > 0 && `${plural(idle.length, 'agent')} available: ${idle.slice(0, 6).map((s) => agents.label(s)).join(', ')}.`}
+                {idle.length > 0 &&
+                  `${plural(idle.length, 'agent')} available: ${idle
+                    .slice(0, 6)
+                    .map((s) => agents.label(s))
+                    .join(', ')}.`}
               </EmptyState>
             ) : (
               <AgentRows
@@ -428,7 +501,9 @@ export function MissionControl() {
               />
             )}
           </section>
-          {selected && <Preview key={selected.id} mission={selected} agents={agents} onLiveNow={setLiveNow} />}
+          {selected && (
+            <Preview key={selected.id} mission={selected} agents={agents} onLiveNow={setLiveNow} />
+          )}
         </div>
 
         <section aria-labelledby="done" className="flex flex-col">
@@ -440,16 +515,23 @@ export function MissionControl() {
               <ErrorState error={finished.error} className="mt-3" />
             )
           ) : today.length === 0 ? (
-            <div className="py-3.5 text-ui text-text-3">{finished.isPending ? ' ' : 'Nothing finished yet today.'}</div>
+            <div className="py-3.5 text-ui text-text-3">
+              {finished.isPending ? ' ' : 'Nothing finished yet today.'}
+            </div>
           ) : (
             <ul className="m-0 flex list-none flex-wrap gap-x-7 gap-y-2 p-0 py-3.5 text-ui text-text-2">
               {today.map((m) => {
                 const st = missionStatus(m.status)
                 return (
                   <li key={m.id}>
-                    <Link to="/missions/$id" params={{ id: m.id }} className="flex items-center gap-2 text-text-2 no-underline hover:text-text">
+                    <Link
+                      to="/missions/$id"
+                      params={{ id: m.id }}
+                      className="flex items-center gap-2 text-text-2 no-underline hover:text-text"
+                    >
                       <StatusMark tone={st.tone} label={st.label} size={13} />
-                      {m.title} · {m.status === 'succeeded' ? agents.label(missionAgent(m)) : st.label.toLowerCase()}
+                      {m.title} ·{' '}
+                      {m.status === 'succeeded' ? agents.label(missionAgent(m)) : st.label.toLowerCase()}
                     </Link>
                   </li>
                 )

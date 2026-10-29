@@ -42,10 +42,19 @@ describe('openStream', () => {
     const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
       const h = new Headers(init?.headers)
       calls.push(h.get('Last-Event-ID'))
-      if (calls.length === 1) return Promise.resolve(sseResponse(['id: 41\nevent: status\ndata: {}\n\n', 'id: 42\nevent: usage\ndata: {}\n\n']))
+      if (calls.length === 1)
+        return Promise.resolve(
+          sseResponse(['id: 41\nevent: status\ndata: {}\n\n', 'id: 42\nevent: usage\ndata: {}\n\n']),
+        )
       return Promise.resolve(sseResponse(['id: 43\nevent: plan\ndata: {}\n\n'], false))
     })
-    const h = openStream({ path: '/missions/m/events', fetchImpl: fetchImpl as unknown as typeof fetch, onMessage: (m) => seen.push(m.id ?? ''), onState: (s) => states.push(s), maxDelayMs: 5 })
+    const h = openStream({
+      path: '/missions/m/events',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onMessage: (m) => seen.push(m.id ?? ''),
+      onState: (s) => states.push(s),
+      maxDelayMs: 5,
+    })
     await vi.waitFor(() => {
       expect(seen).toEqual(['41', '42', '43'])
     })
@@ -57,8 +66,25 @@ describe('openStream', () => {
 
   it('stops with "unavailable" when the route is not served (404 Not Found)', async () => {
     const states: StreamState[] = []
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ type: 'urn:z:problem:not-found', title: 'Not found', status: 404, detail: 'Not Found' }), { status: 404 })))
-    openStream({ path: '/stream', fetchImpl: fetchImpl as unknown as typeof fetch, onMessage: () => undefined, onState: (s) => states.push(s) })
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            type: 'urn:z:problem:not-found',
+            title: 'Not found',
+            status: 404,
+            detail: 'Not Found',
+          }),
+          { status: 404 },
+        ),
+      ),
+    )
+    openStream({
+      path: '/stream',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onMessage: () => undefined,
+      onState: (s) => states.push(s),
+    })
     await vi.waitFor(() => {
       expect(states.at(-1)).toBe('unavailable')
     })
@@ -69,8 +95,20 @@ describe('openStream', () => {
     const errors: number[] = []
     const off = onApiError((e) => errors.push(e.status))
     const states: StreamState[] = []
-    const fetchImpl = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }), { status: 401 })))
-    openStream({ path: '/missions/m/events', fetchImpl: fetchImpl as unknown as typeof fetch, onMessage: () => undefined, onState: (s) => states.push(s) })
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }),
+          { status: 401 },
+        ),
+      ),
+    )
+    openStream({
+      path: '/missions/m/events',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onMessage: () => undefined,
+      onState: (s) => states.push(s),
+    })
     await vi.waitFor(() => {
       expect(states.at(-1)).toBe('closed')
     })

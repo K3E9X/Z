@@ -12,9 +12,14 @@ const full = process.env.FULL !== '0'
 const out = process.env.OUT ?? 'e2e/out'
 mkdirSync(out, { recursive: true })
 
-const browser = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome' })
+const browser = await chromium.launch({
+  executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome',
+})
 for (const theme of themes) {
-  const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme === 'day' ? 'light' : 'dark' })
+  const ctx = await browser.newContext({
+    viewport: { width, height },
+    colorScheme: theme === 'day' ? 'light' : 'dark',
+  })
   await ctx.addInitScript((t) => {
     localStorage.setItem('z.pref.theme', t)
     localStorage.setItem('z.pref.followSystem', 'false')

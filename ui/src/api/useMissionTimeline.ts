@@ -36,7 +36,17 @@ export function useMissionTimeline(missionId: string | null, opts: { enabled?: b
     buffer.current = []
     if (events.length) dispatch({ type: 'events', events })
     // Status, approvals and questions change server-side aggregates: refresh them.
-    if (events.some((e) => e.type === 'status' || e.type === 'action_proposed' || e.type === 'question' || e.type === 'action_status' || e.type === 'question_answered' || e.type === 'plan')) {
+    if (
+      events.some(
+        (e) =>
+          e.type === 'status' ||
+          e.type === 'action_proposed' ||
+          e.type === 'question' ||
+          e.type === 'action_status' ||
+          e.type === 'question_answered' ||
+          e.type === 'plan',
+      )
+    ) {
       if (missionId) void qc.invalidateQueries({ queryKey: qk.mission(missionId) })
       void qc.invalidateQueries({ queryKey: qk.reviewAll })
     }
@@ -60,7 +70,8 @@ export function useMissionTimeline(missionId: string | null, opts: { enabled?: b
 
   useEffect(
     () => () => {
-      if (frame.current !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame.current)
+      if (frame.current !== null && typeof cancelAnimationFrame === 'function')
+        cancelAnimationFrame(frame.current)
     },
     [],
   )

@@ -55,13 +55,20 @@ for (const [path, heading] of SCREENS) {
 }
 
 // A mission and its replay, when the server has one.
-const missions = await page.evaluate(async () => (await fetch('/api/v1/missions?limit=1', { credentials: 'same-origin' })).json())
+const missions = await page.evaluate(async () =>
+  (await fetch('/api/v1/missions?limit=1', { credentials: 'same-origin' })).json(),
+)
 const m = missions.items?.[0]
 if (m) {
   for (const p of [`/missions/${m.id}`, `/missions/${m.id}/replay`]) {
     problems.length = 0
     await page.goto(base + p, { waitUntil: 'load' })
-    const ok = await page.getByRole('heading', { name: m.title }).first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+    const ok = await page
+      .getByRole('heading', { name: m.title })
+      .first()
+      .waitFor({ timeout: 8000 })
+      .then(() => true)
+      .catch(() => false)
     check(ok && problems.length === 0, p, problems.join(' | ').slice(0, 300))
   }
 }
@@ -75,7 +82,11 @@ check(await palette.isVisible(), 'Ctrl K opens the palette')
 await page.keyboard.type('settings')
 await page.waitForTimeout(200)
 const options = await palette.getByRole('option').allTextContents()
-check(options.some((o) => /Settings/.test(o)) && options.every((o) => /settings|New mission/i.test(o)), 'palette filters by words', options.join(', ').slice(0, 200))
+check(
+  options.some((o) => /Settings/.test(o)) && options.every((o) => /settings|New mission/i.test(o)),
+  'palette filters by words',
+  options.join(', ').slice(0, 200),
+)
 await page.keyboard.press('Escape')
 await page.keyboard.press('Shift+?')
 check(await page.getByRole('dialog', { name: /Keyboard shortcuts/ }).isVisible(), '? opens the shortcuts')

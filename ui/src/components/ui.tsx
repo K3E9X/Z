@@ -89,7 +89,13 @@ export function Spinner({ size = 14, label }: { size?: number; label?: string })
     <span role={label ? 'status' : undefined} className="inline-flex items-center">
       <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" className="animate-zspin">
         <circle cx="8" cy="8" r="6" fill="none" stroke="var(--line-2)" strokeWidth="2" />
-        <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path
+          d="M8 2a6 6 0 0 1 6 6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
       </svg>
       {label && <span className="sr-only">{label}</span>}
     </span>
@@ -124,7 +130,9 @@ export function Chip({
             ? 'bg-run-bg text-run'
             : 'bg-raised text-text-2'
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] px-2 text-sm ${t} ${className}`}>{children}</span>
+    <span className={`inline-flex h-6 items-center gap-1.5 rounded-[6px] px-2 text-sm ${t} ${className}`}>
+      {children}
+    </span>
   )
 }
 
@@ -302,7 +310,13 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className = '', ...rest }, ref) {
-    return <textarea ref={ref} className={`py-2 leading-[1.5] ${width(className)} ${FIELD} ${className}`} {...rest} />
+    return (
+      <textarea
+        ref={ref}
+        className={`py-2 leading-[1.5] ${width(className)} ${FIELD} ${className}`}
+        {...rest}
+      />
+    )
   },
 )
 

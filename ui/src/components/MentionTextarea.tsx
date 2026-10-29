@@ -17,7 +17,10 @@ export interface MentionHandle {
 }
 
 /** Token being typed right before the caret: "@ve" → {trigger:'@', query:'ve', start}. */
-export function activeToken(text: string, caret: number): { trigger: '@' | '#'; query: string; start: number } | null {
+export function activeToken(
+  text: string,
+  caret: number,
+): { trigger: '@' | '#'; query: string; start: number } | null {
   const before = text.slice(0, caret)
   const m = /(^|\s)([@#])([\p{L}\p{N}._-]*)$/u.exec(before)
   if (!m) return null
@@ -34,7 +37,9 @@ export function parseMentions(text: string, options: MentionOption[]): MentionOp
     const trigger = m[2] as '@' | '#'
     const word = (m[3] ?? '').toLowerCase().replace(/[.,;:]+$/, '')
     const opt = options.find(
-      (o) => o.trigger === trigger && (o.insert.toLowerCase() === word || o.label.toLowerCase().replace(/\s+/g, '-') === word),
+      (o) =>
+        o.trigger === trigger &&
+        (o.insert.toLowerCase() === word || o.label.toLowerCase().replace(/\s+/g, '-') === word),
     )
     if (opt && !found.includes(opt)) found.push(opt)
   }
@@ -57,7 +62,10 @@ export const MentionTextarea = forwardRef<
     onSubmit?: () => void
     className?: string
   }
->(function MentionTextarea({ value, onChange, options, placeholder, label, rows = 4, onSubmit, className = '' }, ref) {
+>(function MentionTextarea(
+  { value, onChange, options, placeholder, label, rows = 4, onSubmit, className = '' },
+  ref,
+) {
   const ta = useRef<HTMLTextAreaElement>(null)
   const listId = useId()
   const [caret, setCaret] = useState(0)
@@ -68,7 +76,11 @@ export const MentionTextarea = forwardRef<
     if (!token) return []
     const q = token.query.toLowerCase()
     return options
-      .filter((o) => o.trigger === token.trigger && (o.insert.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)))
+      .filter(
+        (o) =>
+          o.trigger === token.trigger &&
+          (o.insert.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)),
+      )
       .slice(0, 8)
   }, [token, options])
   const open = !!token && matches.length > 0 && dismissed !== token.start

@@ -22,7 +22,11 @@ await ctx.addInitScript((t) => {
 const page = await ctx.newPage()
 const problems = []
 page.on('console', (m) => {
-  if (m.type() === 'error' && !/Failed to load resource: the server responded with a status of 40[45]/.test(m.text())) problems.push(m.text())
+  if (
+    m.type() === 'error' &&
+    !/Failed to load resource: the server responded with a status of 40[45]/.test(m.text())
+  )
+    problems.push(m.text())
 })
 page.on('pageerror', (e) => problems.push(String(e)))
 const shot = async (name, full = false) => {
@@ -77,9 +81,16 @@ switch (flow) {
     console.log('approved', title)
     await page.keyboard.press('x')
     await page.waitForTimeout(300)
-    await page.getByRole('dialog').getByRole('textbox').first().fill('Duplicate of an existing SECOPS ticket.')
+    await page
+      .getByRole('dialog')
+      .getByRole('textbox')
+      .first()
+      .fill('Duplicate of an existing SECOPS ticket.')
     await shot('review-reject-dialog')
-    await page.getByRole('dialog').getByRole('button', { name: /^Reject/ }).click()
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^Reject/ })
+      .click()
     await page.waitForTimeout(1500)
     await shot('review-after-reject')
     break
@@ -91,7 +102,10 @@ switch (flow) {
     for (let i = 0; i < n; i++) await boxes.nth(i).check()
     await page.waitForTimeout(400)
     await shot('review-batch-selected')
-    await page.getByRole('button', { name: /^Approve \d+/ }).first().click()
+    await page
+      .getByRole('button', { name: /^Approve \d+/ })
+      .first()
+      .click()
     await page.waitForTimeout(600)
     await shot('review-batch-confirm')
     const confirm = page.getByRole('dialog').getByRole('button', { name: /^Approve/ })
@@ -115,7 +129,10 @@ switch (flow) {
     await shot('atlas-mention')
     await page.keyboard.press('Enter')
     await page.waitForTimeout(300)
-    console.log('composer text:', await page.getByRole('combobox', { name: 'What should Z do?' }).inputValue())
+    console.log(
+      'composer text:',
+      await page.getByRole('combobox', { name: 'What should Z do?' }).inputValue(),
+    )
     break
   }
   case 'signin': {
@@ -124,17 +141,36 @@ switch (flow) {
       r.fulfill({
         status: 401,
         contentType: 'application/problem+json',
-        body: JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }),
+        body: JSON.stringify({
+          type: 'urn:z:problem:unauthenticated',
+          title: 'Sign-in required',
+          status: 401,
+        }),
       }),
     )
     await go('/review')
     await shot('signin')
-    console.log('sign-in link:', await page.getByRole('link', { name: /GitLab/ }).first().getAttribute('href').catch(() => null))
+    console.log(
+      'sign-in link:',
+      await page
+        .getByRole('link', { name: /GitLab/ })
+        .first()
+        .getAttribute('href')
+        .catch(() => null),
+    )
     break
   }
   case 'noaccess': {
     await page.route('**/api/v1/me', (r) =>
-      r.fulfill({ status: 401, contentType: 'application/problem+json', body: JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }) }),
+      r.fulfill({
+        status: 401,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({
+          type: 'urn:z:problem:unauthenticated',
+          title: 'Sign-in required',
+          status: 401,
+        }),
+      }),
     )
     await go('/signin?error=not_in_allowed_group')
     await shot('noaccess')
@@ -149,11 +185,19 @@ switch (flow) {
       return r.fulfill({
         status: 403,
         contentType: 'application/problem+json',
-        body: JSON.stringify({ type: 'urn:z:problem:step-up-required', title: 'Step-up required', status: 403, detail: 'Re-authenticate to continue.' }),
+        body: JSON.stringify({
+          type: 'urn:z:problem:step-up-required',
+          title: 'Step-up required',
+          status: 403,
+          detail: 'Re-authenticate to continue.',
+        }),
       })
     })
     await go('/admin?tab=audit')
-    await page.getByRole('button', { name: /Verify/ }).first().click()
+    await page
+      .getByRole('button', { name: /Verify/ })
+      .first()
+      .click()
     await page.waitForTimeout(500)
     await shot('stepup')
     break

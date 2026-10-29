@@ -57,7 +57,11 @@ function label(key: string, s: JsonSchema): string {
 }
 
 /** Errors keyed by path ("product", "limits.max"). Empty object = valid. */
-export function validate(schema: JsonSchema | undefined, value: FormValue, prefix = ''): Record<string, string> {
+export function validate(
+  schema: JsonSchema | undefined,
+  value: FormValue,
+  prefix = '',
+): Record<string, string> {
   const errors: Record<string, string> = {}
   const req = new Set(schema?.required ?? [])
   for (const [k, p] of Object.entries(schema?.properties ?? {})) {
@@ -70,9 +74,12 @@ export function validate(schema: JsonSchema | undefined, value: FormValue, prefi
     }
     const t = typeOf(p)
     if (t === 'string' && typeof v === 'string') {
-      if (p.minLength !== undefined && v.length < p.minLength) errors[path] = `At least ${p.minLength} characters`
-      else if (p.maxLength !== undefined && v.length > p.maxLength) errors[path] = `At most ${p.maxLength} characters`
-      else if (p.pattern && !new RegExp(p.pattern).test(v)) errors[path] = 'Does not match the expected format'
+      if (p.minLength !== undefined && v.length < p.minLength)
+        errors[path] = `At least ${p.minLength} characters`
+      else if (p.maxLength !== undefined && v.length > p.maxLength)
+        errors[path] = `At most ${p.maxLength} characters`
+      else if (p.pattern && !new RegExp(p.pattern).test(v))
+        errors[path] = 'Does not match the expected format'
       else if (p.enum && !p.enum.includes(v)) errors[path] = 'Pick one of the options'
     }
     if (t === 'number' || t === 'integer') {
@@ -82,8 +89,10 @@ export function validate(schema: JsonSchema | undefined, value: FormValue, prefi
       else if (p.minimum !== undefined && n < p.minimum) errors[path] = `At least ${p.minimum}`
       else if (p.maximum !== undefined && n > p.maximum) errors[path] = `At most ${p.maximum}`
     }
-    if (t === 'array' && Array.isArray(v) && p.minItems !== undefined && v.length < p.minItems) errors[path] = `At least ${p.minItems}`
-    if (t === 'object' && p.properties && typeof v === 'object' && !Array.isArray(v)) Object.assign(errors, validate(p, v as FormValue, path))
+    if (t === 'array' && Array.isArray(v) && p.minItems !== undefined && v.length < p.minItems)
+      errors[path] = `At least ${p.minItems}`
+    if (t === 'object' && p.properties && typeof v === 'object' && !Array.isArray(v))
+      Object.assign(errors, validate(p, v as FormValue, path))
   }
   return errors
 }
@@ -111,14 +120,21 @@ function FieldFor({
   const t = typeOf(schema)
   const descId = `${id}-d`
   const errId = `${id}-e`
-  const describedBy = [schema.description ? descId : null, error ? errId : null].filter(Boolean).join(' ') || undefined
+  const describedBy =
+    [schema.description ? descId : null, error ? errId : null].filter(Boolean).join(' ') || undefined
   const common = { id, 'aria-describedby': describedBy, 'aria-invalid': error ? true : undefined, required }
 
   if (t === 'object' && schema.properties) {
     return (
       <fieldset className="m-0 flex flex-col gap-3 rounded-panel border border-line p-4">
         <legend className="px-1 text-meta text-text-2">{label(name, schema)}</legend>
-        <SchemaFields schema={schema} value={(value as FormValue | undefined) ?? {}} onChange={onChange} errors={errors} prefix={path} />
+        <SchemaFields
+          schema={schema}
+          value={(value as FormValue | undefined) ?? {}}
+          onChange={onChange}
+          errors={errors}
+          prefix={path}
+        />
       </fieldset>
     )
   }
@@ -171,7 +187,14 @@ function FieldFor({
       />
     )
   } else if (t === 'array') {
-    control = <ArrayInput common={common} value={value} itemType={schema.items ? typeOf(schema.items) : 'string'} onChange={onChange} />
+    control = (
+      <ArrayInput
+        common={common}
+        value={value}
+        itemType={schema.items ? typeOf(schema.items) : 'string'}
+        onChange={onChange}
+      />
+    )
   } else if ((schema.maxLength ?? 0) > 200) {
     control = (
       <Textarea
@@ -187,7 +210,15 @@ function FieldFor({
     control = (
       <Input
         {...common}
-        type={schema.format === 'date' ? 'date' : schema.format === 'date-time' ? 'datetime-local' : schema.format === 'uri' ? 'url' : 'text'}
+        type={
+          schema.format === 'date'
+            ? 'date'
+            : schema.format === 'date-time'
+              ? 'datetime-local'
+              : schema.format === 'uri'
+                ? 'url'
+                : 'text'
+        }
         value={str(value)}
         onChange={(e) => {
           onChange(e.target.value)
@@ -229,7 +260,9 @@ function ArrayInput({
   itemType: string
   onChange: (v: unknown) => void
 }) {
-  const [text, setText] = useState(() => (Array.isArray(value) ? (value as unknown[]).map(str).join(', ') : ''))
+  const [text, setText] = useState(() =>
+    Array.isArray(value) ? (value as unknown[]).map(str).join(', ') : '',
+  )
   return (
     <Input
       {...common}

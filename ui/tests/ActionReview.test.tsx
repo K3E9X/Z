@@ -8,7 +8,11 @@ import { ActionReview, batchItems } from '@/components/ActionReview'
 import type { AgentIndex } from '@/components/Avatar'
 import { makeMe, renderRouted } from './utils'
 
-const agents: AgentIndex = { bySlug: new Map(), get: () => undefined, label: (s) => (s === 'ticket-manager' ? 'Ticket Manager' : (s ?? '')) }
+const agents: AgentIndex = {
+  bySlug: new Map(),
+  get: () => undefined,
+  label: (s) => (s === 'ticket-manager' ? 'Ticket Manager' : (s ?? '')),
+}
 
 function action(patch: Partial<ProposedAction> = {}): ProposedAction {
   return {
@@ -21,7 +25,15 @@ function action(patch: Partial<ProposedAction> = {}): ProposedAction {
     class: 'write',
     summary: 'Create SECOPS ticket: weak TLS on the monitoring portal',
     payload: { project: 'SECOPS', summary: 'Weak TLS', description: 'TLS 1.0 still accepted' },
-    preview: { kind: 'issue', tracker: 'jira', project: 'SECOPS', title: 'Weak TLS on the monitoring portal', description: 'TLS 1.0 and 1.1 are still accepted.', priority: 'Low', labels: ['security'] },
+    preview: {
+      kind: 'issue',
+      tracker: 'jira',
+      project: 'SECOPS',
+      title: 'Weak TLS on the monitoring portal',
+      description: 'TLS 1.0 and 1.1 are still accepted.',
+      priority: 'Low',
+      labels: ['security'],
+    },
     reversible: true,
     judge_verdict: { verdict: 'ok', checks: [{ name: 'injection', ok: true }] },
     runs_as: { scope: 'service', identity: 'svc-z-jira-rw' },
@@ -44,7 +56,13 @@ const server = setupServer(
     calls.push({ url: `reject:${String(params.id)}`, body: await request.json() })
     return HttpResponse.json({ ...action(), status: 'rejected' })
   }),
-  http.get('*/api/v1/*', () => HttpResponse.json({ items: [], counts: { all: 0, writes: 0, questions: 0, suggestions: 0 }, next_cursor: null })),
+  http.get('*/api/v1/*', () =>
+    HttpResponse.json({
+      items: [],
+      counts: { all: 0, writes: 0, questions: 0, suggestions: 0 },
+      next_cursor: null,
+    }),
+  ),
 )
 beforeAll(() => {
   server.listen()
@@ -99,7 +117,15 @@ describe('ActionReview', () => {
   it('pre-excludes batch items the judge marked as duplicates', async () => {
     const user = userEvent.setup()
     const a = action({
-      preview: { kind: 'json', data: { items: [{ key: 't1', title: 'Exposed dependency' }, { key: 't2', title: 'Weak TLS', duplicate_of: 'SECOPS-1790' }] } },
+      preview: {
+        kind: 'json',
+        data: {
+          items: [
+            { key: 't1', title: 'Exposed dependency' },
+            { key: 't2', title: 'Weak TLS', duplicate_of: 'SECOPS-1790' },
+          ],
+        },
+      },
       summary: 'Create 2 tickets',
     })
     expect(batchItems(a).map((i) => [i.key, i.duplicateOf])).toEqual([
@@ -116,7 +142,17 @@ describe('ActionReview', () => {
   })
 
   it('explains why a destructive write needs two approvers and blocks a second approval by the same person', async () => {
-    await renderRouted(<ActionReview action={action({ class: 'destructive', required_approvals: 2, approvals: [{ by: 'alice', at: new Date().toISOString(), step_up: true }] })} agents={agents} />, { me: makeMe(['*']) })
+    await renderRouted(
+      <ActionReview
+        action={action({
+          class: 'destructive',
+          required_approvals: 2,
+          approvals: [{ by: 'alice', at: new Date().toISOString(), step_up: true }],
+        })}
+        agents={agents}
+      />,
+      { me: makeMe(['*']) },
+    )
     expect(await screen.findByText(/needs 2 different approvers \(1 of 2 so far\)/)).toBeInTheDocument()
     expect(screen.getByText(/You already approved this/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Approve/ })).toBeDisabled()

@@ -26,7 +26,14 @@ function Mark({ state }: { state: ReturnType<typeof stepState> }) {
       {state === 'done' && (
         <>
           <circle cx="8" cy="8" r="7" fill="var(--ok-bg)" />
-          <path d="M5 8.2l2 2 4-4.2" fill="none" stroke="var(--ok)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M5 8.2l2 2 4-4.2"
+            fill="none"
+            stroke="var(--ok)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </>
       )}
       {state === 'current' && (
@@ -47,12 +54,20 @@ function Mark({ state }: { state: ReturnType<typeof stepState> }) {
           <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="var(--err)" strokeWidth="1.6" strokeLinecap="round" />
         </>
       )}
-      {state === 'pending' && <circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--line-2)" strokeWidth="1.6" />}
+      {state === 'pending' && (
+        <circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--line-2)" strokeWidth="1.6" />
+      )}
     </svg>
   )
 }
 
-const STATE_LABEL = { done: 'done', current: 'in progress', waiting: 'waiting', failed: 'failed', pending: 'not started' }
+const STATE_LABEL = {
+  done: 'done',
+  current: 'in progress',
+  waiting: 'waiting',
+  failed: 'failed',
+  pending: 'not started',
+}
 
 /** The plan as a checklist (Mission control preview, Agent at work). */
 export function PlanChecklist({
@@ -74,7 +89,10 @@ export function PlanChecklist({
         const state = stepState(s)
         const j = s.jobs
         return (
-          <li key={s.id ?? i} className={`flex gap-2.5 ${state === 'current' || state === 'waiting' ? 'text-text' : 'text-text-3'}`}>
+          <li
+            key={s.id ?? i}
+            className={`flex gap-2.5 ${state === 'current' || state === 'waiting' ? 'text-text' : 'text-text-3'}`}
+          >
             <Mark state={state} />
             <span className="flex min-w-0 flex-col">
               <span className={state === 'current' ? 'font-medium' : ''}>

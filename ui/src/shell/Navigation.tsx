@@ -68,7 +68,11 @@ export function Sidebar() {
       >
         <Icon name={i.icon} />
         <span className="flex-1 truncate">{i.label}</span>
-        {b?.text && <span className={`font-mono text-sm ${b.tone === 'wait' ? 'text-wait' : 'text-text-3'}`}>{b.text}</span>}
+        {b?.text && (
+          <span className={`font-mono text-sm ${b.tone === 'wait' ? 'text-wait' : 'text-text-3'}`}>
+            {b.text}
+          </span>
+        )}
         {b && !b.text && b.tone && <Dot tone={b.tone} />}
       </Link>
     )
@@ -158,7 +162,13 @@ export function IconRail() {
   const d = useShellData()
   const [menu, setMenu] = useState(false)
   const items = visible(NAV, me)
-  const healthTone = d.health ? (d.health.status === 'healthy' ? 'ok' : d.health.status === 'down' ? 'err' : 'wait') : null
+  const healthTone = d.health
+    ? d.health.status === 'healthy'
+      ? 'ok'
+      : d.health.status === 'down'
+        ? 'err'
+        : 'wait'
+    : null
   return (
     <nav
       aria-label="Main navigation"

@@ -46,7 +46,14 @@ export type Autonomy = S['Autonomy']
 export type MissionPlan = Omit<S['mission-plan.schema'], '$defs'>
 export type PlanStep = StepCore & {
   status?: string
-  jobs?: { total?: number; queued?: number; running?: number; succeeded?: number; failed?: number; needs_attention?: number }
+  jobs?: {
+    total?: number
+    queued?: number
+    running?: number
+    succeeded?: number
+    failed?: number
+    needs_attention?: number
+  }
 }
 
 export type ReviewItem = S['ReviewItem']

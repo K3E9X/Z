@@ -66,7 +66,15 @@ function Item({
 }
 
 /** ⌘K: Ask Z, agents, missions, actions (docs/09 screen 12). */
-export function CommandPalette({ open, initial, onClose }: { open: boolean; initial: string; onClose: () => void }) {
+export function CommandPalette({
+  open,
+  initial,
+  onClose,
+}: {
+  open: boolean
+  initial: string
+  onClose: () => void
+}) {
   const ref = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState(initial)
   const navigate = useNavigate()
@@ -120,11 +128,18 @@ export function CommandPalette({ open, initial, onClose }: { open: boolean; init
 
   const pauseAll = async () => {
     onClose()
-    const running = (missions.data?.items ?? []).filter((m) => m.status === 'running' || m.status === 'waiting')
+    const running = (missions.data?.items ?? []).filter(
+      (m) => m.status === 'running' || m.status === 'waiting',
+    )
     let ok = 0
     for (const m of running) {
       try {
-        await unwrap(api.POST('/missions/{id}/pause', { params: { path: { id: m.id } }, body: { reason: 'Pause all from the palette' } }))
+        await unwrap(
+          api.POST('/missions/{id}/pause', {
+            params: { path: { id: m.id } },
+            body: { reason: 'Pause all from the palette' },
+          }),
+        )
         ok++
       } catch {
         // reported below
@@ -172,7 +187,9 @@ export function CommandPalette({ open, initial, onClose }: { open: boolean; init
               className="h-7 flex-1 border-none bg-transparent text-[16px] outline-none"
               autoFocus
             />
-            <kbd className="rounded-[5px] border border-line-2 px-1.5 py-px font-mono text-micro text-text-3">esc</kbd>
+            <kbd className="rounded-[5px] border border-line-2 px-1.5 py-px font-mono text-micro text-text-3">
+              esc
+            </kbd>
           </div>
           <Command.List className="scrollbar-thin max-h-[min(460px,60vh)] overflow-auto p-2 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-2.5 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-meta [&_[cmdk-group-heading]]:text-text-3">
             <Command.Empty className="px-3 py-6 text-center text-meta text-text-3">

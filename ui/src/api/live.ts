@@ -36,7 +36,11 @@ export interface UseStreamOptions {
 }
 
 /** Subscribe to an SSE endpoint for the lifetime of the component. */
-export function useStream(path: string | null, onMessage: (m: SseMessage) => void, opts: UseStreamOptions = {}) {
+export function useStream(
+  path: string | null,
+  onMessage: (m: SseMessage) => void,
+  opts: UseStreamOptions = {},
+) {
   const handler = useRef(onMessage)
   const stateHandler = useRef(opts.onState)
   const lastIdRef = useRef(opts.lastEventId)

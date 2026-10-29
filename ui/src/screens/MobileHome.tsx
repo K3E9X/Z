@@ -32,7 +32,9 @@ function DecisionCard({ item, agents }: { item: ReviewItem; agents: AgentIndex }
       <div className="text-meta text-wait">
         {agents.label(agent)} · {kind}
       </div>
-      <div className="text-[15px] font-medium">{item.question ? item.question.text : reviewItemTitle(item)}</div>
+      <div className="text-[15px] font-medium">
+        {item.question ? item.question.text : reviewItemTitle(item)}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         {item.action && (
           <>
@@ -79,12 +81,20 @@ function DecisionCard({ item, agents }: { item: ReviewItem; agents: AgentIndex }
               </Button>
             ))
           ) : (
-            <Link to="/review" search={{ item: id }} className="col-span-2 flex h-11 items-center justify-center rounded-btn border border-line-2 no-underline">
+            <Link
+              to="/review"
+              search={{ item: id }}
+              className="col-span-2 flex h-11 items-center justify-center rounded-btn border border-line-2 no-underline"
+            >
               Answer
             </Link>
           ))}
         {item.suggestion && (
-          <Link to="/review" search={{ item: id }} className="col-span-2 flex h-11 items-center justify-center rounded-btn border border-line-2 no-underline">
+          <Link
+            to="/review"
+            search={{ item: id }}
+            className="col-span-2 flex h-11 items-center justify-center rounded-btn border border-line-2 no-underline"
+          >
             Review suggestion
           </Link>
         )}
@@ -181,7 +191,11 @@ export function MobileHome() {
             placeholder="Ask Z…"
             className="h-10 min-w-0 flex-1 border-none bg-transparent text-[15px] outline-none"
           />
-          <button type="submit" aria-label="Send" className="flex h-11 w-11 items-center justify-center rounded-btn bg-inv-bg text-inv-text">
+          <button
+            type="submit"
+            aria-label="Send"
+            className="flex h-11 w-11 items-center justify-center rounded-btn bg-inv-bg text-inv-text"
+          >
             <Icon name="arrowUp" size={16} />
           </button>
         </form>

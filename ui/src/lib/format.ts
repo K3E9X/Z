@@ -111,7 +111,9 @@ export function dateTime(iso: string | null | undefined): string {
 export function isToday(iso: string | null | undefined, now = new Date()): boolean {
   if (!iso) return false
   const d = new Date(iso)
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  return (
+    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  )
 }
 
 export function greeting(now = new Date()): string {
@@ -135,7 +137,10 @@ export function plural(n: number, one: string, many = `${one}s`): string {
 }
 
 export function initials(name: string): string {
-  const parts = name.trim().split(/[\s._-]+/).filter(Boolean)
+  const parts = name
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean)
   if (parts.length === 0) return '?'
   if (parts.length === 1) return (parts[0] ?? '?').slice(0, 2).toUpperCase()
   return ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase()

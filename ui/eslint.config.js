@@ -39,9 +39,7 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            { name: 'rehype-raw', message: 'Raw HTML in markdown is not allowed.' },
-          ],
+          paths: [{ name: 'rehype-raw', message: 'Raw HTML in markdown is not allowed.' }],
         },
       ],
       'no-restricted-globals': [

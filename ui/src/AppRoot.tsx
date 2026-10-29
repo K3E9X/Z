@@ -64,7 +64,10 @@ export function AppRoot() {
     )
   }
   if (onSignin) {
-    const to = search.redirect && search.redirect.startsWith('/') && !search.redirect.startsWith('//') ? search.redirect : '/'
+    const to =
+      search.redirect && search.redirect.startsWith('/') && !search.redirect.startsWith('//')
+        ? search.redirect
+        : '/'
     return <Navigate to={to} replace />
   }
   return (

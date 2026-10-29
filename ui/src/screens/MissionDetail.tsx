@@ -31,7 +31,17 @@ import { PlanEditor } from './PlanEditor'
 
 type Tab = 'activity' | 'terminal' | 'files' | 'browser' | 'reasoning'
 
-function SubAgents({ jobs, onPick, selected, agents }: { jobs: Job[]; onPick: (id: string) => void; selected?: string; agents: AgentIndex }) {
+function SubAgents({
+  jobs,
+  onPick,
+  selected,
+  agents,
+}: {
+  jobs: Job[]
+  onPick: (id: string) => void
+  selected?: string
+  agents: AgentIndex
+}) {
   const c = { done: 0, running: 0, failed: 0, queued: 0, attention: 0 }
   for (const j of jobs) {
     if (j.status === 'succeeded') c.done++
@@ -41,7 +51,15 @@ function SubAgents({ jobs, onPick, selected, agents }: { jobs: Job[]; onPick: (i
     else c.queued++
   }
   const color = (s: string) =>
-    s === 'succeeded' ? 'bg-ok' : s === 'running' ? 'bg-run' : ['failed', 'timed_out', 'budget_exceeded'].includes(s) ? 'bg-err' : s === 'needs_attention' || s === 'paused' ? 'bg-wait' : 'bg-raised border border-line-2'
+    s === 'succeeded'
+      ? 'bg-ok'
+      : s === 'running'
+        ? 'bg-run'
+        : ['failed', 'timed_out', 'budget_exceeded'].includes(s)
+          ? 'bg-err'
+          : s === 'needs_attention' || s === 'paused'
+            ? 'bg-wait'
+            : 'bg-raised border border-line-2'
   return (
     <section aria-labelledby="subagents" className="flex flex-col gap-2.5">
       <h2 id="subagents" className="m-0 text-ui font-medium">
@@ -77,14 +95,27 @@ function SubAgents({ jobs, onPick, selected, agents }: { jobs: Job[]; onPick: (i
   )
 }
 
-function Context({ mission, timeline, agents }: { mission: Mission; timeline: TimelineState; agents: AgentIndex }) {
+function Context({
+  mission,
+  timeline,
+  agents,
+}: {
+  mission: Mission
+  timeline: TimelineState
+  agents: AgentIndex
+}) {
   const slugs = missionAgents(mission)
   const skills = [...new Set(slugs.flatMap((s) => agents.get(s)?.skills ?? []))]
   const plan = planSteps(mission)
   const writes = [...new Set(plan.flatMap((s) => s.writes ?? []))]
   const used = mission.tokens_in + mission.tokens_out || timeline.tokens.in + timeline.tokens.out
   const max = mission.budget.max_tokens ?? 0
-  const tools = [...mission.connectors.map((c) => `${c} (read)`), ...(plan.some((s) => s.workspace === 'git_clone' || s.workspace === 'files') ? ['isolated workspace'] : [])]
+  const tools = [
+    ...mission.connectors.map((c) => `${c} (read)`),
+    ...(plan.some((s) => s.workspace === 'git_clone' || s.workspace === 'files')
+      ? ['isolated workspace']
+      : []),
+  ]
   return (
     <section aria-labelledby="context" className="flex flex-col gap-2.5">
       <h2 id="context" className="m-0 text-ui font-medium">
@@ -97,19 +128,36 @@ function Context({ mission, timeline, agents }: { mission: Mission; timeline: Ti
         <dd className="m-0">{skills.length ? skills.join(', ') : '—'}</dd>
         <dt className="text-text-3">Writes</dt>
         <dd className="m-0">
-          {mission.autonomy === 'read_only' ? 'None, read only' : writes.length ? `${writes.join(', ')}, after approval` : 'None in this plan'}
+          {mission.autonomy === 'read_only'
+            ? 'None, read only'
+            : writes.length
+              ? `${writes.join(', ')}, after approval`
+              : 'None in this plan'}
         </dd>
         <dt className="text-text-3">Data</dt>
         <dd className="m-0">
           <span className="font-mono">{timeline.dataClass ?? mission.data_class}</span>
-          <span className="text-text-3"> · {(timeline.dataClass ?? mission.data_class) >= 'C2' ? 'internal models only' : 'external allowed by policy'}</span>
+          <span className="text-text-3">
+            {' '}
+            ·{' '}
+            {(timeline.dataClass ?? mission.data_class) >= 'C2'
+              ? 'internal models only'
+              : 'external allowed by policy'}
+          </span>
         </dd>
         <dt className="text-text-3">Budget</dt>
         <dd className="m-0 flex flex-col gap-1.5">
           <span className="font-mono">
             {compactNumber(used)} / {max ? compactNumber(max) : '∞'} tokens
           </span>
-          {max > 0 && <ProgressBar value={used} max={max} tone={used / max > 0.9 ? 'err' : used / max > 0.75 ? 'wait' : 'text'} label="Token budget used" />}
+          {max > 0 && (
+            <ProgressBar
+              value={used}
+              max={max}
+              tone={used / max > 0.9 ? 'err' : used / max > 0.75 ? 'wait' : 'text'}
+              label="Token budget used"
+            />
+          )}
         </dd>
       </dl>
     </section>
@@ -118,7 +166,12 @@ function Context({ mission, timeline, agents }: { mission: Mission; timeline: Ti
 
 function TerminalTab({ timeline }: { timeline: TimelineState }) {
   const items = timeline.items.filter((i) => i.kind === 'terminal')
-  if (items.length === 0) return <EmptyState icon="terminal" title="No command ran yet">Commands run in the sandbox appear here with their output.</EmptyState>
+  if (items.length === 0)
+    return (
+      <EmptyState icon="terminal" title="No command ran yet">
+        Commands run in the sandbox appear here with their output.
+      </EmptyState>
+    )
   return (
     <div className="flex flex-col gap-3 py-4">
       {items.map((it) =>
@@ -128,7 +181,9 @@ function TerminalTab({ timeline }: { timeline: TimelineState }) {
               <span className="text-text-3">$</span>
               <span className="min-w-0 flex-1 truncate">{it.term.command}</span>
               {it.term.exit_code !== null && it.term.exit_code !== undefined && (
-                <span className={it.term.exit_code === 0 ? 'text-ok' : 'text-err'}>exit {it.term.exit_code}</span>
+                <span className={it.term.exit_code === 0 ? 'text-ok' : 'text-err'}>
+                  exit {it.term.exit_code}
+                </span>
               )}
               {it.term.output_ref && <FullOutput id={it.term.output_ref} />}
             </div>
@@ -164,7 +219,13 @@ function FullOutput({ id }: { id: string }) {
         title="Terminal output"
         width={900}
       >
-        {q.isPending ? <Skeleton className="h-40" /> : q.error ? <ErrorState error={q.error} /> : <pre className="m-0 font-mono text-xs whitespace-pre-wrap text-text-2">{q.data}</pre>}
+        {q.isPending ? (
+          <Skeleton className="h-40" />
+        ) : q.error ? (
+          <ErrorState error={q.error} />
+        ) : (
+          <pre className="m-0 font-mono text-xs whitespace-pre-wrap text-text-2">{q.data}</pre>
+        )}
       </Dialog>
     </>
   )
@@ -173,13 +234,18 @@ function FullOutput({ id }: { id: string }) {
 function FilesTab({ timeline }: { timeline: TimelineState }) {
   const edits = timeline.items.filter((i) => i.kind === 'file_edit')
   const byPath = new Map<string, typeof edits>()
-  for (const e of edits) if (e.kind === 'file_edit') byPath.set(e.edit.path, [...(byPath.get(e.edit.path) ?? []), e])
+  for (const e of edits)
+    if (e.kind === 'file_edit') byPath.set(e.edit.path, [...(byPath.get(e.edit.path) ?? []), e])
   const artifacts = timeline.items.filter((i) => i.kind === 'artifact')
   const [open, setOpen] = useState<string | null>(null)
   const openEdit = edits.find((e) => e.kind === 'file_edit' && e.key === open)
   const diffQ = useArtifactText(openEdit?.kind === 'file_edit' ? openEdit.edit.diff_ref : null)
   if (edits.length === 0 && artifacts.length === 0)
-    return <EmptyState icon="file" title="No file changed yet">Edits in the sandbox and files the agent produces appear here.</EmptyState>
+    return (
+      <EmptyState icon="file" title="No file changed yet">
+        Edits in the sandbox and files the agent produces appear here.
+      </EmptyState>
+    )
   return (
     <div className="flex flex-col gap-6 py-4">
       {byPath.size > 0 && (
@@ -208,7 +274,13 @@ function FilesTab({ timeline }: { timeline: TimelineState }) {
                   </button>
                   {open === last?.key && (
                     <div className="pb-3">
-                      {diffQ.isPending ? <Skeleton className="h-24" /> : diffQ.error ? <ErrorState error={diffQ.error} /> : <DiffViewer diff={diffQ.data} />}
+                      {diffQ.isPending ? (
+                        <Skeleton className="h-24" />
+                      ) : diffQ.error ? (
+                        <ErrorState error={diffQ.error} />
+                      ) : (
+                        <DiffViewer diff={diffQ.data} />
+                      )}
                     </div>
                   )}
                 </li>
@@ -227,7 +299,12 @@ function FilesTab({ timeline }: { timeline: TimelineState }) {
                   <Icon name="doc" size={14} className="text-text-3" />
                   <span className="min-w-0 flex-1 truncate">{a.artifact.name}</span>
                   <span className="text-meta text-text-3">{a.artifact.kind}</span>
-                  <Button size="xs" variant="ghost" icon="download" onClick={() => void downloadArtifact(a.artifact.artifact_id, a.artifact.name)}>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    icon="download"
+                    onClick={() => void downloadArtifact(a.artifact.artifact_id, a.artifact.name)}
+                  >
                     Download
                   </Button>
                 </li>
@@ -242,19 +319,35 @@ function FilesTab({ timeline }: { timeline: TimelineState }) {
 
 function BrowserTab({ timeline }: { timeline: TimelineState }) {
   const shots = timeline.items.filter((i) => i.kind === 'browser')
-  if (shots.length === 0) return <EmptyState icon="globe" title="No browser session">Browser flows run gateway-side; their steps and screenshots appear here.</EmptyState>
+  if (shots.length === 0)
+    return (
+      <EmptyState icon="globe" title="No browser session">
+        Browser flows run gateway-side; their steps and screenshots appear here.
+      </EmptyState>
+    )
   return (
     <div className="grid gap-4 py-4 sm:grid-cols-2">
       {shots.map((s) =>
         s.kind === 'browser' ? (
-          <figure key={s.key} className="m-0 flex flex-col gap-2 rounded-panel border border-line bg-panel p-3">
+          <figure
+            key={s.key}
+            className="m-0 flex flex-col gap-2 rounded-panel border border-line bg-panel p-3"
+          >
             {s.browser.screenshot_ref ? (
-              <img src={artifactUrl(s.browser.screenshot_ref)} alt={`Screenshot: ${s.browser.action}`} loading="lazy" className="rounded-btn border border-line" />
+              <img
+                src={artifactUrl(s.browser.screenshot_ref)}
+                alt={`Screenshot: ${s.browser.action}`}
+                loading="lazy"
+                className="rounded-btn border border-line"
+              />
             ) : (
-              <div className="flex h-32 items-center justify-center rounded-btn bg-raised text-meta text-text-3">No screenshot</div>
+              <div className="flex h-32 items-center justify-center rounded-btn bg-raised text-meta text-text-3">
+                No screenshot
+              </div>
             )}
             <figcaption className="text-meta">
-              <span className="font-medium">{s.browser.action}</span> <span className="font-mono text-text-3">{s.browser.url}</span>
+              <span className="font-medium">{s.browser.action}</span>{' '}
+              <span className="font-mono text-text-3">{s.browser.url}</span>
             </figcaption>
           </figure>
         ) : null,
@@ -266,7 +359,11 @@ function BrowserTab({ timeline }: { timeline: TimelineState }) {
 function ReasoningTab({ timeline, agents }: { timeline: TimelineState; agents: AgentIndex }) {
   const [open, setOpen] = useState<Set<number>>(() => new Set())
   if (timeline.thoughts.length === 0)
-    return <EmptyState icon="sparkle" title="No reasoning recorded">When the model shares its reasoning, each step appears here, collapsed.</EmptyState>
+    return (
+      <EmptyState icon="sparkle" title="No reasoning recorded">
+        When the model shares its reasoning, each step appears here, collapsed.
+      </EmptyState>
+    )
   return (
     <ol className="m-0 flex list-none flex-col p-0 py-2">
       {timeline.thoughts.map((t) => {
@@ -287,8 +384,12 @@ function ReasoningTab({ timeline, agents }: { timeline: TimelineState; agents: A
               }}
             >
               <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="mt-1 text-text-3" />
-              <span className="font-mono text-xs text-text-3">{new Date(t.ts).toLocaleTimeString('en-GB')}</span>
-              <span className={`min-w-0 flex-1 ${isOpen ? '' : 'truncate'} text-text-2`}>{isOpen ? null : t.text}</span>
+              <span className="font-mono text-xs text-text-3">
+                {new Date(t.ts).toLocaleTimeString('en-GB')}
+              </span>
+              <span className={`min-w-0 flex-1 ${isOpen ? '' : 'truncate'} text-text-2`}>
+                {isOpen ? null : t.text}
+              </span>
               {t.agent && <span className="text-sm text-text-3">{agents.label(t.agent)}</span>}
             </button>
             {isOpen && <Markdown className="mt-2 pl-7 text-text-2">{t.text}</Markdown>}
@@ -350,7 +451,12 @@ function Composer({ mission, jobId }: { mission: Mission; jobId?: string }) {
     if (!t) return
     setBusy(true)
     try {
-      await unwrap(api.POST('/missions/{id}/messages', { params: { path: { id: mission.id } }, body: { text: t, ...(jobId ? { job_id: jobId } : {}) } }))
+      await unwrap(
+        api.POST('/missions/{id}/messages', {
+          params: { path: { id: mission.id } },
+          body: { text: t, ...(jobId ? { job_id: jobId } : {}) },
+        }),
+      )
       setText('')
       toast.ok('Sent. The agent reads it at its next step.')
     } catch (e) {
@@ -408,7 +514,12 @@ function StopDialog({ open, onClose, mission }: { open: boolean; onClose: () => 
   const stop = async () => {
     setBusy(true)
     try {
-      await unwrap(api.POST('/missions/{id}/cancel', { params: { path: { id: mission.id } }, body: reason ? { reason } : {} }))
+      await unwrap(
+        api.POST('/missions/{id}/cancel', {
+          params: { path: { id: mission.id } },
+          body: reason ? { reason } : {},
+        }),
+      )
       await qc.invalidateQueries({ queryKey: qk.mission(mission.id) })
       toast.ok('Mission stopped')
       onClose()
@@ -434,7 +545,8 @@ function StopDialog({ open, onClose, mission }: { open: boolean; onClose: () => 
     >
       <div className="flex flex-col gap-3">
         <p className="m-0 text-text-2">
-          Running jobs stop after their current step. Writes already approved still apply; pending ones are dropped.
+          Running jobs stop after their current step. Writes already approved still apply; pending ones are
+          dropped.
         </p>
         <label className="flex flex-col gap-1.5">
           <span className="text-meta text-text-2">Why? The reason teaches the agent.</span>
@@ -477,17 +589,51 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
     <div className="flex items-center gap-2">
       <StatusText tone={st.tone} label={st.label} className="mr-2 text-ui" />
       {can && (mission.status === 'running' || mission.status === 'waiting') && (
-        <Button size="sm" busy={busy === 'pause'} onClick={() => void run('pause', () => unwrap(api.POST('/missions/{id}/pause', { params: { path: { id: mission.id } }, body: {} })), 'Pausing after the current step')}>
+        <Button
+          size="sm"
+          busy={busy === 'pause'}
+          onClick={() =>
+            void run(
+              'pause',
+              () =>
+                unwrap(api.POST('/missions/{id}/pause', { params: { path: { id: mission.id } }, body: {} })),
+              'Pausing after the current step',
+            )
+          }
+        >
           Pause
         </Button>
       )}
       {can && mission.status === 'paused' && (
-        <Button size="sm" busy={busy === 'resume'} onClick={() => void run('resume', () => unwrap(api.POST('/missions/{id}/resume', { params: { path: { id: mission.id } }, body: {} })), 'Resumed')}>
+        <Button
+          size="sm"
+          busy={busy === 'resume'}
+          onClick={() =>
+            void run(
+              'resume',
+              () =>
+                unwrap(api.POST('/missions/{id}/resume', { params: { path: { id: mission.id } }, body: {} })),
+              'Resumed',
+            )
+          }
+        >
           Resume
         </Button>
       )}
       {can && (mission.status === 'draft' || mission.status === 'planned') && (
-        <Button size="sm" variant="primary" busy={busy === 'start'} onClick={() => void run('start', () => unwrap(api.POST('/missions/{id}/start', { params: { path: { id: mission.id } }, body: {} })), 'Started')}>
+        <Button
+          size="sm"
+          variant="primary"
+          busy={busy === 'start'}
+          onClick={() =>
+            void run(
+              'start',
+              () =>
+                unwrap(api.POST('/missions/{id}/start', { params: { path: { id: mission.id } }, body: {} })),
+              'Started',
+            )
+          }
+        >
           Start
         </Button>
       )}
@@ -499,10 +645,19 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
             void run(
               'takeover',
               async () => {
-                const jobs = await unwrap(api.GET('/missions/{id}/jobs', { params: { path: { id: mission.id }, query: { status: 'running,needs_attention,paused' } } }))
+                const jobs = await unwrap(
+                  api.GET('/missions/{id}/jobs', {
+                    params: { path: { id: mission.id }, query: { status: 'running,needs_attention,paused' } },
+                  }),
+                )
                 const job = jobs.items[0]
                 if (!job) throw new Error('No running job to take over')
-                const s = await unwrap(api.POST('/missions/{id}/take-over', { params: { path: { id: mission.id } }, body: { job_id: job.id, mode: 'read_only' } }))
+                const s = await unwrap(
+                  api.POST('/missions/{id}/take-over', {
+                    params: { path: { id: mission.id } },
+                    body: { job_id: job.id, mode: 'read_only' },
+                  }),
+                )
                 window.open(s.terminal_url, '_blank', 'noopener,noreferrer')
               },
               'Workspace opened read-only in a new tab',
@@ -519,10 +674,21 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
       )}
       {!active && (
         <>
-          <Button size="sm" onClick={() => void navigate({ to: '/missions/$id/replay', params: { id: mission.id } })}>
+          <Button
+            size="sm"
+            onClick={() => void navigate({ to: '/missions/$id/replay', params: { id: mission.id } })}
+          >
             Replay
           </Button>
-          <Button size="sm" onClick={() => void navigate({ to: '/missions/new', search: { prompt: mission.prompt ?? undefined, playbook: mission.playbook ?? undefined } })}>
+          <Button
+            size="sm"
+            onClick={() =>
+              void navigate({
+                to: '/missions/new',
+                search: { prompt: mission.prompt ?? undefined, playbook: mission.playbook ?? undefined },
+              })
+            }
+          >
             Run again
           </Button>
         </>
@@ -546,14 +712,22 @@ export function MissionDetail() {
   const [editPlan, setEditPlan] = useState(false)
   const now = useNow(1000)
   const canStart = useCan('missions:start')
-  const tab = (['activity', 'terminal', 'files', 'browser', 'reasoning'].includes(search.tab ?? '') ? search.tab : 'activity') as Tab
+  const tab = (
+    ['activity', 'terminal', 'files', 'browser', 'reasoning'].includes(search.tab ?? '')
+      ? search.tab
+      : 'activity'
+  ) as Tab
   const jobFilter = search.job
 
   const items = useMemo(
     () => (jobFilter ? timeline.items.filter((i) => i.jobId === jobFilter) : timeline.items),
     [timeline.items, jobFilter],
   )
-  const filesCount = new Set(timeline.items.filter((i) => i.kind === 'file_edit').map((i) => (i.kind === 'file_edit' ? i.edit.path : ''))).size
+  const filesCount = new Set(
+    timeline.items
+      .filter((i) => i.kind === 'file_edit')
+      .map((i) => (i.kind === 'file_edit' ? i.edit.path : '')),
+  ).size
 
   if (mission.error || !mission.data) {
     return (
@@ -571,25 +745,47 @@ export function MissionDetail() {
   const steps = timeline.plan ?? planSteps(m)
   const agentSlug = missionAgent(m)
   const models = [...timeline.models]
-  const attention = (jobs.data?.items ?? []).filter((j) => j.status === 'needs_attention' && j.needs_attention_reason !== 'approval' && j.needs_attention_reason !== 'question')
-  const subJobs = (jobs.data?.items ?? []).filter((j) => (jobs.data?.items.length ?? 0) > 1 || j.parent_job_id)
+  const attention = (jobs.data?.items ?? []).filter(
+    (j) =>
+      j.status === 'needs_attention' &&
+      j.needs_attention_reason !== 'approval' &&
+      j.needs_attention_reason !== 'question',
+  )
+  const subJobs = (jobs.data?.items ?? []).filter(
+    (j) => (jobs.data?.items.length ?? 0) > 1 || j.parent_job_id,
+  )
   const meta = [
     models.length ? models.join(', ') : agents.get(agentSlug)?.model,
     jobs.data && jobs.data.items.length > 1 ? plural(jobs.data.items.length, 'sub-agent') : null,
-    m.started_at ? `${elapsed(m.started_at, m.ended_at, now)} ${m.ended_at ? 'total' : 'elapsed'}` : `created ${relative(m.created_at)}`,
+    m.started_at
+      ? `${elapsed(m.started_at, m.ended_at, now)} ${m.ended_at ? 'total' : 'elapsed'}`
+      : `created ${relative(m.created_at)}`,
     m.autonomy === 'read_only' ? 'read only' : 'writes need your approval',
     m.playbook ? `playbook ${m.playbook}${m.playbook_version ? ` v${m.playbook_version}` : ''}` : null,
   ].filter(Boolean)
   const setTab = (t: Tab) => {
-    void navigate({ to: '/missions/$id', params: { id }, search: { ...search, tab: t === 'activity' ? undefined : t }, replace: true })
+    void navigate({
+      to: '/missions/$id',
+      params: { id },
+      search: { ...search, tab: t === 'activity' ? undefined : t },
+      replace: true,
+    })
   }
   const pickJob = (jid: string) => {
-    void navigate({ to: '/missions/$id', params: { id }, search: { ...search, job: search.job === jid ? undefined : jid }, replace: true })
+    void navigate({
+      to: '/missions/$id',
+      params: { id },
+      search: { ...search, job: search.job === jid ? undefined : jid },
+      replace: true,
+    })
   }
 
   return (
     <div className="flex h-screen min-h-0 flex-col">
-      <TopBar crumbs={[{ label: 'Mission control', to: '/' }, { label: agents.label(agentSlug) }]} right={<Header mission={m} onStop={() => setStop(true)} />} />
+      <TopBar
+        crumbs={[{ label: 'Mission control', to: '/' }, { label: agents.label(agentSlug) }]}
+        right={<Header mission={m} onStop={() => setStop(true)} />}
+      />
       <div className="flex flex-col gap-1.5 border-b border-line px-7 pt-6 pb-5">
         <h1 className="m-0 text-2xl font-semibold">{m.title}</h1>
         <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm text-text-2">
@@ -601,32 +797,59 @@ export function MissionDetail() {
         {attention.length > 0 && <Attention jobs={attention} agents={agents} />}
         {m.status === 'waiting' && m.waiting_reason === 'approval' && m.pending_actions === 0 ? (
           // Every write is decided; the mission waits for the executor to report back.
-          <span className="text-meta text-text-3">Every write is decided; waiting for the results from the executor.</span>
+          <span className="text-meta text-text-3">
+            Every write is decided; waiting for the results from the executor.
+          </span>
         ) : (
           m.status === 'waiting' &&
           m.waiting_reason && (
-            <Link to="/review" search={{ kind: m.waiting_reason === 'question' ? 'questions' : 'writes' }} className="self-start text-meta text-wait">
-              {m.waiting_reason === 'question' ? 'A question is waiting for you' : `${plural(m.pending_actions ?? 1, 'write')} waiting for your approval`} →
+            <Link
+              to="/review"
+              search={{ kind: m.waiting_reason === 'question' ? 'questions' : 'writes' }}
+              className="self-start text-meta text-wait"
+            >
+              {m.waiting_reason === 'question'
+                ? 'A question is waiting for you'
+                : `${plural(m.pending_actions ?? 1, 'write')} waiting for your approval`}{' '}
+              →
             </Link>
           )
         )}
       </div>
       <div className="flex min-h-0 flex-1">
-        <aside aria-label="Plan and context" className="scrollbar-thin flex w-[300px] flex-none flex-col gap-7 overflow-y-auto border-r border-line px-6 py-6 max-lg:hidden">
+        <aside
+          aria-label="Plan and context"
+          className="scrollbar-thin flex w-[300px] flex-none flex-col gap-7 overflow-y-auto border-r border-line px-6 py-6 max-lg:hidden"
+        >
           <section aria-labelledby="plan" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h2 id="plan" className="m-0 text-ui font-medium">
                 Plan
               </h2>
               {canStart && (m.status === 'draft' || m.status === 'planned') && (
-                <button type="button" className="text-meta text-text-3 hover:text-text" onClick={() => setEditPlan(true)}>
+                <button
+                  type="button"
+                  className="text-meta text-text-3 hover:text-text"
+                  onClick={() => setEditPlan(true)}
+                >
                   Edit
                 </button>
               )}
             </div>
-            {steps.length ? <PlanChecklist steps={steps} inputs={m.inputs} agentLabel={(s) => agents.label(s)} showAgents={new Set(steps.map((s) => s.agent)).size > 1} /> : <div className="text-meta text-text-3">No plan yet.</div>}
+            {steps.length ? (
+              <PlanChecklist
+                steps={steps}
+                inputs={m.inputs}
+                agentLabel={(s) => agents.label(s)}
+                showAgents={new Set(steps.map((s) => s.agent)).size > 1}
+              />
+            ) : (
+              <div className="text-meta text-text-3">No plan yet.</div>
+            )}
           </section>
-          {subJobs.length > 0 && <SubAgents jobs={subJobs} onPick={pickJob} selected={jobFilter} agents={agents} />}
+          {subJobs.length > 0 && (
+            <SubAgents jobs={subJobs} onPick={pickJob} selected={jobFilter} agents={agents} />
+          )}
           <Context mission={m} timeline={timeline} agents={agents} />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -659,7 +882,14 @@ export function MissionDetail() {
                 agents={agents}
                 scrollRef={scrollRef}
                 empty={
-                  <EmptyState icon="missionControl" title={m.status === 'draft' || m.status === 'planned' ? 'Not started' : 'Waiting for the first event'}>
+                  <EmptyState
+                    icon="missionControl"
+                    title={
+                      m.status === 'draft' || m.status === 'planned'
+                        ? 'Not started'
+                        : 'Waiting for the first event'
+                    }
+                  >
                     {m.status === 'draft' || m.status === 'planned'
                       ? 'Review the plan, then start the mission.'
                       : 'Tool calls, edits, guardrail blocks and questions stream in here live.'}
@@ -674,13 +904,17 @@ export function MissionDetail() {
           </div>
           <div className="border-t border-line px-6 py-4">
             <Composer mission={m} jobId={jobFilter} />
-            <div className="mt-1.5 text-sm text-text-3 max-md:hidden">↵ send · ⇧↵ new line · {MOD}K palette</div>
+            <div className="mt-1.5 text-sm text-text-3 max-md:hidden">
+              ↵ send · ⇧↵ new line · {MOD}K palette
+            </div>
           </div>
         </div>
       </div>
       <StopDialog open={stop} onClose={() => setStop(false)} mission={m} />
       {editPlan && <PlanEditor mission={m} open={editPlan} onClose={() => setEditPlan(false)} />}
-      {jobs.error && !isNotServed(jobs.error) && <span className="sr-only">{problemMessage(jobs.error)}</span>}
+      {jobs.error && !isNotServed(jobs.error) && (
+        <span className="sr-only">{problemMessage(jobs.error)}</span>
+      )}
     </div>
   )
 }

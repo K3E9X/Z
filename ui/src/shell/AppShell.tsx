@@ -146,7 +146,9 @@ export function AppShell() {
         Skip to content
       </a>
       <div className="flex min-h-screen bg-bg text-text">
-        <div className="hidden border-r border-line bg-panel md:flex">{full ? <Sidebar /> : <IconRail />}</div>
+        <div className="hidden border-r border-line bg-panel md:flex">
+          {full ? <Sidebar /> : <IconRail />}
+        </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <AccountBanners />
           <LiveBanner />

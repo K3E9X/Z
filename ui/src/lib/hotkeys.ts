@@ -44,7 +44,12 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
       const global = key.startsWith('mod+') || key === 'escape'
       if (typing && !global) return
       // Inside an open modal dialog only the dialog's own handlers apply.
-      if (!global && document.querySelector('dialog[open]') && !(e.target instanceof Node && document.querySelector('dialog[open]')?.contains(e.target))) return
+      if (
+        !global &&
+        document.querySelector('dialog[open]') &&
+        !(e.target instanceof Node && document.querySelector('dialog[open]')?.contains(e.target))
+      )
+        return
       const bindings = ref.current
       if (pending) {
         const seq = `${pending} ${key}`

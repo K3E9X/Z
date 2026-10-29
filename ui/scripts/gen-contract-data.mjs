@@ -37,7 +37,8 @@ ev += 'export interface EventEnvelope {\n'
 ev += "  mission_id: S['Id']\n  job_id: S['Id'] | null\n  seq: number\n  ts: S['Timestamp']\n"
 ev += '  agent?: string | null\n  step_id?: string | null\n}\n\n'
 ev += '/** One mission event, discriminated by `type`. */\n'
-ev += 'export type ZEvent = { [K in EventType]: EventEnvelope & { type: K; payload: EventPayloads[K] } }[EventType]\n'
+ev +=
+  'export type ZEvent = { [K in EventType]: EventEnvelope & { type: K; payload: EventPayloads[K] } }[EventType]\n'
 ev += 'export type ZEventOf<K extends EventType> = Extract<ZEvent, { type: K }>\n\n'
 ev += 'export function isEventType(value: string): value is EventType {\n'
 ev += '  return (EVENT_TYPES as readonly string[]).includes(value)\n}\n'
@@ -70,4 +71,6 @@ pm += 'export type BuiltinRole = keyof typeof BUILTIN_ROLES\n\n'
 pm += `export const LOCAL_ACCOUNT_LIMITS = ${JSON.stringify(perms.local_accounts, null, 2)} as const\n`
 writeFileSync(resolve(out, 'permissions.gen.ts'), pm)
 
-console.log(`events: ${types.length} types; permissions: ${names.length}, roles: ${Object.keys(perms.roles).length}`)
+console.log(
+  `events: ${types.length} types; permissions: ${names.length}, roles: ${Object.keys(perms.roles).length}`,
+)

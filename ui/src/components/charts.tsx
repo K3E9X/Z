@@ -40,10 +40,19 @@ export function StackedBars({
 }) {
   const folded = useMemo(() => {
     if (series.length <= 3) return series
-    const sorted = [...series].sort((a, b) => b.values.reduce((x, y) => x + y, 0) - a.values.reduce((x, y) => x + y, 0))
+    const sorted = [...series].sort(
+      (a, b) => b.values.reduce((x, y) => x + y, 0) - a.values.reduce((x, y) => x + y, 0),
+    )
     const top = sorted.slice(0, 3)
     const rest = sorted.slice(3)
-    return [...top, { key: 'other', label: 'Other', values: labels.map((_, i) => rest.reduce((n, s) => n + (s.values[i] ?? 0), 0)) }]
+    return [
+      ...top,
+      {
+        key: 'other',
+        label: 'Other',
+        values: labels.map((_, i) => rest.reduce((n, s) => n + (s.values[i] ?? 0), 0)),
+      },
+    ]
   }, [series, labels])
   const totals = labels.map((_, i) => folded.reduce((n, s) => n + (s.values[i] ?? 0), 0))
   const max = niceMax(Math.max(0, ...totals))
@@ -101,14 +110,27 @@ export function StackedBars({
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${height}`} className="block h-auto w-full" role="img" aria-labelledby={`${id}-s`} onMouseLeave={() => setHover(null)}>
+      <svg
+        viewBox={`0 0 ${W} ${height}`}
+        className="block h-auto w-full"
+        role="img"
+        aria-labelledby={`${id}-s`}
+        onMouseLeave={() => setHover(null)}
+      >
         <title id={`${id}-s`}>{summary}</title>
         {ticks.map((t) => {
           const y = padT + plotH - (t / max) * plotH
           return (
             <g key={t}>
               <line x1={padL} x2={W} y1={y} y2={y} stroke="var(--line)" strokeWidth="1" />
-              <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="11" fill="var(--text-3)" fontFamily="var(--mono)">
+              <text
+                x={padL - 8}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="11"
+                fill="var(--text-3)"
+                fontFamily="var(--mono)"
+              >
                 {formatTick(t)}
               </text>
             </g>
@@ -139,11 +161,26 @@ export function StackedBars({
                     opacity={hover === null || hover === i ? 1 : 0.55}
                   />
                 ) : (
-                  <rect key={s.si} x={x} y={s.y + 2} width={barW} height={h} fill={SERIES[s.si] ?? 'var(--text-3)'} opacity={hover === null || hover === i ? 1 : 0.55} />
+                  <rect
+                    key={s.si}
+                    x={x}
+                    y={s.y + 2}
+                    width={barW}
+                    height={h}
+                    fill={SERIES[s.si] ?? 'var(--text-3)'}
+                    opacity={hover === null || hover === i ? 1 : 0.55}
+                  />
                 )
               })}
               {i % labelEvery === 0 && (
-                <text x={x + barW / 2} y={height - 4} textAnchor="middle" fontSize="11" fill="var(--text-3)" fontFamily="var(--mono)">
+                <text
+                  x={x + barW / 2}
+                  y={height - 4}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fill="var(--text-3)"
+                  fontFamily="var(--mono)"
+                >
                   {l}
                 </text>
               )}
@@ -155,7 +192,9 @@ export function StackedBars({
         <div
           role="tooltip"
           className="pointer-events-none absolute top-2 z-10 min-w-[150px] rounded-btn border border-line-2 bg-raised px-3 py-2 text-sm"
-          style={{ left: `min(calc(${((padL + hover * band + band) / W) * 100}% + 8px), calc(100% - 170px))` }}
+          style={{
+            left: `min(calc(${((padL + hover * band + band) / W) * 100}% + 8px), calc(100% - 170px))`,
+          }}
         >
           <div className="mb-1 font-mono text-text-2">{labels[hover]}</div>
           {folded.map((s, si) => (
@@ -180,7 +219,11 @@ export function Legend({ items }: { items: { label: string; value?: string }[] }
     <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm">
       {items.map((it, i) => (
         <li key={it.label} className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: SERIES[i] ?? 'var(--text-3)' }} aria-hidden="true" />
+          <span
+            className="h-2.5 w-2.5 rounded-[2px]"
+            style={{ background: SERIES[i] ?? 'var(--text-3)' }}
+            aria-hidden="true"
+          />
           <span className="font-mono">{it.label}</span>
           {it.value && <span className="font-mono text-text-2">{it.value}</span>}
         </li>
@@ -190,7 +233,13 @@ export function Legend({ items }: { items: { label: string; value?: string }[] }
 }
 
 /** Horizontal bars, one series (tokens by agent): value at the bar end, sorted by the caller. */
-export function HBars({ rows, max }: { rows: { label: string; value: number; sub?: string }[]; max?: number }) {
+export function HBars({
+  rows,
+  max,
+}: {
+  rows: { label: string; value: number; sub?: string }[]
+  max?: number
+}) {
   const m = max ?? Math.max(1, ...rows.map((r) => r.value))
   return (
     <ul className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label="Bars">
@@ -200,7 +249,11 @@ export function HBars({ rows, max }: { rows: { label: string; value: number; sub
             {r.label}
           </span>
           <span className="flex h-2 items-center">
-            <span className="h-2 rounded-r-[4px] bg-s1" style={{ width: `${Math.max(1.5, (r.value / m) * 100)}%` }} aria-hidden="true" />
+            <span
+              className="h-2 rounded-r-[4px] bg-s1"
+              style={{ width: `${Math.max(1.5, (r.value / m) * 100)}%` }}
+              aria-hidden="true"
+            />
           </span>
           <span className="text-right font-mono text-[12.5px]">{compactNumber(r.value)}</span>
         </li>
@@ -210,26 +263,60 @@ export function HBars({ rows, max }: { rows: { label: string; value: number; sub
 }
 
 /** Trend line for objectives and KPIs; the last point carries a dot. */
-export function Sparkline({ values, width = 96, height = 24, label, target }: { values: number[]; width?: number; height?: number; label: string; target?: number }) {
+export function Sparkline({
+  values,
+  width = 96,
+  height = 24,
+  label,
+  target,
+}: {
+  values: number[]
+  width?: number
+  height?: number
+  label: string
+  target?: number
+}) {
   if (values.length < 2) return <span className="text-meta text-text-3">—</span>
   const all = target !== undefined ? [...values, target] : values
   const lo = Math.min(...all)
   const hi = Math.max(...all)
   const span = hi - lo || 1
-  const pts = values.map((v, i) => [2 + (i / (values.length - 1)) * (width - 6), height - 3 - ((v - lo) / span) * (height - 6)] as const)
+  const pts = values.map(
+    (v, i) =>
+      [2 + (i / (values.length - 1)) * (width - 6), height - 3 - ((v - lo) / span) * (height - 6)] as const,
+  )
   const last = pts[pts.length - 1]
   const ty = target !== undefined ? height - 3 - ((target - lo) / span) * (height - 6) : null
   return (
     <svg width={width} height={height} role="img" aria-label={label} className="flex-none overflow-visible">
       {ty !== null && <line x1={0} x2={width} y1={ty} y2={ty} stroke="var(--line-2)" strokeWidth="1" />}
-      <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="var(--s1)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      {last && <circle cx={last[0]} cy={last[1]} r="3" fill="var(--s1)" stroke="var(--panel)" strokeWidth="2" />}
+      <polyline
+        points={pts.map((p) => p.join(',')).join(' ')}
+        fill="none"
+        stroke="var(--s1)"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {last && (
+        <circle cx={last[0]} cy={last[1]} r="3" fill="var(--s1)" stroke="var(--panel)" strokeWidth="2" />
+      )}
     </svg>
   )
 }
 
 /** Used / cap bar (TokenMeter): turns wait at 80 %, err past the cap. */
-export function TokenMeter({ used, cap, className = '', label }: { used: number; cap: number | null | undefined; className?: string; label?: string }) {
+export function TokenMeter({
+  used,
+  cap,
+  className = '',
+  label,
+}: {
+  used: number
+  cap: number | null | undefined
+  className?: string
+  label?: string
+}) {
   const ratio = cap ? used / cap : 0
   const tone = ratio >= 1 ? 'bg-err' : ratio >= 0.8 ? 'bg-wait' : 'bg-text-2'
   return (

@@ -49,13 +49,15 @@ export function DecisionRow({ item, agents }: { item: ReviewItem; agents: AgentI
         }`}
         aria-hidden="true"
       >
-        <Icon name={item.kind === 'question' ? 'question' : item.kind === 'suggestion' ? 'sparkle' : 'doc'} size={15} strokeWidth={1.8} />
+        <Icon
+          name={item.kind === 'question' ? 'question' : item.kind === 'suggestion' ? 'sparkle' : 'doc'}
+          size={15}
+          strokeWidth={1.8}
+        />
       </span>
       <div className="min-w-0 flex-[1_1_320px]">
         <div className="font-medium">{reviewItemTitle(item)}</div>
-        <div className="text-meta text-text-3">
-          {meta.join(' · ')}
-        </div>
+        <div className="text-meta text-text-3">{meta.join(' · ')}</div>
       </div>
       <div className="flex flex-wrap gap-2">
         {item.action && (

@@ -18,29 +18,63 @@ import { clock, isToday, relative, shortAge, titleCase } from '@/lib/format'
 import { missionAgent, playbookTitle, progress } from '@/lib/mission'
 import { missionStatus } from '@/lib/status'
 
-const SOURCE_LABEL: Record<string, string> = { jira: 'Jira', gitlab: 'GitLab', webhook: 'Webhook', email: 'Email', chat: 'Chat', schedule: 'Schedule', manual: 'Manual' }
+const SOURCE_LABEL: Record<string, string> = {
+  jira: 'Jira',
+  gitlab: 'GitLab',
+  webhook: 'Webhook',
+  email: 'Email',
+  chat: 'Chat',
+  schedule: 'Schedule',
+  manual: 'Manual',
+}
 
 function triggerLabel(t: Trigger): string {
   const f = t.filter
-  if (t.kind === 'schedule') return `${t.name ?? playbookTitle(t.playbook)} · ${describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)}`
+  if (t.kind === 'schedule')
+    return `${t.name ?? playbookTitle(t.playbook)} · ${describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)}`
   if (t.kind === 'jira') return `Jira · ${typeof f.label === 'string' ? `label ${f.label}` : 'issues'}`
-  if (t.kind === 'gitlab') return `GitLab · ${typeof f.assignee === 'string' ? `issues assigned to @${f.assignee}` : typeof f.label === 'string' ? `label ${f.label}` : 'events'}`
+  if (t.kind === 'gitlab')
+    return `GitLab · ${typeof f.assignee === 'string' ? `issues assigned to @${f.assignee}` : typeof f.label === 'string' ? `label ${f.label}` : 'events'}`
   return `${t.name ?? titleCase(t.kind)} · ${t.kind}`
 }
 
-function Column({ title, count, tone, children }: { title: string; count: number | null; tone?: 'wait'; children: ReactNode }) {
+function Column({
+  title,
+  count,
+  tone,
+  children,
+}: {
+  title: string
+  count: number | null
+  tone?: 'wait'
+  children: ReactNode
+}) {
   return (
     <section aria-label={title} className="flex min-w-[240px] flex-1 flex-col gap-2.5">
       <h2 className="m-0 flex items-baseline gap-2 border-b border-line pb-2.5 text-ui font-medium">
         {title}
-        {count !== null && <span className={tone === 'wait' && count > 0 ? 'text-wait' : 'text-text-3'}>{count}</span>}
+        {count !== null && (
+          <span className={tone === 'wait' && count > 0 ? 'text-wait' : 'text-text-3'}>{count}</span>
+        )}
       </h2>
       <div className="flex flex-col gap-2">{children}</div>
     </section>
   )
 }
 
-function Card({ children, to, params, search, muted }: { children: ReactNode; to?: string; params?: Record<string, string>; search?: Record<string, string>; muted?: boolean }) {
+function Card({
+  children,
+  to,
+  params,
+  search,
+  muted,
+}: {
+  children: ReactNode
+  to?: string
+  params?: Record<string, string>
+  search?: Record<string, string>
+  muted?: boolean
+}) {
   const cls = `flex flex-col gap-1.5 rounded-panel border border-line bg-panel px-3.5 py-3 no-underline ${muted ? 'text-text-2' : ''}`
   return to ? (
     <Link to={to} params={params} search={search} className={`${cls} hover:border-line-2`}>
@@ -59,7 +93,16 @@ function TaskCard({ t, agents }: { t: Task; agents: AgentIndex }) {
   const act = async (action: 'start' | 'dismiss') => {
     setBusy(action)
     try {
-      await unwrap(api.PATCH('/tasks/{id}', { params: { path: { id: t.id } }, body: { action, ...(t.suggested_playbook ? { playbook: t.suggested_playbook } : {}), ...(t.suggested_agent ? { agent: t.suggested_agent } : {}) } }))
+      await unwrap(
+        api.PATCH('/tasks/{id}', {
+          params: { path: { id: t.id } },
+          body: {
+            action,
+            ...(t.suggested_playbook ? { playbook: t.suggested_playbook } : {}),
+            ...(t.suggested_agent ? { agent: t.suggested_agent } : {}),
+          },
+        }),
+      )
       await qc.invalidateQueries({ queryKey: qk.tasks })
       await qc.invalidateQueries({ queryKey: ['missions'] })
       toast.ok(action === 'start' ? 'Mission started from the task' : 'Task dismissed')
@@ -99,12 +142,22 @@ function MissionCard({ m, agents, line }: { m: Mission; agents: AgentIndex; line
   const st = missionStatus(m.status)
   return (
     <Card to="/missions/$id" params={{ id: m.id }}>
-      <span className={`flex items-center gap-1.5 text-meta ${st.tone === 'run' ? 'text-run' : st.tone === 'wait' ? 'text-wait' : st.tone === 'ok' ? 'text-ok' : st.tone === 'err' || st.tone === 'budget' ? 'text-err' : 'text-text-3'}`}>
+      <span
+        className={`flex items-center gap-1.5 text-meta ${st.tone === 'run' ? 'text-run' : st.tone === 'wait' ? 'text-wait' : st.tone === 'ok' ? 'text-ok' : st.tone === 'err' || st.tone === 'budget' ? 'text-err' : 'text-text-3'}`}
+      >
         <Dot tone={st.tone} />
         {line ?? `${agents.label(missionAgent(m))} · ${p.done} of ${p.total}`}
       </span>
       <span className="font-medium">{m.title}</span>
-      {m.status === 'running' && <ProgressBar value={p.done} max={p.total || 1} tone="run" className="mt-1" label={`${p.done} of ${p.total}`} />}
+      {m.status === 'running' && (
+        <ProgressBar
+          value={p.done}
+          max={p.total || 1}
+          tone="run"
+          className="mt-1"
+          label={`${p.done} of ${p.total}`}
+        />
+      )}
     </Card>
   )
 }
@@ -171,9 +224,19 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
     >
       {created ? (
         <div className="flex flex-col gap-3">
-          <p className="m-0 text-text-2">Point the tool at this URL. The secret is shown once; requests are checked with HMAC.</p>
-          <Field label="Webhook URL">{(id) => <Input id={id} readOnly value={created.webhook_url ?? ''} className="font-mono text-sm" />}</Field>
-          {created.secret && <Field label="Signing secret (shown once)">{(id) => <Input id={id} readOnly value={created.secret ?? ''} className="font-mono text-sm" />}</Field>}
+          <p className="m-0 text-text-2">
+            Point the tool at this URL. The secret is shown once; requests are checked with HMAC.
+          </p>
+          <Field label="Webhook URL">
+            {(id) => (
+              <Input id={id} readOnly value={created.webhook_url ?? ''} className="font-mono text-sm" />
+            )}
+          </Field>
+          {created.secret && (
+            <Field label="Signing secret (shown once)">
+              {(id) => <Input id={id} readOnly value={created.secret ?? ''} className="font-mono text-sm" />}
+            </Field>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -189,7 +252,16 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
             )}
           </Field>
           {(kind === 'jira' || kind === 'gitlab' || kind === 'schedule') && (
-            <Field label={kind === 'jira' ? 'Label' : kind === 'gitlab' ? 'Assignee' : 'Cron'}>{(id) => <Input id={id} value={value} onChange={(e) => setValue(e.target.value)} className="font-mono" />}</Field>
+            <Field label={kind === 'jira' ? 'Label' : kind === 'gitlab' ? 'Assignee' : 'Cron'}>
+              {(id) => (
+                <Input
+                  id={id}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  className="font-mono"
+                />
+              )}
+            </Field>
           )}
           <Field label="Playbook" className="sm:col-span-2">
             {(id) => (
@@ -230,7 +302,11 @@ export function Tasks() {
   const scheduledTasks = taskList.filter((t) => t.status === 'scheduled')
   const schedules = (triggers.data ?? []).filter((t) => t.kind === 'schedule' && t.enabled)
   const intake = (triggers.data ?? []).filter((t) => t.enabled)
-  const finished = (done.data?.items ?? []).filter((m) => isToday(m.ended_at) || (m.ended_at && Date.parse(m.ended_at) > Date.parse(new Date().toDateString()) - 86400_000 * 2))
+  const finished = (done.data?.items ?? []).filter(
+    (m) =>
+      isToday(m.ended_at) ||
+      (m.ended_at && Date.parse(m.ended_at) > Date.parse(new Date().toDateString()) - 86400_000 * 2),
+  )
   const reviewByMission = new Map<string, number>()
   for (const it of review.data?.items ?? []) {
     const mid = it.action?.mission_id ?? it.question?.mission_id
@@ -245,7 +321,10 @@ export function Tasks() {
         lead="Work comes in from your tools and schedules. Z picks it up, routes it to the right agent and brings it back to you for review."
         right={
           canStart ? (
-            <Link to="/missions/new" className="flex h-[34px] items-center rounded-btn bg-inv-bg px-3.5 font-medium text-inv-text no-underline">
+            <Link
+              to="/missions/new"
+              className="flex h-[34px] items-center rounded-btn bg-inv-bg px-3.5 font-medium text-inv-text no-underline"
+            >
               New mission
             </Link>
           ) : undefined
@@ -257,36 +336,62 @@ export function Tasks() {
           <NotServed what="Intake sources" endpoint="GET /triggers" compact />
         ) : (
           intake.map((t) => (
-            <span key={t.id} className="flex h-[30px] items-center gap-2 rounded-ctl border border-line-2 px-3 text-ui">
+            <span
+              key={t.id}
+              className="flex h-[30px] items-center gap-2 rounded-ctl border border-line-2 px-3 text-ui"
+            >
               <Dot tone="ok" />
               {triggerLabel(t)}
             </span>
           ))
         )}
-        {!isNotServed(triggers.error) && schedules.length > 1 && <span className="text-meta text-text-3">Schedules · {schedules.length}</span>}
+        {!isNotServed(triggers.error) && schedules.length > 1 && (
+          <span className="text-meta text-text-3">Schedules · {schedules.length}</span>
+        )}
         {canTriggers && !isNotServed(triggers.error) && (
-          <button type="button" onClick={() => setAdding(true)} className="flex h-[30px] items-center rounded-ctl border border-dashed border-line-2 px-3 text-text-2 hover:text-text">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex h-[30px] items-center rounded-ctl border border-dashed border-line-2 px-3 text-text-2 hover:text-text"
+          >
             Add a source
           </button>
         )}
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         <Column title="Incoming" count={tasksNotServed ? null : incoming.length}>
-          {tasksNotServed ? <NotServed what="The task inbox" endpoint="GET /tasks" /> : incoming.map((t) => <TaskCard key={t.id} t={t} agents={agents} />)}
-          {!tasksNotServed && tasks.data && incoming.length === 0 && <span className="text-meta text-text-3">Nothing new.</span>}
+          {tasksNotServed ? (
+            <NotServed what="The task inbox" endpoint="GET /tasks" />
+          ) : (
+            incoming.map((t) => <TaskCard key={t.id} t={t} agents={agents} />)
+          )}
+          {!tasksNotServed && tasks.data && incoming.length === 0 && (
+            <span className="text-meta text-text-3">Nothing new.</span>
+          )}
         </Column>
-        <Column title="Scheduled" count={tasksNotServed && isNotServed(triggers.error) ? null : scheduledTasks.length + schedules.length}>
+        <Column
+          title="Scheduled"
+          count={
+            tasksNotServed && isNotServed(triggers.error) ? null : scheduledTasks.length + schedules.length
+          }
+        >
           {schedules.map((t) => (
             <Card key={t.id} muted>
-              <span className="font-mono text-sm text-text-3">{describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)} · playbook</span>
+              <span className="font-mono text-sm text-text-3">
+                {describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)} · playbook
+              </span>
               <span className="font-medium text-text">{playbookTitle(t.playbook) || t.name}</span>
-              <span className="text-meta text-text-3">{t.last_fired_at ? `last run ${relative(t.last_fired_at)}` : 'not run yet'}</span>
+              <span className="text-meta text-text-3">
+                {t.last_fired_at ? `last run ${relative(t.last_fired_at)}` : 'not run yet'}
+              </span>
             </Card>
           ))}
           {scheduledTasks.map((t) => (
             <TaskCard key={t.id} t={t} agents={agents} />
           ))}
-          {isNotServed(triggers.error) && schedules.length === 0 && <span className="text-meta text-text-3">Schedules appear once triggers are served.</span>}
+          {isNotServed(triggers.error) && schedules.length === 0 && (
+            <span className="text-meta text-text-3">Schedules appear once triggers are served.</span>
+          )}
         </Column>
         <Column title="Running" count={running.data?.items.length ?? null}>
           {(running.data?.items ?? []).map((m) => (
@@ -296,16 +401,23 @@ export function Tasks() {
         <Column title="Needs review" count={waiting.data?.items.length ?? null} tone="wait">
           {(waiting.data?.items ?? []).map((m) => {
             const n = reviewByMission.get(m.id) ?? 0
-            const first = (review.data?.items ?? []).find((i) => (i.action?.mission_id ?? i.question?.mission_id) === m.id)
+            const first = (review.data?.items ?? []).find(
+              (i) => (i.action?.mission_id ?? i.question?.mission_id) === m.id,
+            )
             return (
               <Card key={m.id} to="/review" search={first ? { item: reviewItemId(first) } : {}}>
                 <span className="flex items-center gap-1.5 text-meta text-wait">
                   <Dot tone="wait" />
-                  {m.waiting_reason === 'question' ? 'Question' : n > 1 ? `Approve ${n} writes` : 'Approve writes'}
+                  {m.waiting_reason === 'question'
+                    ? 'Question'
+                    : n > 1
+                      ? `Approve ${n} writes`
+                      : 'Approve writes'}
                 </span>
                 <span className="font-medium">{m.title}</span>
                 <span className="text-meta text-text-3">
-                  {agents.label(missionAgent(m))} · {first ? `${shortAge(first.age_s)} ago` : relative(m.started_at)}
+                  {agents.label(missionAgent(m))} ·{' '}
+                  {first ? `${shortAge(first.age_s)} ago` : relative(m.started_at)}
                 </span>
               </Card>
             )
@@ -314,7 +426,9 @@ export function Tasks() {
         <Column title="Done" count={finished.length}>
           {finished.map((m) => {
             const st = missionStatus(m.status)
-            return <MissionCard key={m.id} m={m} agents={agents} line={`${st.label} · ${clock(m.ended_at)}`} />
+            return (
+              <MissionCard key={m.id} m={m} agents={agents} line={`${st.label} · ${clock(m.ended_at)}`} />
+            )
           })}
         </Column>
       </div>

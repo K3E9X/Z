@@ -12,9 +12,13 @@ export function useArtifactText(id: string | null | undefined, enabled = true, m
     enabled: !!id && enabled,
     staleTime: Infinity,
     queryFn: async () => {
-      const res = await rawFetch(`/artifacts/${encodeURIComponent(id ?? '')}`, { headers: { Accept: 'text/plain, */*' } })
+      const res = await rawFetch(`/artifacts/${encodeURIComponent(id ?? '')}`, {
+        headers: { Accept: 'text/plain, */*' },
+      })
       const text = await res.text()
-      return text.length > maxBytes ? `${text.slice(0, maxBytes)}\n… (truncated, download the artifact for the rest)` : text
+      return text.length > maxBytes
+        ? `${text.slice(0, maxBytes)}\n… (truncated, download the artifact for the rest)`
+        : text
     },
   })
 }

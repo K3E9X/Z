@@ -46,7 +46,8 @@ export function renderWithProviders(ui: ReactNode, opts: { me?: Me } = {}) {
 
 /** Render inside a minimal router (components with <Link>) plus the app providers. */
 export async function renderRouted(ui: ReactNode, opts: { me?: Me } = {}) {
-  const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import('@tanstack/react-router')
+  const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } =
+    await import('@tanstack/react-router')
   const root = createRootRoute({ component: () => <>{ui}</> })
   const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ['/'] }) })
   const out = renderWithProviders(<RouterProvider router={router as never} />, opts)

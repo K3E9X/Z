@@ -14,7 +14,9 @@ function store(): Storage | null {
 
 export function readPref<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   const raw = store()?.getItem(PREFIX + key)
-  return raw !== null && raw !== undefined && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback
+  return raw !== null && raw !== undefined && (allowed as readonly string[]).includes(raw)
+    ? (raw as T)
+    : fallback
 }
 
 export function readBoolPref(key: string, fallback: boolean): boolean {

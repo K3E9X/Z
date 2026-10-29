@@ -15,7 +15,12 @@ import { useCan } from '@/lib/auth'
 import { clock, plural } from '@/lib/format'
 import { useNow } from '@/lib/useMedia'
 
-const KIND: Record<string, string> = { skill_edit: 'Skill improvement', memory_fact: 'Memory', routing_rule: 'Routing', playbook_edit: 'Playbook' }
+const KIND: Record<string, string> = {
+  skill_edit: 'Skill improvement',
+  memory_fact: 'Memory',
+  routing_rule: 'Routing',
+  playbook_edit: 'Playbook',
+}
 const STATUS: Record<string, { label: string; tone: string }> = {
   observed: { label: 'Observed', tone: 'text-text-3' },
   proposed: { label: 'Proposed', tone: 'text-text-2' },
@@ -41,7 +46,11 @@ const SIGNAL: Record<string, string> = {
 
 function signalDetail(s: Signal): string {
   const p = s.payload
-  const bits = [typeof p.summary === 'string' ? p.summary : null, typeof p.reason === 'string' ? p.reason : null, typeof p.ref === 'string' ? p.ref : null].filter(Boolean)
+  const bits = [
+    typeof p.summary === 'string' ? p.summary : null,
+    typeof p.reason === 'string' ? p.reason : null,
+    typeof p.ref === 'string' ? p.ref : null,
+  ].filter(Boolean)
   return bits.join(' · ')
 }
 
@@ -60,7 +69,12 @@ function ProposalDetail({ p }: { p: Proposal }) {
         await unwrap(api.POST('/proposals/{id}/apply', { params: { path: { id: p.id } }, body: {} }))
         toast.ok('Applied as a new version. Roll back any time from the skill.')
       } else if (what === 'reject') {
-        await unwrap(api.POST('/proposals/{id}/reject', { params: { path: { id: p.id } }, body: reason ? { reason } : {} }))
+        await unwrap(
+          api.POST('/proposals/{id}/reject', {
+            params: { path: { id: p.id } },
+            body: reason ? { reason } : {},
+          }),
+        )
         toast.ok('Rejected')
         setRejecting(false)
       } else {
@@ -107,9 +121,23 @@ function ProposalDetail({ p }: { p: Proposal }) {
       <dl className="m-0 grid grid-cols-2 gap-4 border-b border-line px-6 py-5 sm:grid-cols-4">
         {[
           ['Evals before', before ? `${before.cases_passed} / ${before.cases_total}` : '—', ''],
-          ['Evals after', after ? `${after.cases_passed} / ${after.cases_total}` : p.status === 'evaluating' ? 'running…' : '—', after && before && after.cases_passed > before.cases_passed ? 'text-ok' : ''],
+          [
+            'Evals after',
+            after
+              ? `${after.cases_passed} / ${after.cases_total}`
+              : p.status === 'evaluating'
+                ? 'running…'
+                : '—',
+            after && before && after.cases_passed > before.cases_passed ? 'text-ok' : '',
+          ],
           ['Regressions', String(p.regressions.length), p.regressions.length ? 'text-err' : ''],
-          ['Token cost', p.cost_delta === null || p.cost_delta === undefined ? '—' : `${p.cost_delta >= 0 ? '+' : ''}${Math.round(p.cost_delta * 100)}%`, ''],
+          [
+            'Token cost',
+            p.cost_delta === null || p.cost_delta === undefined
+              ? '—'
+              : `${p.cost_delta >= 0 ? '+' : ''}${Math.round(p.cost_delta * 100)}%`,
+            '',
+          ],
         ].map(([k, v, tone]) => (
           <div key={k} className="flex flex-col gap-1">
             <dt className="text-meta text-text-2">{k}</dt>
@@ -126,12 +154,17 @@ function ProposalDetail({ p }: { p: Proposal }) {
       )}
       {p.shadow && (
         <div className="border-b border-line px-6 py-3 text-meta text-text-2">
-          Shadow replay: {p.shadow.matched ?? 0} of {p.shadow.missions ?? 0} recent missions match what humans approved.
+          Shadow replay: {p.shadow.matched ?? 0} of {p.shadow.missions ?? 0} recent missions match what humans
+          approved.
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 px-6 py-4">
         <span className="min-w-0 flex-1 text-meta text-text-2">
-          {p.status === 'ready' ? 'Applying creates a new version. You can roll back at any time.' : p.status === 'discarded' ? 'Discarded by the gates: no regression is allowed.' : STATUS[p.status]?.label}
+          {p.status === 'ready'
+            ? 'Applying creates a new version. You can roll back at any time.'
+            : p.status === 'discarded'
+              ? 'Discarded by the gates: no regression is allowed.'
+              : STATUS[p.status]?.label}
           {p.decided_by ? ` · decided by ${p.decided_by}` : ''}
         </span>
         {canApply && p.status === 'ready' && (
@@ -142,7 +175,12 @@ function ProposalDetail({ p }: { p: Proposal }) {
             <Button onClick={() => void decide('try')} busy={busy === 'try'}>
               Try on one mission
             </Button>
-            <Button variant="primary" onClick={() => void decide('apply')} busy={busy === 'apply'} disabled={p.regressions.length > 0}>
+            <Button
+              variant="primary"
+              onClick={() => void decide('apply')}
+              busy={busy === 'apply'}
+              disabled={p.regressions.length > 0}
+            >
               Apply
             </Button>
           </>
@@ -161,7 +199,13 @@ function ProposalDetail({ p }: { p: Proposal }) {
           </>
         }
       >
-        <Textarea aria-label="Reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why not? The learner uses it." />
+        <Textarea
+          aria-label="Reason"
+          rows={3}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Why not? The learner uses it."
+        />
       </Dialog>
     </article>
   )
@@ -180,10 +224,34 @@ export function Learning() {
   const discarded = list.filter((p) => p.status === 'discarded')
   const selected = list.find((p) => p.id === search.proposal) ?? ready[0] ?? list[0] ?? null
   const strip = [
-    ['01 · Observe', signals.data ? String(week.length) : '—', 'signals this week', 'Rejections, edits, retries, guardrail hits', isNotServed(signals.error)],
-    ['02 · Propose', proposals.data ? String(list.filter((p) => !['observed'].includes(p.status)).length) : '—', 'proposals', 'Skill edits, memory facts, routing rules', isNotServed(proposals.error)],
-    ['03 · Evaluate', proposals.data ? String(discarded.length) : '—', 'discarded', 'Replayed on evals; any regression is rejected', isNotServed(proposals.error)],
-    ['04 · Validate', proposals.data ? String(ready.length) : '—', 'waiting for you', 'A human applies, versioned and reversible', isNotServed(proposals.error)],
+    [
+      '01 · Observe',
+      signals.data ? String(week.length) : '—',
+      'signals this week',
+      'Rejections, edits, retries, guardrail hits',
+      isNotServed(signals.error),
+    ],
+    [
+      '02 · Propose',
+      proposals.data ? String(list.filter((p) => !['observed'].includes(p.status)).length) : '—',
+      'proposals',
+      'Skill edits, memory facts, routing rules',
+      isNotServed(proposals.error),
+    ],
+    [
+      '03 · Evaluate',
+      proposals.data ? String(discarded.length) : '—',
+      'discarded',
+      'Replayed on evals; any regression is rejected',
+      isNotServed(proposals.error),
+    ],
+    [
+      '04 · Validate',
+      proposals.data ? String(ready.length) : '—',
+      'waiting for you',
+      'A human applies, versioned and reversible',
+      isNotServed(proposals.error),
+    ],
   ] as const
   return (
     <main className="flex w-full max-w-[1320px] flex-col gap-7 px-[72px] pt-11 pb-14 max-lg:px-8 max-md:px-5">
@@ -192,10 +260,16 @@ export function Learning() {
         lead="Z learns from every decision, edit and failure. It proposes improvements to skills, memory and routing, tests them against the eval suite, and applies nothing without your approval."
         right={
           <div className="flex gap-2">
-            <Link to="/evals" className="flex h-[34px] items-center rounded-btn border border-line-2 px-3.5 no-underline hover:bg-raised">
+            <Link
+              to="/evals"
+              className="flex h-[34px] items-center rounded-btn border border-line-2 px-3.5 no-underline hover:bg-raised"
+            >
               Evals
             </Link>
-            <Link to="/analytics" className="flex h-[34px] items-center rounded-btn border border-line-2 px-3.5 no-underline hover:bg-raised">
+            <Link
+              to="/analytics"
+              className="flex h-[34px] items-center rounded-btn border border-line-2 px-3.5 no-underline hover:bg-raised"
+            >
               Analytics
             </Link>
           </div>
@@ -206,7 +280,9 @@ export function Learning() {
           <li key={step} className="flex flex-col gap-2 bg-bg px-5 py-5">
             <span className="font-mono text-sm text-text-3">{step}</span>
             <span className="flex items-baseline gap-2">
-              <span className={`text-[22px] font-medium ${i === 3 && ready.length ? 'text-wait' : ''}`}>{n}</span>
+              <span className={`text-[22px] font-medium ${i === 3 && ready.length ? 'text-wait' : ''}`}>
+                {n}
+              </span>
               <span>{what}</span>
             </span>
             <span className="text-meta text-text-2">{ns ? 'Not available on this server yet' : sub}</span>
@@ -221,7 +297,8 @@ export function Learning() {
                 <ProposalDetail key={selected.id} p={selected} />
               ) : (
                 <EmptyState icon="learning" title="No proposal yet">
-                  Proposals appear when a pattern repeats in your edits and rejections, after the eval gates pass.
+                  Proposals appear when a pattern repeats in your edits and rejections, after the eval gates
+                  pass.
                 </EmptyState>
               )
             }
@@ -239,7 +316,12 @@ export function Learning() {
                 .filter((p) => p.id !== selected?.id)
                 .slice(0, 12)
                 .map((p) => (
-                  <button key={p.id} type="button" onClick={() => void navigate({ to: '/learning', search: { proposal: p.id } })} className="flex flex-col gap-1 border-b border-line py-3.5 text-left">
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => void navigate({ to: '/learning', search: { proposal: p.id } })}
+                    className="flex flex-col gap-1 border-b border-line py-3.5 text-left"
+                  >
                     <span className="flex justify-between text-meta text-text-3">
                       <span>
                         {KIND[p.kind] ?? p.kind} · {agents.label(p.target.split('@')[0])}

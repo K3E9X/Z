@@ -49,7 +49,11 @@ export function PendingChange({
     }
   }
   return (
-    <div role="region" aria-label="Unsaved change" className="flex flex-wrap items-start gap-4 rounded-card border border-wait px-5 py-4">
+    <div
+      role="region"
+      aria-label="Unsaved change"
+      className="flex flex-wrap items-start gap-4 rounded-card border border-wait px-5 py-4"
+    >
       <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-2">
         <div className="font-medium">
           <span className="text-wait">Unsaved change</span> · {title}

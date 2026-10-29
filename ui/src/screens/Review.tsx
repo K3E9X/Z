@@ -78,21 +78,41 @@ function QuestionDetail({ item, agents }: { item: ReviewItem; agents: AgentIndex
       <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
         <div className="text-meta text-text-3">
           Mission “{item.mission_title}” ·{' '}
-          <Link to="/missions/$id" params={{ id: q.mission_id }} className="text-text-2 underline underline-offset-2">
+          <Link
+            to="/missions/$id"
+            params={{ id: q.mission_id }}
+            className="text-text-2 underline underline-offset-2"
+          >
             open the mission
           </Link>
         </div>
         <h1 className="m-0 text-2xl font-semibold">{agents.label(q.agent)} has a question</h1>
-        <div className="text-meta text-text-3">Asked {relative(q.created_at)} · the job is paused until you answer</div>
+        <div className="text-meta text-text-3">
+          Asked {relative(q.created_at)} · the job is paused until you answer
+        </div>
       </div>
       <div className="max-w-[820px] px-8 py-6">
-        <QuestionCard id={q.id} text={q.text} options={q.options} answer={q.answer} answeredBy={q.answered_by} />
+        <QuestionCard
+          id={q.id}
+          text={q.text}
+          options={q.options}
+          answer={q.answer}
+          answeredBy={q.answered_by}
+        />
       </div>
     </div>
   )
 }
 
-function SuggestionDetail({ item, agents, onDecided }: { item: ReviewItem; agents: AgentIndex; onDecided: () => void }) {
+function SuggestionDetail({
+  item,
+  agents,
+  onDecided,
+}: {
+  item: ReviewItem
+  agents: AgentIndex
+  onDecided: () => void
+}) {
   const s = item.suggestion
   const actions = useReviewActions()
   const canStart = useCan('missions:start')
@@ -112,7 +132,10 @@ function SuggestionDetail({ item, agents, onDecided }: { item: ReviewItem; agent
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
-          <div className="text-meta text-text-3">Suggested by {agents.label(s.agent)} · {relative(s.created_at)}{s.objective_id ? ' · from an objective' : ''}</div>
+          <div className="text-meta text-text-3">
+            Suggested by {agents.label(s.agent)} · {relative(s.created_at)}
+            {s.objective_id ? ' · from an objective' : ''}
+          </div>
           <h1 className="m-0 text-2xl font-semibold">{s.title}</h1>
         </div>
         <div className="flex max-w-[820px] flex-col gap-4 px-8 py-6">
@@ -121,9 +144,13 @@ function SuggestionDetail({ item, agents, onDecided }: { item: ReviewItem; agent
             <dt className="text-text-3">Playbook</dt>
             <dd className="m-0">{s.playbook ? playbookTitle(s.playbook) : 'Free-form plan'}</dd>
             <dt className="text-text-3">Estimated cost</dt>
-            <dd className="m-0 font-mono">{s.estimated_tokens ? `${compactNumber(s.estimated_tokens)} tokens` : '—'}</dd>
+            <dd className="m-0 font-mono">
+              {s.estimated_tokens ? `${compactNumber(s.estimated_tokens)} tokens` : '—'}
+            </dd>
             <dt className="text-text-3">Writes</dt>
-            <dd className="m-0">{s.has_writes ? 'Yes, each one will still need your approval' : 'None, read only'}</dd>
+            <dd className="m-0">
+              {s.has_writes ? 'Yes, each one will still need your approval' : 'None, read only'}
+            </dd>
           </dl>
           {Object.keys(s.inputs).length > 0 && <JsonView data={s.inputs} />}
         </div>
@@ -142,10 +169,26 @@ function SuggestionDetail({ item, agents, onDecided }: { item: ReviewItem; agent
   )
 }
 
-function ActionDetail({ item, agents, onDecided }: { item: ReviewItem; agents: AgentIndex; onDecided: () => void }) {
+function ActionDetail({
+  item,
+  agents,
+  onDecided,
+}: {
+  item: ReviewItem
+  agents: AgentIndex
+  onDecided: () => void
+}) {
   const mission = useMission(item.action?.mission_id ?? '')
   if (!item.action) return null
-  return <ActionReview key={item.action.id} action={item.action} mission={mission.data ?? null} agents={agents} onDecided={onDecided} />
+  return (
+    <ActionReview
+      key={item.action.id}
+      action={item.action}
+      mission={mission.data ?? null}
+      agents={agents}
+      onDecided={onDecided}
+    />
+  )
 }
 
 export function Review() {
@@ -153,7 +196,9 @@ export function Review() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const agents = useAgentIndex()
-  const kind = (['all', 'writes', 'questions', 'suggestions'].includes(search.kind ?? '') ? search.kind : 'all') as ReviewKind
+  const kind = (
+    ['all', 'writes', 'questions', 'suggestions'].includes(search.kind ?? '') ? search.kind : 'all'
+  ) as ReviewKind
   const review = useReview(kind)
   const all = useReview('all')
   const actions = useReviewActions()
@@ -162,13 +207,30 @@ export function Review() {
   const [batchBusy, setBatchBusy] = useState(false)
   const items = useMemo(() => review.data?.items ?? [], [review.data])
   const counts = all.data?.counts ?? review.data?.counts
-  const selectedId = search.item && items.some((i) => reviewItemId(i) === search.item) ? search.item : isMobile ? null : items[0] ? reviewItemId(items[0]) : null
+  const selectedId =
+    search.item && items.some((i) => reviewItemId(i) === search.item)
+      ? search.item
+      : isMobile
+        ? null
+        : items[0]
+          ? reviewItemId(items[0])
+          : null
   const selected = items.find((i) => reviewItemId(i) === selectedId) ?? null
-  const batchable = items.filter((i) => i.action && i.action.status === 'pending' && i.action.class !== 'destructive' && i.action.required_approvals <= 1)
+  const batchable = items.filter(
+    (i) =>
+      i.action &&
+      i.action.status === 'pending' &&
+      i.action.class !== 'destructive' &&
+      i.action.required_approvals <= 1,
+  )
   const chosen = batchable.filter((i) => checked.has(reviewItemId(i)))
 
   const select = (id: string | null) => {
-    void navigate({ to: '/review', search: { kind: kind === 'all' ? undefined : kind, item: id ?? undefined }, replace: true })
+    void navigate({
+      to: '/review',
+      search: { kind: kind === 'all' ? undefined : kind, item: id ?? undefined },
+      replace: true,
+    })
   }
   const move = (d: 1 | -1) => {
     const idx = items.findIndex((i) => reviewItemId(i) === selectedId)
@@ -185,7 +247,10 @@ export function Review() {
   useHotkeys({ j: () => move(1), k: () => move(-1), arrowdown: () => move(1), arrowup: () => move(-1) })
 
   const list = (
-    <section aria-label="Waiting for review" className="flex min-h-0 w-full flex-col border-line md:w-[320px] md:flex-none md:border-r">
+    <section
+      aria-label="Waiting for review"
+      className="flex min-h-0 w-full flex-col border-line md:w-[320px] md:flex-none md:border-r"
+    >
       <div className="flex flex-col gap-3.5 px-5 pt-6 pb-3">
         <h1 className="m-0 text-xl font-semibold">Review</h1>
         <Tabs<ReviewKind>
@@ -199,7 +264,9 @@ export function Review() {
             { id: 'all', label: 'All', badge: counts?.all },
             { id: 'writes', label: 'Writes', badge: counts?.writes },
             { id: 'questions', label: 'Questions', badge: counts?.questions },
-            ...(counts?.suggestions ? [{ id: 'suggestions' as const, label: 'Suggested', badge: counts.suggestions }] : []),
+            ...(counts?.suggestions
+              ? [{ id: 'suggestions' as const, label: 'Suggested', badge: counts.suggestions }]
+              : []),
           ]}
         />
       </div>
@@ -304,7 +371,9 @@ export function Review() {
   ) : (
     <div className="flex flex-1 items-center justify-center p-10">
       <EmptyState icon="review" title={items.length ? 'Select an item' : 'All caught up'}>
-        {items.length ? 'Use J and K to move through the list.' : 'New writes and questions appear here live.'}
+        {items.length
+          ? 'Use J and K to move through the list.'
+          : 'New writes and questions appear here live.'}
       </EmptyState>
     </div>
   )
@@ -314,7 +383,11 @@ export function Review() {
       <main className="flex min-h-[calc(100vh-48px)] flex-col">
         {selected ? (
           <>
-            <button type="button" className="flex items-center gap-2 px-5 py-3 text-meta text-text-2" onClick={() => select(null)}>
+            <button
+              type="button"
+              className="flex items-center gap-2 px-5 py-3 text-meta text-text-2"
+              onClick={() => select(null)}
+            >
               <Icon name="chevronRight" size={12} className="rotate-180" /> All items
             </button>
             {detail}

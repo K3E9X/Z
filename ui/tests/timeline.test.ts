@@ -2,9 +2,19 @@ import { describe, expect, it } from 'vitest'
 import type { ZEvent } from '@/api/events.gen'
 import { activityText, emptyTimeline, parseEvent, reduceEvents, stepState } from '@/lib/timeline'
 
-const base = { mission_id: 'msn_1', job_id: 'job_1', ts: '2026-10-28T10:21:00Z', agent: 'dev-engineer', step_id: 'bump' }
+const base = {
+  mission_id: 'msn_1',
+  job_id: 'job_1',
+  ts: '2026-10-28T10:21:00Z',
+  agent: 'dev-engineer',
+  step_id: 'bump',
+}
 let seq = 0
-function ev<T extends ZEvent['type']>(type: T, payload: Extract<ZEvent, { type: T }>['payload'], s?: number): ZEvent {
+function ev<T extends ZEvent['type']>(
+  type: T,
+  payload: Extract<ZEvent, { type: T }>['payload'],
+  s?: number,
+): ZEvent {
   seq = s ?? seq + 1
   return { ...base, seq, type, payload } as ZEvent
 }
@@ -12,8 +22,16 @@ function ev<T extends ZEvent['type']>(type: T, payload: Extract<ZEvent, { type: 
 describe('event timeline reducer', () => {
   it('merges a tool call with its result and counts judge flags', () => {
     const t = reduceEvents(emptyTimeline(), [
-      ev('tool_call', { call_id: 'c1', tool: 'gateway', operation: 'gitlab.projects.list', args: { group: 'infra' } }, 1),
-      ev('tool_result', { call_id: 'c1', ok: true, summary: '34 projects', duration_ms: 120, judge: 'flagged' }, 2),
+      ev(
+        'tool_call',
+        { call_id: 'c1', tool: 'gateway', operation: 'gitlab.projects.list', args: { group: 'infra' } },
+        1,
+      ),
+      ev(
+        'tool_result',
+        { call_id: 'c1', ok: true, summary: '34 projects', duration_ms: 120, judge: 'flagged' },
+        2,
+      ),
     ])
     expect(t.items).toHaveLength(1)
     const item = t.items[0]
@@ -24,7 +42,10 @@ describe('event timeline reducer', () => {
   })
 
   it('is idempotent: replaying events after an SSE resume changes nothing', () => {
-    const events = [ev('message', { role: 'agent', text: 'hello' }, 1), ev('denied', { what: 'curl https://repo1.maven.org', rule: 'egress' }, 2)]
+    const events = [
+      ev('message', { role: 'agent', text: 'hello' }, 1),
+      ev('denied', { what: 'curl https://repo1.maven.org', rule: 'egress' }, 2),
+    ]
     const once = reduceEvents(emptyTimeline(), events)
     const twice = reduceEvents(once, events)
     expect(twice).toBe(once)
@@ -33,7 +54,10 @@ describe('event timeline reducer', () => {
   })
 
   it('sorts events that arrive out of order', () => {
-    const t = reduceEvents(emptyTimeline(), [ev('message', { role: 'agent', text: 'second' }, 5), ev('message', { role: 'agent', text: 'first' }, 3)])
+    const t = reduceEvents(emptyTimeline(), [
+      ev('message', { role: 'agent', text: 'second' }, 5),
+      ev('message', { role: 'agent', text: 'first' }, 3),
+    ])
     const t2 = reduceEvents(t, [ev('message', { role: 'agent', text: 'between' }, 4)])
     expect(t2.items.map((i) => i.seq)).toEqual([3, 4, 5])
   })
@@ -41,11 +65,24 @@ describe('event timeline reducer', () => {
   it('tracks questions, answers, proposed actions and their status', () => {
     let t = reduceEvents(emptyTimeline(), [
       ev('question', { question_id: 'q1', text: 'Mark it failed?', options: ['Yes', 'No'] }, 1),
-      ev('action_proposed', { action_id: 'a1', connector: 'gitlab', operation: 'gitlab.merge_requests.create', class: 'write', summary: 'MR on auth-service' }, 2),
+      ev(
+        'action_proposed',
+        {
+          action_id: 'a1',
+          connector: 'gitlab',
+          operation: 'gitlab.merge_requests.create',
+          class: 'write',
+          summary: 'MR on auth-service',
+        },
+        2,
+      ),
     ])
     expect(t.questions.get('q1')?.answer).toBeNull()
     expect(t.actions.get('a1')?.status).toBe('pending')
-    t = reduceEvents(t, [ev('question_answered', { question_id: 'q1', answer: 'Yes', answered_by: 'alice' }, 3), ev('action_status', { action_id: 'a1', from: 'pending', to: 'applied' }, 4)])
+    t = reduceEvents(t, [
+      ev('question_answered', { question_id: 'q1', answer: 'Yes', answered_by: 'alice' }, 3),
+      ev('action_status', { action_id: 'a1', from: 'pending', to: 'applied' }, 4),
+    ])
     expect(t.questions.get('q1')?.answer).toBe('Yes')
     expect(t.actions.get('a1')?.status).toBe('applied')
     expect(t.items.filter((i) => i.kind === 'question')).toHaveLength(1)
@@ -53,7 +90,16 @@ describe('event timeline reducer', () => {
 
   it('sums usage, follows the plan, mission status and data class', () => {
     const t = reduceEvents(emptyTimeline(), [
-      ev('plan', { steps: [{ id: 'list', title: 'List' }, { id: 'bump', title: 'Bump' }] }, 1),
+      ev(
+        'plan',
+        {
+          steps: [
+            { id: 'list', title: 'List' },
+            { id: 'bump', title: 'Bump' },
+          ],
+        },
+        1,
+      ),
       ev('status', { entity: 'step', id: 'list', from: 'running', to: 'succeeded' }, 2),
       ev('status', { entity: 'mission', from: 'queued', to: 'running' }, 3),
       ev('usage', { model: 'z-heavy', tokens_in: 1000, tokens_out: 200, cached_tokens: 600 }, 4),
@@ -75,7 +121,10 @@ describe('event timeline reducer', () => {
   })
 
   it('parses SSE data and rejects what is not an event', () => {
-    const e = parseEvent('message', JSON.stringify({ ...base, seq: 7, type: 'message', payload: { role: 'agent', text: 'x' } }))
+    const e = parseEvent(
+      'message',
+      JSON.stringify({ ...base, seq: 7, type: 'message', payload: { role: 'agent', text: 'x' } }),
+    )
     expect(e?.seq).toBe(7)
     expect(parseEvent('message', 'not json')).toBeNull()
     expect(parseEvent('bogus', JSON.stringify({ seq: 1, type: 'bogus', payload: {} }))).toBeNull()

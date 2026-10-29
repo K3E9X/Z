@@ -154,15 +154,25 @@ export function DiffViewer({
                         <div key={li} role="row" className={`flex ${ROW[l.kind]}`}>
                           {lineNumbers && (
                             <>
-                              <span role="cell" className="w-10 flex-none pr-2 text-right text-text-3 select-none">
+                              <span
+                                role="cell"
+                                className="w-10 flex-none pr-2 text-right text-text-3 select-none"
+                              >
                                 {l.oldNo ?? ''}
                               </span>
-                              <span role="cell" className="w-10 flex-none pr-2 text-right text-text-3 select-none">
+                              <span
+                                role="cell"
+                                className="w-10 flex-none pr-2 text-right text-text-3 select-none"
+                              >
                                 {l.newNo ?? ''}
                               </span>
                             </>
                           )}
-                          <span role="cell" className="w-5 flex-none pl-2 select-none" aria-label={l.kind === 'add' ? 'added' : l.kind === 'del' ? 'removed' : undefined}>
+                          <span
+                            role="cell"
+                            className="w-5 flex-none pl-2 select-none"
+                            aria-label={l.kind === 'add' ? 'added' : l.kind === 'del' ? 'removed' : undefined}
+                          >
                             {SIGN[l.kind]}
                           </span>
                           <span role="cell" className="pr-4 whitespace-pre">

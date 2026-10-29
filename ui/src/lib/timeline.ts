@@ -17,19 +17,123 @@ export type TimelineItem =
       call: ZEventOf<'tool_call'>['payload']
       result: ZEventOf<'tool_result'>['payload'] | null
     }
-  | { kind: 'file_edit'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; edit: ZEventOf<'file_edit'>['payload'] }
-  | { kind: 'denied'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; denied: ZEventOf<'denied'>['payload'] }
-  | { kind: 'question'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; questionId: string }
-  | { kind: 'action'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; actionId: string }
-  | { kind: 'message'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; message: ZEventOf<'message'>['payload'] }
-  | { kind: 'validation'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; error: ZEventOf<'validation_error'>['payload'] }
-  | { kind: 'status'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; status: ZEventOf<'status'>['payload'] }
-  | { kind: 'subagent'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; sub: ZEventOf<'subagent'>['payload'] }
-  | { kind: 'artifact'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; artifact: ZEventOf<'artifact'>['payload'] }
-  | { kind: 'data_class'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; change: ZEventOf<'data_class'>['payload'] }
-  | { kind: 'judge'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; judge: ZEventOf<'judge'>['payload'] }
-  | { kind: 'terminal'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; term: ZEventOf<'terminal'>['payload'] }
-  | { kind: 'browser'; key: string; seq: number; ts: string; agent: string | null; jobId: string | null; browser: ZEventOf<'browser'>['payload'] }
+  | {
+      kind: 'file_edit'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      edit: ZEventOf<'file_edit'>['payload']
+    }
+  | {
+      kind: 'denied'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      denied: ZEventOf<'denied'>['payload']
+    }
+  | {
+      kind: 'question'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      questionId: string
+    }
+  | {
+      kind: 'action'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      actionId: string
+    }
+  | {
+      kind: 'message'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      message: ZEventOf<'message'>['payload']
+    }
+  | {
+      kind: 'validation'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      error: ZEventOf<'validation_error'>['payload']
+    }
+  | {
+      kind: 'status'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      status: ZEventOf<'status'>['payload']
+    }
+  | {
+      kind: 'subagent'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      sub: ZEventOf<'subagent'>['payload']
+    }
+  | {
+      kind: 'artifact'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      artifact: ZEventOf<'artifact'>['payload']
+    }
+  | {
+      kind: 'data_class'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      change: ZEventOf<'data_class'>['payload']
+    }
+  | {
+      kind: 'judge'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      judge: ZEventOf<'judge'>['payload']
+    }
+  | {
+      kind: 'terminal'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      term: ZEventOf<'terminal'>['payload']
+    }
+  | {
+      kind: 'browser'
+      key: string
+      seq: number
+      ts: string
+      agent: string | null
+      jobId: string | null
+      browser: ZEventOf<'browser'>['payload']
+    }
 
 export interface QuestionState {
   id: string
@@ -113,7 +217,8 @@ export function parseEvent(type: string, data: string): ZEvent | null {
   if (typeof obj !== 'object' || obj === null) return null
   const o = obj as Record<string, unknown>
   const t = typeof o.type === 'string' ? o.type : type
-  if (!isEventType(t) || typeof o.seq !== 'number' || typeof o.payload !== 'object' || o.payload === null) return null
+  if (!isEventType(t) || typeof o.seq !== 'number' || typeof o.payload !== 'object' || o.payload === null)
+    return null
   return { ...(o as unknown as ZEvent), type: t } as ZEvent
 }
 
@@ -205,7 +310,10 @@ export function reduceEvents(prev: TimelineState, events: readonly ZEvent[]): Ti
           s.plan = s.plan.map((st) => (st.id === stepId ? { ...st, status: p.to } : st))
         }
         // Mission-level transitions and failures are worth a line; routine job starts are not.
-        if (p.entity === 'mission' || ['failed', 'needs_attention', 'budget_exceeded', 'timed_out', 'paused'].includes(p.to)) {
+        if (
+          p.entity === 'mission' ||
+          ['failed', 'needs_attention', 'budget_exceeded', 'timed_out', 'paused'].includes(p.to)
+        ) {
           s.items.push({ kind: 'status', key: `s${e.seq}`, ...base, status: p })
         }
         break
@@ -284,7 +392,8 @@ export function reduceEvents(prev: TimelineState, events: readonly ZEvent[]): Ti
           answer: cur?.answer ?? null,
           answeredBy: cur?.answeredBy ?? null,
         })
-        if (!cur) s.items.push({ kind: 'question', key: `q${q.question_id}`, ...base, questionId: q.question_id })
+        if (!cur)
+          s.items.push({ kind: 'question', key: `q${q.question_id}`, ...base, questionId: q.question_id })
         break
       }
       case 'question_answered': {
