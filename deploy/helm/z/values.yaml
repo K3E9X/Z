@@ -405,6 +405,7 @@ config:
     executor:
       kind: kubernetes
       kubernetes: { namespace: z-runners, service_account: z-runner, job_ttl_s: 3600 }
+      tool_images: []    # cli connector tools (ADR 0025): name@sha256:..., pulled by the runners namespace
       default_concurrency: 8
       max_concurrency: 32
     inference:

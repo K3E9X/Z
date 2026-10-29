@@ -47,6 +47,7 @@ executor:
   kind: docker                  # docker | process (dev only) | kubernetes
   docker: { socket_proxy_url: http://docker-socket-proxy:2375, network: z_runners }   # compose declares the network with name: z_runners
   kubernetes: { namespace: z-runners, runtime_class: "", job_ttl_s: 3600 }
+  tool_images: []              # cli connector tools (ADR 0025): name@sha256:..., also in the socket proxy's Z_TOOL_IMAGES
   default_concurrency: 8
   max_concurrency: 32
 

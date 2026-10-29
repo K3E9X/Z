@@ -97,6 +97,8 @@ services:
     image: z-socket-proxy:local
     environment:
       Z_RUNNER_IMAGES: ${Z_RUNNER_IMAGE:-z-runner:local}
+      # cli connector tool images (ADR 0025), digest-pinned, comma-separated; the same list as executor.tool_images
+      Z_TOOL_IMAGES: ${Z_TOOL_IMAGES:-}
       Z_RUNNER_NETWORK: z_runners
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
