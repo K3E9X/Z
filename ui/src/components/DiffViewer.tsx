@@ -59,9 +59,11 @@ export function parseUnified(text: string): DiffFile[] {
   } catch {
     // fall through to the raw view
   }
+  // Not a valid patch (e.g. wrong hunk counts): show it line by line, file headers and hunk markers as meta.
+  const isMeta = (l: string) => /^(--- |\+\+\+ |@@|diff |index )/.test(l)
   const lines: DiffLine[] = text.split('\n').map((l) => ({
-    kind: l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx',
-    text: l.startsWith('+') || l.startsWith('-') || l.startsWith(' ') ? l.slice(1) : l,
+    kind: isMeta(l) ? 'meta' : l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx',
+    text: isMeta(l) ? l : l.startsWith('+') || l.startsWith('-') || l.startsWith(' ') ? l.slice(1) : l,
     oldNo: null,
     newNo: null,
   }))

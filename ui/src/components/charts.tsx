@@ -54,7 +54,8 @@ export function StackedBars({
   const padL = 44
   const padB = 22
   const plotW = W - padL
-  const plotH = height - padB
+  const padT = 10 // room for the top tick label
+  const plotH = height - padB - padT
   const band = n > 0 ? plotW / n : plotW
   const barW = Math.min(24, Math.max(3, band * 0.7))
   const peakIdx = totals.indexOf(Math.max(...totals))
@@ -103,7 +104,7 @@ export function StackedBars({
       <svg viewBox={`0 0 ${W} ${height}`} className="block h-auto w-full" role="img" aria-labelledby={`${id}-s`} onMouseLeave={() => setHover(null)}>
         <title id={`${id}-s`}>{summary}</title>
         {ticks.map((t) => {
-          const y = plotH - (t / max) * plotH
+          const y = padT + plotH - (t / max) * plotH
           return (
             <g key={t}>
               <line x1={padL} x2={W} y1={y} y2={y} stroke="var(--line)" strokeWidth="1" />
@@ -115,7 +116,7 @@ export function StackedBars({
         })}
         {labels.map((l, i) => {
           const x = padL + i * band + (band - barW) / 2
-          let y = plotH
+          let y = padT + plotH
           const segs = folded.map((s, si) => {
             const v = s.values[i] ?? 0
             const h = (v / max) * plotH
@@ -125,7 +126,7 @@ export function StackedBars({
           const top = segs.filter((s) => s.h > 0).at(-1)
           return (
             <g key={`${l}-${i}`} onMouseEnter={() => setHover(i)}>
-              <rect x={padL + i * band} y={0} width={band} height={plotH} fill="transparent" />
+              <rect x={padL + i * band} y={padT} width={band} height={plotH} fill="transparent" />
               {segs.map((s) => {
                 if (s.h <= 0) return null
                 const isTop = s === top

@@ -18,6 +18,8 @@ import { clock, isToday, relative, shortAge, titleCase } from '@/lib/format'
 import { missionAgent, playbookTitle, progress } from '@/lib/mission'
 import { missionStatus } from '@/lib/status'
 
+const SOURCE_LABEL: Record<string, string> = { jira: 'Jira', gitlab: 'GitLab', webhook: 'Webhook', email: 'Email', chat: 'Chat', schedule: 'Schedule', manual: 'Manual' }
+
 function triggerLabel(t: Trigger): string {
   const f = t.filter
   if (t.kind === 'schedule') return `${t.name ?? playbookTitle(t.playbook)} · ${describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)}`
@@ -71,7 +73,7 @@ function TaskCard({ t, agents }: { t: Task; agents: AgentIndex }) {
     <Card>
       <span className="font-mono text-sm text-text-3">
         {t.external_ref ? `${t.external_ref} · ` : ''}
-        {titleCase(t.source)}
+        {SOURCE_LABEL[t.source] ?? titleCase(t.source)}
       </span>
       <span className="font-medium">{t.title}</span>
       <span className="text-meta text-text-3">
