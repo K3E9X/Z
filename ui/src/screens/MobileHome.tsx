@@ -5,7 +5,7 @@ import { useMissions, useReview } from '@/api/queries'
 import type { ReviewItem } from '@/api/types'
 import { useAgentIndex, type AgentIndex } from '@/components/Avatar'
 import { reviewItemId, reviewItemTitle } from '@/components/DecisionRow'
-import { Icon, ZMark } from '@/components/Icon'
+import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui'
 import { useCan, useCurrentMe } from '@/lib/auth'
@@ -107,9 +107,9 @@ export function MobileHome() {
   const canStart = useCan('missions:start')
 
   return (
-    <main className="flex min-h-screen flex-col gap-6 px-5 pt-4 pb-28">
-      <div className="flex items-center justify-between">
-        <ZMark size={26} />
+    <main className="flex min-h-screen flex-col gap-6 px-5 pt-1 pb-28">
+      {/* The mobile bar above already carries the mark and the menu. */}
+      <div className="flex items-center justify-end">
         <span className="flex items-center gap-2 text-meta text-text-2">
           <span className="h-1.5 w-1.5 rounded-full bg-run" aria-hidden="true" />
           {working} {working === 1 ? 'mission' : 'missions'} running

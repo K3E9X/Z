@@ -385,7 +385,7 @@ function Composer({ mission, jobId }: { mission: Mission; jobId?: string }) {
             void send()
           }
         }}
-        placeholder={done ? 'This mission has ended.' : 'Guide the agent: “skip archived repositories”'}
+        placeholder={done ? 'This mission has ended.' : 'Guide the agent: “skip archived repos”'}
         className="min-h-[34px] flex-1 resize-none border-none px-0 focus-visible:outline-none"
       />
       <button
@@ -668,7 +668,7 @@ export function MissionDetail() {
           </div>
           <div className="border-t border-line px-6 py-4">
             <Composer mission={m} jobId={jobFilter} />
-            <div className="mt-1.5 text-sm text-text-3">↵ send · ⇧↵ new line · {MOD}K palette</div>
+            <div className="mt-1.5 text-sm text-text-3 max-md:hidden">↵ send · ⇧↵ new line · {MOD}K palette</div>
           </div>
         </div>
       </div>
