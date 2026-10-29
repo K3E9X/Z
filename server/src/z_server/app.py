@@ -45,7 +45,7 @@ from z_server.gateway.mcp_server import GatewayEndpoint
 from z_server.llm.litellm import KeyAdmin, LiteLLMKeyAdmin
 from z_server.mcp_endpoint import PATH as MCP_PATH
 from z_server.mcp_endpoint import ZMcpEndpoint
-from z_server.security import SecurityHeaders
+from z_server.security import BodyLimit, SecurityHeaders
 from z_server.settings import Settings
 from z_server.startup import prepare
 from z_server.state import AppState
@@ -167,6 +167,7 @@ def create_app(
     app.router.routes.append(Route(GATEWAY_PATH, endpoint=gateway_endpoint, methods=["GET", "POST", "DELETE"]))
     app.router.routes.append(Route(MCP_PATH, endpoint=z_mcp, methods=["GET", "POST", "DELETE"]))
     app.add_middleware(SecurityHeaders)
+    app.add_middleware(BodyLimit)  # outermost: before any body is read
     for router in ROUTERS:
         app.include_router(router)
 

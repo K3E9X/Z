@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from z_server.errors import Problem
 
@@ -43,6 +44,49 @@ METADATA = {
     ipaddress.ip_address("fd00:ec2::254"),
     ipaddress.ip_address("100.100.100.200"),
 }
+
+
+class BodyLimit:
+    """MAX_BODY for bodies without a Content-Length too (chunked): SecurityHeaders only sees the header. The body is
+    read up to the limit and replayed to the app, or answered with 413 (the internal runner routes have their own)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        headers = dict(scope.get("headers") or []) if scope["type"] == "http" else {}
+        if (
+            scope["type"] != "http"
+            or b"content-length" in headers
+            or str(scope.get("path", "")).startswith("/api/v1/internal/")
+            or scope.get("method") in {"GET", "HEAD", "OPTIONS", "DELETE"}
+        ):
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        size, more = 0, True
+        while more:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > MAX_BODY:
+                response = Response(
+                    '{"type":"urn:z:problem:validation","title":"request body too large","status":413}',
+                    status_code=413,
+                    media_type="application/problem+json",
+                )
+                await response(scope, receive, send)
+                return
+            chunks.append(chunk)
+            more = bool(message.get("more_body"))
+        replay = [{"type": "http.request", "body": b"".join(chunks), "more_body": False}]
+
+        async def replayed() -> Message:
+            return replay.pop() if replay else await receive()
+
+        await self.app(scope, replayed, send)
 
 
 class SecurityHeaders(BaseHTTPMiddleware):
