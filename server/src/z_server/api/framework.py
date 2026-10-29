@@ -26,12 +26,16 @@ from z_common.contracts import openapi
 from z_server import audit
 from z_server.auth import identity
 from z_server.errors import Problem
+from z_server.gateway.limits import replica_share
 from z_server.rbac import Principal
 from z_server.state import AppState
 
 API_PREFIX = "/api/v1"
 SPECIAL = {"public", "authenticated", "hmac", "job_token", "service"}
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# docs/12 §5: API requests per minute per session or token (per client IP when anonymous), shared out across
+# replicas. Login and token endpoints have their own, stricter limits (routes_auth.LOGIN_LIMIT).
+API_LIMIT_PER_MINUTE = 600
 SESSION_COOKIE = "__Host-z_session"
 CSRF_COOKIE = "__Host-z_csrf"
 CSRF_HEADER = "X-CSRF-Token"
@@ -189,6 +193,10 @@ async def _ctx(request: Request) -> AsyncIterator[Ctx]:
                         principal = None
                     else:
                         raise
+            client = request.client.host if request.client else "unknown"
+            key = f"api:{principal.session_id or principal.user_id}" if principal else f"api-ip:{client}"
+            if not state.limiter.allow(key, replica_share(API_LIMIT_PER_MINUTE), 60.0):
+                raise Problem("rate-limited", f"more than {API_LIMIT_PER_MINUTE} requests a minute")
             denial = _check(op, principal, request, await state.step_up_max_age(db))
         if denial is not None:
             kind, reason = denial

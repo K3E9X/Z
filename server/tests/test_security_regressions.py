@@ -169,3 +169,19 @@ def test_a_cancelled_missions_job_cannot_call_tools(app: TestClient, jars: dict[
         headers={"Authorization": f"Bearer {runner.session}", "Accept": "application/json, text/event-stream"},
     )
     assert resp.status_code == 401 or resp.json().get("error") or resp.json()["result"]["isError"], resp.text
+
+
+def test_api_rate_limit_per_session(
+    make_client: Callable[..., TestClient], oidc: FakeGitLabOIDC, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """docs/12 §5: API requests are rate limited per session or token (and per IP when anonymous)."""
+    from z_server.api import framework
+
+    monkeypatch.setattr(framework, "API_LIMIT_PER_MINUTE", 5)
+    app = make_client()
+    sign_in_as(app, oidc, "bob")
+    codes = [app.get("/api/v1/me").status_code for _ in range(7)]
+    assert codes[:4] == [200] * 4 and codes[-1] == 429, codes
+    other = make_client()
+    sign_in_as(other, oidc, "alice")  # another session has its own window
+    assert other.get("/api/v1/me").status_code == 200
