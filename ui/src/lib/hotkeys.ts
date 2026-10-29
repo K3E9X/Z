@@ -5,7 +5,8 @@ import { useEffect, useRef } from 'react'
  * and two-key sequences 'g m'. Single letters are ignored while typing in a field; `mod+…` and
  * 'escape' work everywhere.
  */
-export type HotkeyMap = Record<string, (e: KeyboardEvent) => void>
+/** A handler that returns `false` did not handle the key: the event keeps its default action. */
+export type HotkeyMap = Record<string, (e: KeyboardEvent) => unknown>
 
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -57,8 +58,7 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
         if (timer) clearTimeout(timer)
         const fn = bindings[seq]
         if (fn) {
-          e.preventDefault()
-          fn(e)
+          if (fn(e) !== false) e.preventDefault()
           return
         }
       }
@@ -70,10 +70,7 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
         return
       }
       const fn = bindings[key]
-      if (fn) {
-        e.preventDefault()
-        fn(e)
-      }
+      if (fn && fn(e) !== false) e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => {

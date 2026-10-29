@@ -66,14 +66,26 @@ export function useReviewActions() {
 
   const approve = useCallback(
     async (action: ProposedAction, opts: { comment?: string; exclude?: string[] } = {}) => {
-      const snap = removeFromReview(qc, new Set([action.id]))
+      const ids = new Set([action.id])
+      const body = {
+        ...(opts.comment ? { comment: opts.comment } : {}),
+        ...(opts.exclude && opts.exclude.length > 0 ? { exclude: opts.exclude } : {}),
+      }
       try {
-        const body = {
-          ...(opts.comment ? { comment: opts.comment } : {}),
-          ...(opts.exclude && opts.exclude.length > 0 ? { exclude: opts.exclude } : {}),
-        }
         const res = await stepUp.run(
-          () => unwrap(api.POST('/actions/{id}/approve', { params: { path: { id: action.id } }, body })),
+          async () => {
+            // Optimistic only while the request is in flight: when the server asks for a step-up the item
+            // comes back, so the detail (and its hotkeys) stay on this write while "Confirm it's you" is open.
+            const snap = removeFromReview(qc, ids)
+            try {
+              return await unwrap(
+                api.POST('/actions/{id}/approve', { params: { path: { id: action.id } }, body }),
+              )
+            } catch (e) {
+              restoreReview(qc, snap)
+              throw e
+            }
+          },
           {
             what: action.class === 'destructive' ? 'Approving a destructive action' : 'Approving this write',
             destructive: action.class === 'destructive',
@@ -87,7 +99,6 @@ export function useReviewActions() {
         )
         return res
       } catch (e) {
-        restoreReview(qc, snap)
         if (!(e instanceof StepUpCancelled)) toast.error(e, 'Approval failed')
         throw e
       } finally {

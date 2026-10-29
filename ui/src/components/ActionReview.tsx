@@ -269,7 +269,7 @@ export function ActionReview({
     : action.operation
 
   const approve = () => {
-    if (disabledReason || busy) return
+    if (disabledReason || busy || count === 0) return
     setBusy(true)
     actions
       .approve(action, { comment: note || undefined, exclude: [...excluded] })
@@ -284,7 +284,12 @@ export function ActionReview({
 
   useHotkeys(
     {
-      'mod+enter': approve,
+      'mod+enter': () => {
+        // Another dialog (step-up, the command palette...) owns the keyboard while it is open.
+        if (document.querySelector('dialog[open]')) return false
+        approve()
+        return true
+      },
       x: () => {
         if (pending && canApprove) setRejecting(true)
       },

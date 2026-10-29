@@ -141,6 +141,20 @@ describe('ActionReview', () => {
     })
   })
 
+  it('does not approve with Cmd/Ctrl+Enter when every batch item is excluded', async () => {
+    const user = userEvent.setup()
+    const a = action({
+      preview: { kind: 'json', data: { items: [{ key: 't1', title: 'Exposed dependency' }] } },
+    })
+    await renderRouted(<ActionReview action={a} agents={agents} />)
+    await user.click(await screen.findByLabelText('Include Exposed dependency'))
+    expect(screen.getByRole('button', { name: /^Approve/ })).toBeDisabled()
+    await user.click(document.body)
+    await user.keyboard('{Control>}{Enter}{/Control}')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(calls).toEqual([])
+  })
+
   it('explains why a destructive write needs two approvers and blocks a second approval by the same person', async () => {
     await renderRouted(
       <ActionReview
