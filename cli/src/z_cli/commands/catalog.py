@@ -550,3 +550,92 @@ def connectors_test(connector: str, as_json: JsonOpt = False) -> None:
         .post(f"/connectors/{connector}/test", {}, feature="Connector tests (POST /connectors/{id}/test)")
     )
     output.emit(result, as_json, lambda r: Text(json.dumps(r, indent=2, default=str)))
+
+
+@command(agents_app, "create")
+def agents_create(
+    describe: Annotated[
+        str | None, typer.Option("--describe", help="Plain-language description: Z drafts the profile.")
+    ] = None,
+    from_template: Annotated[
+        str | None, typer.Option("--from-template", help="Duplicate this agent as a start.")
+    ] = None,
+    name: Annotated[str | None, typer.Option("--name", help="Display name (e.g. Vega).")] = None,
+    handle: Annotated[str | None, typer.Option("--handle", help="Handle (default: from the name).")] = None,
+    yes: YesOpt = False,
+    as_json: JsonOpt = False,
+) -> None:
+    """Create an agent from a description (agent builder) or from a template."""
+    from z_cli.commands.learn import draft_agent
+
+    api = state.get().api()
+    if bool(describe) == bool(from_template):
+        raise UsageError("give --describe or --from-template")
+    if from_template:
+        if not name:
+            raise UsageError("--from-template needs --name")
+        body = {"display_name": name, "handle": (handle or name).lower().replace(" ", "-")}
+        created = api.post(f"/agents/{from_template.removeprefix('@')}/duplicate", body)
+    else:
+        drafted = draft_agent(str(describe), None)
+        profile = drafted["profile"]
+        if name:
+            profile["display_name"] = name
+        if handle:
+            profile["handle"] = handle
+        if not as_json:
+            output.out().print(
+                output.kv(
+                    [
+                        ("name", f"{profile['display_name']} (@{profile['handle']})"),
+                        ("role", profile["role"]),
+                        ("model", profile["model"]),
+                        ("skills", ", ".join(profile["skills"]) or "none"),
+                        ("tools", ", ".join(profile["tools"]) or "none"),
+                        ("autonomy", profile["autonomy"]),
+                        ("new skills", ", ".join(s["name"] for s in drafted.get("new_skills") or []) or None),
+                    ]
+                )
+            )
+            for question in drafted.get("questions") or []:
+                output.note(f"Open question: {question}")
+        if not confirm("Create this agent?", yes=yes, default=True):
+            output.note("Nothing created.")
+            return
+        created = api.post("/agents", profile)
+    if as_json:
+        output.print_json(created)
+        return
+    output.success(f"Created {created['display_name']} (@{created['handle']}).")
+
+
+@command(agents_app, "rename")
+def agents_rename(
+    agent: Annotated[str, typer.Argument(help="@handle, name or id.")],
+    name: Annotated[str, typer.Option("--name", help="New display name.")],
+    handle: Annotated[str | None, typer.Option("--handle", help="New handle.")] = None,
+    as_json: JsonOpt = False,
+) -> None:
+    """Rename an agent (display name and handle; history is kept)."""
+    body = {"display_name": name, "handle": handle or name.lower().replace(" ", "-")}
+    updated = state.get().api().patch(f"/agents/{agent.removeprefix('@')}", body)
+    if as_json:
+        output.print_json(updated)
+        return
+    output.success(f"Renamed to {updated['display_name']} (@{updated['handle']}).")
+
+
+@command(agents_app, "duplicate")
+def agents_duplicate(
+    agent: Annotated[str, typer.Argument(help="@handle, name or id.")],
+    name: Annotated[str, typer.Option("--name", help="Display name of the copy.")],
+    handle: Annotated[str | None, typer.Option("--handle", help="Handle of the copy.")] = None,
+    as_json: JsonOpt = False,
+) -> None:
+    """Duplicate an agent under a new name."""
+    body = {"display_name": name, "handle": handle or name.lower().replace(" ", "-")}
+    created = state.get().api().post(f"/agents/{agent.removeprefix('@')}/duplicate", body)
+    if as_json:
+        output.print_json(created)
+        return
+    output.success(f"Created {created['display_name']} (@{created['handle']}).")
