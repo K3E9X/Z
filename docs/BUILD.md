@@ -30,7 +30,7 @@ Open Claude Code at the repo root and paste:
 ---
 
 ## 2. Phase A — foundations and contracts (sequential)
-1. **Monorepo**: `uv` workspace (`server`, `runner`, `cli`, `packages/z-common`), `ui/` with pnpm, `ruff`, `mypy`, `pytest`, `pre-commit`. Copy `ci/github/ci.yml` to `.github/workflows/` with the jobs that can run now, `ci/renovate.json` to the root, `ci/CODEOWNERS.example` to `.github/CODEOWNERS`, create `security/exceptions.yaml` and `security/blocked-versions.yaml` from the examples.
+1. **Monorepo**: `uv` workspace (`server`, `runner`, `cli`, `packages/z-common`), `ui/` with pnpm, `ruff`, `mypy`, `pytest` (no `pre-commit`: it had no hooks configured and only pulled `virtualenv` into the dev tree; CI runs the same checks). Copy `ci/github/ci.yml` to `.github/workflows/` with the jobs that can run now, `ci/renovate.json` to the root, `ci/CODEOWNERS.example` to `.github/CODEOWNERS`, create `security/exceptions.yaml` and `security/blocked-versions.yaml` from the examples.
 2. **Contracts** in `contracts/` from `03-domain-and-contracts.md`:
    - `openapi.yaml` (public + internal API, problem details, SSE endpoints documented);
    - `events.schema.json` (envelope + every event payload);
