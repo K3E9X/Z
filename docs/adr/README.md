@@ -25,3 +25,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0021 — Audit checkpoints and forwarding run in one leader-elected worker](0021-audit-checkpoints-and-forwarding.md)
 - [0022 — Z as an MCP server: four tools, each one a REST operation called as the user](0022-z-as-an-mcp-server.md)
 - [0023 — Notifications go through a transactional outbox to admin-configured targets](0023-notifications-outbox.md)
+- [0024 — Integration with inferX (the internal inference platform)](0024-inferx-integration.md)

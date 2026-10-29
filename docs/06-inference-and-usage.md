@@ -3,7 +3,7 @@
 ## 1. Providers
 | Provider | Kind | Default | Data classes allowed |
 |---|---|---|---|
-| **inferX** | internal, OpenAI-compatible (GLM, Qwen, judge, embeddings) | enabled, primary | C0–C3 |
+| **inferX** | internal, OpenAI-compatible (`glm-5-3-nvfp4`, `qwen3-8-27b-nvfp4`; embeddings when opened), see ADR 0024 | enabled, primary | C0–C3, only for models without an external fallback |
 | Anthropic API | external | disabled | C0–C1 if enabled |
 | Azure OpenAI | external | disabled | C0–C1 if enabled |
 | Mistral API | external | disabled | C0–C1 if enabled |

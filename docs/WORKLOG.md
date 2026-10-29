@@ -21,6 +21,25 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
 
 ## Journal
 
+### Session 3 (autonomous, continued)
+- Query connectors (ADR 0020): `graphql` (declared documents; mutations refused in read operations at
+  validation, lint and call time) and `database` (PostgreSQL, declared SELECT only, READ ONLY transaction,
+  10 s statement timeout, 1000-row cap, rollback). A changed document unexposes its operation.
+- Audit worker (ADR 0021): scheduled signed checkpoints (own short transaction, never network I/O under the chain
+  lock), at-least-once forwarding with a cursor per target: syslog RFC 5424 over TLS with octet counting (tested
+  against a real TLS listener) and JSON lines over HTTPS with a bearer `token_ref`. Delivery state shown in
+  Admin → Audit. `verify` now anchors a retention-purged chain on a signed checkpoint; purge SQL in
+  deploy/README.md.
+- Z as an MCP server (ADR 0022): `/mcp` (bearer tokens only, cookies ignored) and `z mcp serve` (stdio) share
+  `z_common.mcp_tools`; each tool runs the REST operation in-process as the caller, so permissions, scopes,
+  audit and rate limits are unchanged. No approval tool by design.
+- Notifications (ADR 0023): `notification_outbox` (migration 0004) written by `events.append`, break-glass sign-in
+  and the health monitor in the same transaction; worker delivers to Slack/Mattermost/Teams webhooks, signed
+  webhooks and SMTP, with retries/backoff, per-target delivery state and budget alerts once per period.
+  Admin → Notifications tab.
+- Traps: the dependency test caught an undeclared `anyio` import in the CLI (use asyncio.run); `MissionStatus`
+  ends in `succeeded`, not `completed`; ZModel drops None fields, so read optional status keys with `.get`.
+
 ### Session 2 (autonomous night build)
 - Runner (B2) merged (113 tests). Aligned to the contract (`ControlMessage`).
 - **First real mission on compose** (`tests/e2e/test_compose_mission.py`, marker e2e): z-server all ->
