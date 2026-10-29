@@ -41,7 +41,7 @@ variables:
   HELM_IMAGE: alpine/helm:3.22.1@sha256:8191701ad1f82ee3695c87211fcbfe6d7b1bb7df92ac1c8de9ccdb0995a6a2c1
   RELEASE_CLI_IMAGE: registry.gitlab.com/gitlab-org/release-cli:v0.24.0@sha256:3f52d526f48e8d10625c722fa6d6423ee82aadeae1b1aa91f07b62551d96dacf
   PGVECTOR_IMAGE: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
-  SCANNERS_DIR: $CI_PROJECT_DIR/.scanners
+  SCANNERS_DIR: /tmp/z-scanners-$CI_JOB_ID # outside the checkout, so no linter or scanner reads it
   UV_CACHE_DIR: $CI_PROJECT_DIR/.cache/uv
   UV_LINK_MODE: copy
   BUILD_PLATFORMS: linux/amd64,linux/arm64
@@ -190,11 +190,11 @@ security:repo:
     - |
       set -- ; while read -r id; do set -- "$@" --exclude-rule "$id"; done < .exc/sast
       semgrep scan --metrics=off --error --severity ERROR --disable-version-check \
-        --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes "$@"
+        --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes --exclude .cache "$@"
     - skips=$(paste -sd, .exc/sast)
     - bandit -q -r server/src runner/src cli/src packages/z-common/src deploy/images ci/scripts
       --severity-level high --confidence-level high ${skips:+--skip "$skips"}
-    - trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln --ignorefile .exc/deps --skip-dirs .scanners --skip-dirs .cache .
+    - trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln --ignorefile .exc/deps --skip-dirs .cache .
     - |
       for v in k3s k8s; do
         trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile .exc/iac \
