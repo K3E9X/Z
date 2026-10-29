@@ -1,7 +1,7 @@
 # End-to-end (docs/13 §1 "e2e"): the compose stack with the fake LLM, fake tools and fake GitLab OIDC
 # (tests/e2e/compose.fakes.yml + compose.e2e.yml), images built locally, then `pytest -m e2e tests/e2e`.
 # Runs on PRs that touch the server, runner, deploy or e2e code, and on main. No secrets: the stack's
-# passwords are random per run. ZAP baseline and kind/k3d smoke tests are added when their scripts exist.
+# passwords are random per run. Job `kind` installs the Helm chart on a kind cluster. ZAP baseline comes later.
 name: e2e
 on:
   pull_request:
@@ -14,6 +14,8 @@ on:
       - "config/**"
       - "tests/e2e/**"
       - "tests/fakes/**"
+      - "ui/**"
+      - "ci/kind/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/e2e.yml"
@@ -72,3 +74,70 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           docker compose --env-file ../../.env $COMPOSE_FILES down -v --remove-orphans
+
+  # Smoke install of the Helm chart on a kind cluster (docs/13 §1): the images of this commit, the chart on top of
+  # values-k3s.yaml + ci/kind/values-smoke.yaml, in a namespace that enforces Pod Security `restricted`. Proves
+  # the chart deploys and its pods pass `restricted`, the migrations and the seed run, and z-server is ready.
+  kind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HELM_VERSION: v3.22.1
+      HELM_MODULE_SUM: "h1:uo2SouzAxMkKZTNzZ1lLP/c/Bu7xfUJKYDaYMxMHvk8="
+      GO_TOOLCHAIN: go1.26.10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install helm (verified Go module) and kind (pinned, checksum-verified; its node image is pinned by digest)
+        env:
+          GOTOOLCHAIN: ${{ env.GO_TOOLCHAIN }}
+          GOSUMDB: sum.golang.org
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"; mkdir -p "$bin"
+          sum=$(go mod download -json "helm.sh/helm/v3@${HELM_VERSION}" | jq -r .Sum)
+          test "$sum" = "$HELM_MODULE_SUM" || { echo "helm module hash mismatch: $sum"; exit 1; }
+          GOBIN="$bin" go install -trimpath -ldflags "-s -w" "helm.sh/helm/v3/cmd/helm@${HELM_VERSION}"
+          echo "$bin" >> "$GITHUB_PATH"
+          ci/scripts/install-scanners.sh kind
+      - name: Build the images of this commit
+        run: |
+          set -euo pipefail
+          for image in z-server z-ui z-runner; do
+            docker build -t "$image:smoke" -f "deploy/images/$image/Dockerfile" .
+          done
+      - name: Create the cluster and load the images
+        run: |
+          set -euo pipefail
+          kind create cluster --name z --wait 180s
+          kind load docker-image --name z z-server:smoke z-ui:smoke z-runner:smoke
+          kubectl create namespace z
+          kubectl label namespace z pod-security.kubernetes.io/enforce=restricted \
+            pod-security.kubernetes.io/enforce-version=latest
+      - name: helm install (migrations in an initContainer, seed as a post-install hook)
+        run: |
+          helm install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f ci/kind/values-smoke.yaml \
+            --wait --timeout 15m
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          kubectl -n z get pods -o wide
+          # the seed Job is a post-install hook: helm install --wait already failed if it failed, and the
+          # playbook check below shows it ran
+          test "$(kubectl get namespace z-runners -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}')" = restricted
+          kubectl -n z port-forward svc/z-server 8000:8000 > "$RUNNER_TEMP/pf.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/readyz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/readyz | jq -e '.status == "ok"'
+          curl -fsS http://127.0.0.1:8000/api/v1/me | jq -e '.user.username == "dev"'
+          curl -fsS "http://127.0.0.1:8000/api/v1/playbooks?q=summarize" | jq -e '[.items[].name] | index("summarize-file") != null'
+      - name: Cluster state
+        if: failure()
+        run: |
+          kubectl get events -A --sort-by=.lastTimestamp | tail -80
+          kubectl -n z describe pods | tail -200
+          for p in $(kubectl -n z get pods -o name); do echo "== $p"; kubectl -n z logs "$p" --all-containers --tail 80 || true; done

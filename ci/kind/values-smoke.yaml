@@ -1,0 +1,27 @@
+# kind smoke install (.github/workflows/e2e.yml, job `kind`), on top of values-k3s.yaml: images built in the job
+# and loaded into the kind node, dev sign-in, no ingress, kind's `standard` storage class. Not for real use.
+env: development
+authMode: dev
+publicUrl: http://localhost:8000
+
+server:
+  image: { repository: z-server, tag: smoke, digest: "", pullPolicy: Never }
+ui:
+  image: { repository: z-ui, tag: smoke, digest: "", pullPolicy: Never }
+runners:
+  image: { repository: z-runner, tag: smoke }
+
+litellm:
+  inferenceApiBase: http://inference.invalid/v1   # no model is called by the smoke test
+
+postgres:
+  embedded: true
+  storage: { storageClass: standard, size: 1Gi }
+
+persistence:
+  artifacts:
+    storageClass: standard
+    accessModes: [ReadWriteOnce]
+
+ingress:
+  enabled: false
