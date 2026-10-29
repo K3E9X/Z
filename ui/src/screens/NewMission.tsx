@@ -25,9 +25,11 @@ import { NotServed } from '@/components/states'
 import { useToast } from '@/components/toast'
 import { Button, Checkbox, Chip, Input, Radio, Select } from '@/components/ui'
 import { useCan } from '@/lib/auth'
+import { describeCron } from '@/lib/cron'
 import { bytes, compactNumber } from '@/lib/format'
 import { MOD } from '@/lib/hotkeys'
 import { playbookTitle } from '@/lib/mission'
+import { cronError, SCHEDULE_TZ_NOTE } from '@/lib/triggers'
 import { normalizePlan, PlanStepsEditor } from './PlanEditor'
 
 type Mode = 'plan_first' | 'propose' | 'read_only'
@@ -117,6 +119,10 @@ export function NewMission() {
   const [when, setWhen] = useState<When>('now')
   const [cron, setCron] = useState('0 8 * * 1')
   const [eventKind, setEventKind] = useState<'jira' | 'gitlab' | 'webhook'>('jira')
+  const [jiraProject, setJiraProject] = useState('')
+  const [jiraLabel, setJiraLabel] = useState('z')
+  const [gitlabLabel, setGitlabLabel] = useState('z')
+  const [everyCall, setEveryCall] = useState(false)
   const [budget, setBudget] = useState(2_000_000)
   const [minutes, setMinutes] = useState(45)
   const [dataClass, setDataClass] = useState<DataClass>('C2')
@@ -162,6 +168,35 @@ export function NewMission() {
   const steps: PlanStep[] | null = plan ?? (playbook ? (playbook.steps ?? []) : null)
   const writes = [...new Set((steps ?? []).flatMap((s) => s.writes ?? []))]
   const triggersServed = !isNotServed(triggers.error)
+  // A schedule or an event never silently becomes "start now": it needs a playbook and a valid source.
+  const whenError =
+    when === 'now'
+      ? null
+      : !playbook
+        ? 'Schedules and events need a playbook: pick one, or choose Now.'
+        : when === 'schedule'
+          ? cronError(cron)
+          : eventKind === 'jira'
+            ? !jiraProject.trim()
+              ? 'Name the Jira project to watch.'
+              : !jiraLabel.trim()
+                ? 'A label is needed, or every issue of the project starts a mission.'
+                : null
+            : eventKind === 'gitlab'
+              ? !gitlabLabel.trim()
+                ? 'A label is needed, or every GitLab event starts a mission.'
+                : null
+              : !everyCall
+                ? 'Confirm that every signed call to the webhook starts a mission.'
+                : null
+  const triggerSource =
+    when === 'schedule'
+      ? { config: { cron: cron.trim() }, filter: {} }
+      : eventKind === 'jira'
+        ? { config: { project: jiraProject.trim(), label: jiraLabel.trim() }, filter: {} }
+        : eventKind === 'gitlab'
+          ? { config: {}, filter: { label: gitlabLabel.trim() } }
+          : { config: {}, filter: {} }
 
   const choosePlaybook = (name: string | null) => {
     setPlaybookName(name)
@@ -238,13 +273,17 @@ export function NewMission() {
       const needStage = files.length > 0 || planFirst
       const budgetBody = { max_tokens: budget, timeout_s: minutes * 60 }
       let mission: Mission
-      if (when !== 'now' && playbook) {
+      if (when !== 'now') {
+        if (whenError || !playbook) {
+          toast.info(whenError ?? 'Schedules and events need a playbook.')
+          return
+        }
         await unwrap(
           api.POST('/triggers', {
             body: {
               kind: when === 'schedule' ? 'schedule' : eventKind,
               name: `${playbookTitle(playbook.name)} · ${when === 'schedule' ? cron : `on ${eventKind}`}`,
-              config: when === 'schedule' ? { cron } : {},
+              ...triggerSource,
               playbook: playbook.name ?? playbook.id,
               inputs: formValue,
               auto_start: true,
@@ -611,12 +650,19 @@ export function NewMission() {
               <span className="flex flex-wrap items-center gap-2">
                 On a schedule{' '}
                 {when === 'schedule' && (
-                  <Input
-                    aria-label="Cron expression"
-                    value={cron}
-                    onChange={(e) => setCron(e.target.value)}
-                    className="h-7 w-[120px] font-mono text-sm"
-                  />
+                  <>
+                    <Input
+                      aria-label="Cron expression"
+                      value={cron}
+                      onChange={(e) => setCron(e.target.value)}
+                      className="h-7 w-[120px] font-mono text-sm"
+                    />
+                    {!cronError(cron) && (
+                      <span className="text-sm text-text-3">
+                        {describeCron(cron)}. {SCHEDULE_TZ_NOTE}
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             }
@@ -642,14 +688,51 @@ export function NewMission() {
                     <option value="webhook">Webhook</option>
                   </Select>
                 )}
+                {when === 'event' && eventKind === 'jira' && (
+                  <>
+                    <Input
+                      aria-label="Jira project"
+                      placeholder="project"
+                      value={jiraProject}
+                      onChange={(e) => setJiraProject(e.target.value)}
+                      className="h-7 w-[110px] font-mono text-sm"
+                    />
+                    <Input
+                      aria-label="Jira label"
+                      value={jiraLabel}
+                      onChange={(e) => setJiraLabel(e.target.value)}
+                      className="h-7 w-[90px] font-mono text-sm"
+                    />
+                  </>
+                )}
+                {when === 'event' && eventKind === 'gitlab' && (
+                  <Input
+                    aria-label="GitLab label"
+                    value={gitlabLabel}
+                    onChange={(e) => setGitlabLabel(e.target.value)}
+                    className="h-7 w-[110px] font-mono text-sm"
+                  />
+                )}
               </span>
             }
           />
+          {when === 'event' && eventKind === 'webhook' && (
+            <Checkbox
+              checked={everyCall}
+              onChange={setEveryCall}
+              label={<span className="text-sm">Every signed call to the webhook starts a mission</span>}
+            />
+          )}
+          {whenError && (
+            <span role="alert" className="text-sm text-err">
+              {whenError}
+            </span>
+          )}
           {!canTriggers ? (
             <span className="text-sm text-text-3">
               Schedules and events need the triggers:write permission.
             </span>
-          ) : !playbook ? (
+          ) : !playbook && when === 'now' ? (
             <span className="text-sm text-text-3">Schedules and events need a playbook.</span>
           ) : (
             !triggersServed && (
@@ -727,8 +810,15 @@ export function NewMission() {
         <Button size="lg" onClick={() => window.history.back()}>
           Cancel
         </Button>
-        <Button size="lg" variant="primary" busy={busy} onClick={() => void start()}>
-          {when !== 'now' && playbook
+        <Button
+          size="lg"
+          variant="primary"
+          busy={busy}
+          disabled={!!whenError}
+          title={whenError ?? undefined}
+          onClick={() => void start()}
+        >
+          {when !== 'now'
             ? 'Create the trigger'
             : mode === 'plan_first'
               ? 'Create and review the plan'
