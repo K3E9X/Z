@@ -92,3 +92,57 @@ async def run(
 
 def _ms(started: float) -> int:
     return int((time.monotonic() - started) * 1000)
+
+
+class WorkerError(Exception):
+    def __init__(self, status: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status, self.detail = status, detail
+
+
+async def worker(state: AppState, method: str, path: str, body: Any = None, timeout: float = 30) -> Any:
+    """One call to the z-browser worker's recording API."""
+    settings = state.settings
+    if not settings.browser_url:
+        raise WorkerError(503, "browser connectors need the z-browser worker (Z_BROWSER_URL is not set)")
+    try:
+        resp = await state.http.request(
+            method,
+            f"{settings.browser_url}/v1/record{path}",
+            json=body,
+            headers={"Authorization": f"Bearer {settings.browser_token}"},
+            timeout=timeout,
+        )
+    except httpx.HTTPError as exc:
+        raise WorkerError(503, f"the browser worker is unreachable ({type(exc).__name__})") from exc
+    if resp.status_code == 204:
+        return None
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {}
+    if resp.status_code != 200:
+        raise WorkerError(
+            resp.status_code, str((data or {}).get("detail") or f"the browser worker answered {resp.status_code}")
+        )
+    return data
+
+
+async def record_start(state: AppState, connector: Connector, start_url: str, auth: AuthMaterial) -> Any:
+    flows = connector.manifest.get("flows") or {}
+    hosts = sorted({h for f in flows.values() for h in (f.get("allowed_hosts") or [])})
+    return await worker(
+        state,
+        "POST",
+        "",
+        {
+            "base_url": http_invoker.base_url(connector.base_url, connector.manifest),
+            "allowed_hosts": hosts or None,
+            "start_url": start_url,
+            "auth": {
+                "headers": {} if auth.login else auth.headers,
+                "username": auth.login.get("username"),
+                "password": auth.login.get("password"),
+            },
+        },
+    )

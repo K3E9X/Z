@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from z_common.connectors import browser
 from z_common.contracts import validator as contract_validator
@@ -14,9 +17,11 @@ from z_common.packs.classify import ORDER
 
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.auth.identity import now
-from z_server.db.models import Agent, Connector, Credential, Operation
+from z_server.db.models import Agent, Connector, Credential, Operation, Setting
 from z_server.errors import Problem
 from z_server.gateway import admin
+from z_server.gateway import browser as browser_gw
+from z_server.gateway.auth import AuthError
 from z_server.ids import new_id
 from z_server.security import check_outbound_url
 
@@ -478,12 +483,133 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
     )
 
 
+REC_PREFIX = "browser_rec:"
+REC_TTL = timedelta(minutes=10)
+
+
 @router.operation("recordBrowserFlow", status_code=201)
-async def record_browser_flow(ctx: CtxDep, body: dict[str, Any]) -> m.Connector:
-    """Flows are replayed by the z-browser worker; interactive recording is not part of this build yet: say so
-    instead of pretending (docs/05 §1, ADR 0016)."""
-    raise Problem(
-        "unavailable",
-        "interactive recording is not available yet; write the flow in the connector's `flows` "
-        "(steps such as fill, click, extract_table) and submit it for review",
+async def record_browser_flow(ctx: CtxDep, body: m.BrowserRecording) -> m.BrowserRecordingSession:
+    """Open a live page on a browser connector for the admin to record a flow (ADR 0016). The page is signed in
+    with the connector's read (or write) account and acts in the real application."""
+    row = (await ctx.db.execute(select(Connector).where(Connector.name == body.connector))).scalar_one_or_none()
+    if row is None or row.kind != "browser":
+        raise Problem("not-found", f"no browser connector {body.connector}")
+    gateway = ctx.state.gateway
+    if gateway is None:
+        raise Problem("unavailable", "the tool gateway is not running in this process")
+    try:
+        auth = await gateway.auth(row, body.purpose)
+        started = await browser_gw.record_start(ctx.state, row, body.start_url, auth)
+    except AuthError as exc:
+        raise Problem("validation", str(exc)) from exc
+    except browser_gw.WorkerError as exc:
+        raise Problem("unavailable" if exc.status >= 500 else "validation", exc.detail) from exc
+    rec_id = new_id("brec")
+    expires = datetime.now(UTC) + REC_TTL
+    ctx.db.add(
+        Setting(
+            key=REC_PREFIX + rec_id,
+            value={
+                "user": ctx.user.user_id,
+                "connector": row.name,
+                "name": body.name,
+                "purpose": body.purpose,
+                "worker_id": started["id"],
+                "expires_at": expires.isoformat(),
+            },
+        )
     )
+    await ctx.audit(
+        "connector.recording_started", "connector", row.id, after={"purpose": body.purpose, "name": body.name}
+    )
+    return m.BrowserRecordingSession(
+        id=rec_id, viewer_url=f"{ctx.state.settings.public_url}/connectors/record/{rec_id}", expires_at=expires
+    )
+
+
+async def _recording(ctx: Ctx, rec_id: str, *, close: bool = False) -> dict[str, Any]:
+    row = await ctx.db.get(Setting, REC_PREFIX + rec_id, with_for_update=True)
+    if row is None or row.value.get("user") != ctx.user.user_id:
+        raise Problem("not-found", "no such recording")
+    value = dict(row.value)
+    if datetime.fromisoformat(value["expires_at"]) < datetime.now(UTC):
+        await ctx.db.delete(row)
+        raise Problem("conflict", "the recording expired: start it again")
+    if close:
+        await ctx.db.delete(row)
+    else:
+        value["expires_at"] = (datetime.now(UTC) + REC_TTL).isoformat()
+        row.value = value
+    return value
+
+
+def _state(rec_id: str, value: dict[str, Any], worker_state: dict[str, Any]) -> m.BrowserRecordingState:
+    return m.BrowserRecordingState.model_validate(
+        {
+            "id": rec_id,
+            "connector": value["connector"],
+            "name": value["name"],
+            "purpose": value["purpose"],
+            "url": worker_state.get("url") or "",
+            "title": worker_state.get("title") or "",
+            "steps": worker_state.get("steps") or [],
+            "blocked_hosts": worker_state.get("blocked_hosts") or [],
+            "viewport": worker_state.get("viewport") or {"width": 1280, "height": 800},
+            "expires_at": value["expires_at"],
+        }
+    )
+
+
+async def _worker(ctx: Ctx, method: str, path: str, body: Any = None) -> Any:
+    try:
+        return await browser_gw.worker(ctx.state, method, path, body)
+    except browser_gw.WorkerError as exc:
+        if exc.status == 404:
+            raise Problem("conflict", "the recording ended on the browser worker: start it again") from exc
+        raise Problem("unavailable" if exc.status >= 500 else "validation", exc.detail) from exc
+
+
+@router.operation("getBrowserRecording")
+async def get_browser_recording(ctx: CtxDep, id: str) -> m.BrowserRecordingState:
+    value = await _recording(ctx, id)
+    return _state(id, value, await _worker(ctx, "GET", f"/{value['worker_id']}"))
+
+
+@router.operation("getBrowserRecordingScreen")
+async def get_browser_recording_screen(ctx: CtxDep, id: str) -> Response:
+    value = await _recording(ctx, id)
+    state = await _worker(ctx, "GET", f"/{value['worker_id']}")
+    data = base64.b64decode(state.get("screen_jpeg") or "")
+    return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.operation("sendBrowserRecordingInput")
+async def send_browser_recording_input(ctx: CtxDep, id: str, body: m.BrowserRecordingInput) -> m.BrowserRecordingState:
+    value = await _recording(ctx, id)
+    state = await _worker(ctx, "POST", f"/{value['worker_id']}/input", body.dump())
+    detail = {k: v for k, v in body.dump().items() if k in {"kind", "field", "key", "what", "name", "arg"}}
+    await ctx.audit("connector.recording_input", "connector", None, after={"recording": id, **detail})
+    return _state(id, value, state)
+
+
+@router.operation("finishBrowserRecording")
+async def finish_browser_recording(ctx: CtxDep, id: str) -> m.BrowserRecordingDraft:
+    value = await _recording(ctx, id, close=True)
+    out = await _worker(ctx, "POST", f"/{value['worker_id']}/finish")
+    await ctx.audit(
+        "connector.recording_finished",
+        "connector",
+        None,
+        after={"recording": id, "connector": value["connector"], "steps": len(out["flow"]["steps"])},
+    )
+    if not out["flow"]["steps"]:
+        raise Problem("validation", "nothing was recorded")
+    return m.BrowserRecordingDraft.model_validate(out)
+
+
+@router.operation("cancelBrowserRecording", status_code=204)
+async def cancel_browser_recording(ctx: CtxDep, id: str) -> Response:
+    value = await _recording(ctx, id, close=True)
+    await _worker(ctx, "DELETE", f"/{value['worker_id']}")
+    await ctx.audit("connector.recording_cancelled", "connector", None, after={"recording": id})
+    return Response(status_code=204)

@@ -270,3 +270,80 @@ def test_builder_drafts_a_browser_connector(app: TestClient, jars: dict[str, dic
     body["declared"] = [{**source["declared"][0], "flow": "missing"}]
     refused = app.post("/api/v1/connectors/import", json=body, headers=csrf(app))
     assert refused.status_code == 422 and "not defined in flows" in refused.text
+
+
+async def _boxes(url: str, selectors: list[str]) -> dict[str, tuple[float, float]]:
+    """Centers of elements on the page as the recorder renders it (same viewport)."""
+    from playwright.async_api import async_playwright
+
+    out = {}
+    async with async_playwright() as p:
+        b = await p.chromium.launch(headless=True)
+        page = await b.new_page(viewport={"width": 1280, "height": 800})
+        await page.goto(url)
+        for sel in selectors:
+            box = await page.locator(sel).first.bounding_box()
+            assert box is not None
+            out[sel] = (box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        await b.close()
+    return out
+
+
+def test_record_a_flow_from_the_web_app(app: TestClient, jars: dict[str, dict[str, str]], env: FakeTools) -> None:
+    import asyncio
+
+    use_jar(app, jars["alice"])
+    started = app.post(
+        "/api/v1/connectors/record-browser",
+        json={"connector": "fwconsole", "start_url": "login", "name": "find rules"},
+        headers=csrf(app),
+    )
+    assert started.status_code == 201, started.text
+    rec = started.json()
+    assert rec["viewer_url"].endswith(f"/connectors/record/{rec['id']}")
+    base = f"/api/v1/connectors/recordings/{rec['id']}"
+    state = app.get(base).json()
+    assert state["url"] == "login" and state["purpose"] == "read" and state["steps"] == []
+    screen = app.get(f"{base}/screen")
+    assert screen.status_code == 200 and screen.headers["content-type"] == "image/jpeg"
+    assert screen.content[:2] == b"\xff\xd8"
+
+    login = asyncio.run(_boxes(env.url_for("fwconsole") + "/login", ["#username", "#password", "#signin"]))
+
+    def send(body: dict[str, Any]) -> dict[str, Any]:
+        resp = app.post(f"{base}/input", json=body, headers=csrf(app))
+        assert resp.status_code == 200, resp.text
+        return dict(resp.json())
+
+    for field, sel in (("username", "#username"), ("password", "#password")):
+        x, y = login[sel]
+        send({"kind": "click", "x": x, "y": y})
+        send({"kind": "credential", "field": field})
+    x, y = login["#signin"]
+    send({"kind": "click", "x": x, "y": y})
+    send({"kind": "goto", "url": "rules?q=deny"})
+    state = app.get(base).json()
+    assert state["url"].startswith("rules")
+    refused = app.post(f"{base}/input", json={"kind": "goto", "url": "https://example.org/"}, headers=csrf(app))
+    assert refused.status_code == 422 and "not an allowed host" in refused.text
+    send({"kind": "screenshot", "name": "rules"})
+
+    use_jar(app, jars["bob"])  # another person cannot drive it
+    assert app.get(base).status_code in {403, 404}
+    use_jar(app, jars["alice"])
+    draft = app.post(f"{base}/finish", json={}, headers=csrf(app))
+    assert draft.status_code == 200, draft.text
+    flow = draft.json()["flow"]
+    assert flow["start_url"] == "login"
+    actions = [s["action"] for s in flow["steps"]]
+    assert actions == ["click", "fill", "click", "fill", "click", "goto", "screenshot"]
+    assert flow["steps"][3]["value"] == "{{auth.password}}" and "ro-fwconsole" not in str(flow)
+    assert app.get(base).status_code == 404  # finished
+
+    manifest = yaml.safe_load((REPO / "packs/archi-isp/connectors/fwconsole.yaml").read_text())
+    manifest["flows"]["recorded"] = flow
+    manifest["declared"].append({"id": "rules.overview", "flow": "recorded", "input_schema": {"type": "object"}})
+    saved = app.patch("/api/v1/connectors/fwconsole", json={"manifest": manifest}, headers=csrf(app))
+    assert saved.status_code == 200, saved.text
+    ops = {o["id"]: o for o in app.get("/api/v1/connectors/fwconsole/operations").json()}
+    assert ops["fwconsole.rules.overview"]["exposed"] is False  # a recorded flow is reviewed before exposure
