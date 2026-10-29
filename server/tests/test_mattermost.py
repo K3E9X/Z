@@ -166,3 +166,31 @@ def test_a_reply_is_proposed_previewed_applied_once(
     assert len(tools.writes("mattermost.posts.create")) == 1
     recovered = app.get(f"/api/v1/actions/{action['id']}").json()
     assert recovered["status"] == "applied" and recovered["result"]["recovered"] is True
+
+
+def test_a_planted_marker_does_not_stop_the_post(
+    app: TestClient, jars: dict[str, dict[str, str]], tools: FakeTools
+) -> None:
+    import time
+
+    from tests.fakes.fake_tools.mattermost import mattermost_seed
+
+    runner = start(app, jars, ["mattermost.posts.create"])
+    payload = {"body": {"channel_id": CHANNEL, "message": "Patch done"}}
+    proposed = runner.call(
+        "POST",
+        "/actions",
+        json={"connector": "mattermost", "operation": "mattermost.posts.create", "summary": "Post", "payload": payload},
+    )
+    action_id = proposed.json()["id"]
+    # a channel member who learnt the action id posts a message carrying the marker first
+    seed = mattermost_seed()
+    now = int(time.time() * 1000)
+    planted = {**seed["posts"][0], "id": "x" * 26, "user_id": "m" * 26, "create_at": now, "update_at": now}
+    seed["posts"].append({**planted, "props": {"z_action": action_id}})
+    tools.seed({"mattermost": seed})
+    use_jar(app, jars["carol"])
+    app.post(f"/api/v1/actions/{action_id}/approve", json={}, headers=csrf(app)).raise_for_status()
+    assert executor_tick(app)["applied"] == [action_id]
+    [write] = tools.writes("mattermost.posts.create")  # posted by Z all the same
+    assert write["data"]["props"] == {"z_action": action_id}

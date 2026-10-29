@@ -346,9 +346,19 @@ class Mattermost:
         )
         _fail(inv, "idempotency lookup")
         posts = (inv.body or {}).get("posts") if isinstance(inv.body, dict) else None
-        for post in (posts or {}).values():
-            if isinstance(post, dict) and (post.get("props") or {}).get("z_action") == action.id:
-                return {"id": post.get("id"), "channel_id": post.get("channel_id"), "recovered": True}
+        marked = [
+            p
+            for p in (posts or {}).values()
+            if isinstance(p, dict) and (p.get("props") or {}).get("z_action") == action.id
+        ]
+        if not marked:
+            return None
+        # any channel member can set props: only a post by the write account counts as already applied
+        me = await gw.send(connector, "GET", "/api/v4/users/me", "write")
+        _fail(me, "idempotency lookup (write account)")
+        mine = [p for p in marked if p.get("user_id") == (me.body or {}).get("id")]
+        if mine:
+            return {"id": mine[0].get("id"), "channel_id": mine[0].get("channel_id"), "recovered": True}
         return None
 
     async def apply(
@@ -394,10 +404,20 @@ class Slack:
             path, params["ts"] = "/conversations.replies", body["thread_ts"]
         inv = await gw.send(connector, "GET", path, "write", params=params)
         _fail(inv, "idempotency lookup")
+        marked = []
         for message in (inv.body or {}).get("messages") or [] if isinstance(inv.body, dict) else []:
             meta = message.get("metadata") or {} if isinstance(message, dict) else {}
             if meta.get("event_type") == "z_action" and (meta.get("event_payload") or {}).get("action") == action.id:
-                return {"channel": body.get("channel"), "ts": message.get("ts"), "recovered": True}
+                marked.append(message)
+        if not marked:
+            return None
+        # another app in the channel could post the same metadata: only the write app's own message counts
+        me = await gw.send(connector, "POST", "/auth.test", "write", json_body={})
+        _fail(me, "idempotency lookup (write app)")
+        bot = (me.body or {}).get("bot_id") if isinstance(me.body, dict) else None
+        mine = [m for m in marked if bot and m.get("bot_id") == bot]
+        if mine:
+            return {"channel": body.get("channel"), "ts": mine[0].get("ts"), "recovered": True}
         return None
 
     async def apply(

@@ -64,7 +64,7 @@ def router(store: Store) -> APIRouter:
 
     @r.get("/users/me")
     def me(kind: Annotated[TokenKind, Depends(read)]) -> dict[str, Any]:
-        return {"id": "z" * 26, "username": f"z-{kind}"}
+        return {"id": ("w" if kind == "write" else "r") * 26, "username": f"z-{kind}"}
 
     @r.get("/teams/name/{team_name}", dependencies=[Depends(read)])
     def team_by_name(team_name: str) -> dict[str, Any]:
@@ -118,7 +118,7 @@ def router(store: Store) -> APIRouter:
         post = {
             "id": mm_id(),
             "channel_id": channel_id,
-            "user_id": "w" * 26,
+            "user_id": ("w" if kind == "write" else "r") * 26,
             "root_id": body.get("root_id") or "",
             "message": message,
             "create_at": now,

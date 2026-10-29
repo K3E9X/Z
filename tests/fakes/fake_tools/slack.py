@@ -87,6 +87,14 @@ def router(store: Store) -> APIRouter:
             "messages": [view(m, meta) for m in thread if float(m["ts"]) >= float(oldest) or m["ts"] == ts],
         }
 
+    @r.post("/auth.test")
+    def auth_test(request: Request) -> dict[str, Any]:
+        found = kind(request, "auth.test")
+        if isinstance(found, dict):
+            return found
+        bot = "B0ZWRITE1" if found == "write" else "B0ZREAD01"
+        return {"ok": True, "user_id": "U0Z" + found.upper()[:6], "bot_id": bot}
+
     @r.post("/chat.postMessage")
     async def post(request: Request) -> dict[str, Any]:
         found = kind(request, "chat.postMessage", write=True)
