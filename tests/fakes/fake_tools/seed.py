@@ -666,4 +666,5 @@ def default_seed() -> dict[str, Any]:
         "confluence": confluence_seed(),
         "mattermost": mattermost_seed(),
         "slack": slack_seed(),
+        "recordedfuture": {},  # static data in recordedfuture.py
     }

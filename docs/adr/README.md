@@ -31,3 +31,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0027 — The inferX key can be set from Z, and lives in the model gateway only](0027-inferx-key-from-z.md)
 - [0028 — Google Workspace connectors: delegated only, Google's OAuth conventions, idempotent mails and events](0028-google-workspace-connectors.md)
 - [0029 — Every job may write its report; pack tool gaps closed](0029-every-job-writes-a-report.md)
+- [0030 — Recorded Future: read-only enrichment, internal indicators never sent out](0030-recorded-future-connector.md)

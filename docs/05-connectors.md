@@ -67,6 +67,7 @@ No tool is out of reach: anything below ships as a template (YAML + operation cl
 | Chat | **Mattermost (P1)**, Slack, Teams (via Graph) | channel history, threads | post, reply | openapi / mcp |
 | Email (generic) | IMAP/SMTP | mailbox search | send | rest (gateway-side client) |
 | Vulnerability and security tooling | **DefectDojo (P0)**, scanners (e.g. Logos), dependency trackers, secret scanners | findings, products | — (v1) | openapi |
+| Threat intelligence | **Recorded Future** (Connect API: CVE, IP, domain, URL, hash, malware, risk rules) | risk score and rules, exploitation, CVSS context | — (read-only) | openapi (`recordedfuture`) |
 | Internal tools | **Logos (P0 template)**, any tool with an API, a CLI or only a UI | per tool | per tool | openapi / rest / cli / browser |
 | ITSM | ServiceNow, GLPI, Jira Service Management | tickets, CMDB | create/update ticket | openapi |
 | CMDB and directory | **CMDB (P0)**, LDAP/Active Directory, Entra ID | asset owner, environment, user status, last logon | — (proposals only, e.g. disable account) | rest / database |

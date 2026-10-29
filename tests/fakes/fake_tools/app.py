@@ -26,6 +26,7 @@ from . import (
     logos,
     m365,
     mattermost,
+    recordedfuture,
     slack,
 )
 from .errors import FakeToolError
@@ -94,6 +95,7 @@ def create_app(seed: dict[str, Any] | None = None, tokens: dict[str, dict[str, s
     app.include_router(m365.router(store))
     app.include_router(mattermost.router(store))
     app.include_router(slack.router(store))
+    app.include_router(recordedfuture.router(store))
     for google_router in google.routers(store):
         app.include_router(google_router)
     app.include_router(botframework.router(store))

@@ -1,7 +1,7 @@
 ---
 name: triage-finding
 description: Qualify one finding in context and output a structured triage result.
-version: 1.0.0
+version: 1.1.0
 evals: evals/triage-finding.jsonl
 ---
 
@@ -11,6 +11,10 @@ Input: one finding id.
 2. Get the asset with cmdb.assets.get: environment, exposure (internet, internal, isolated), criticality, owner team.
 3. Decide exploitability in this context:
    - Is the vulnerable code path reachable? Is the service exposed? Is there a public exploit or KEV entry?
+   - When Recorded Future is attached, get the CVE with `recordedfuture.vulnerability.get` (fields
+     `entity,risk,timestamps,lifecycleStage,cvssv3`): its risk score, the rules that fired (e.g. exploited in the
+     wild, linked to ransomware) and the lifecycle stage are evidence. A 404 means Recorded Future knows nothing:
+     say so, do not treat it as low risk. Never look up internal addresses or hostnames.
 4. Apply `contextual-cvss` to get the contextual priority.
 5. Write `result.json` matching `schemas/triage-result.json`, and a 5-line `report.md`.
 

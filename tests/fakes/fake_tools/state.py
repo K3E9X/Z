@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 
-TOOLS = ("defectdojo", "cmdb", "logos", "jira", "gitlab", "confluence", "mattermost", "slack")
+TOOLS = ("defectdojo", "cmdb", "logos", "jira", "gitlab", "confluence", "mattermost", "slack", "recordedfuture")
 TokenKind = Literal["read", "write"]
 Access = Literal["read", "write"]
 Scheme = Literal["token", "bearer", "gitlab", "git", "basic"]

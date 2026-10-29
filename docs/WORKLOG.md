@@ -117,6 +117,8 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   report.md and the runner never asked for it, so 80 report-based eval cases could not pass. Now every job is
   asked for its report and may write it; `read` for agents that receive files; browser-agent `documents`;
   Microsoft To Do in the m365 subset for meeting-prep.
+- Recorded Future connector (ADR 0030, asked by the owner): Connect API lookups checked against the official SDK
+  psengine 2.14.0 from PyPI (recordedfuture.com is blocked here); internal indicators refused by the schemas.
 - Personal connections now record the account of each grant (`openid email`, ID token claims) and refuse read
   and write grants of different accounts; the identity field had never been filled.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
