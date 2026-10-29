@@ -25,6 +25,7 @@ import { useCan } from '@/lib/auth'
 import { clock, compactNumber, grouped, ms, percent, shortDate } from '@/lib/format'
 import { useNow } from '@/lib/useMedia'
 import { useStepUp } from '@/shell/stepup'
+import { InferenceKeyPanel } from './InferenceKey'
 
 type Range = '1h' | '24h' | '7d' | '30d'
 const RANGE: Record<Range, { hours: number; bucket: UsageBucketSize }> = {
@@ -741,6 +742,7 @@ export function Inference() {
               </span>
             )}
           </div>
+          {canProviders && <InferenceKeyPanel />}
         </Panel>
         <BudgetsPanel />
       </div>

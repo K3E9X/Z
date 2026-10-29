@@ -59,6 +59,7 @@ export const qk = {
   inferenceHealth: ['inference', 'health'] as const,
   inferenceModels: ['inference', 'models'] as const,
   inferenceNodes: ['inference', 'nodes'] as const,
+  inferenceCredential: ['inference', 'credential'] as const,
   usage: (params: Record<string, unknown>) => ['usage', params] as const,
   budgets: ['budgets'] as const,
   providers: ['providers'] as const,
@@ -356,6 +357,14 @@ export function useUsage(group_by: UsageGroup, from: string, to: string, bucket:
 
 export function useBudgets() {
   return useQuery({ queryKey: qk.budgets, queryFn: () => unwrap(api.GET('/budgets')) })
+}
+
+export function useInferenceCredential(enabled = true) {
+  return useQuery({
+    queryKey: qk.inferenceCredential,
+    queryFn: () => unwrap(api.GET('/inference/credential')),
+    enabled,
+  })
 }
 
 export function useProviders() {
