@@ -255,6 +255,46 @@ async def pause(db: AsyncSession, mission: Mission, reason: str) -> None:
         await set_job_status(db, job, JobStatus.paused, reason)
 
 
+JUDGE = "judge"  # Question.agent of the decision a judge block asks for
+JUDGE_CONTINUE, JUDGE_STOP = "Continue without it", "Stop the mission"
+
+
+async def judge_hold(db: AsyncSession, mission: Mission, job: Job, what: str, categories: list[str]) -> None:
+    """A judge block reaches a person: a question in Review (continue without the withheld content, or stop) and an
+    audit event in History. The job stays paused until it is answered (answerQuestion)."""
+    reason = ", ".join(categories) or "possible prompt injection"
+    question = Question(
+        id=new_id("qst"),
+        mission_id=mission.id,
+        job_id=job.id,
+        agent=JUDGE,
+        text=f"The platform withheld {what} from @{job.agent_name} ({reason}). Look at it in the mission, then let the "
+        "agent continue without it or stop the mission.",
+        options=[JUDGE_CONTINUE, JUDGE_STOP],
+    )
+    db.add(question)
+    await db.flush()
+    await events.append(
+        db,
+        mission.id,
+        "question",
+        {"question_id": question.id, "text": question.text, "options": question.options},
+        job_id=job.id,
+        agent=JUDGE,
+        step_id=job.step_id,
+    )
+    await audit.record(
+        db,
+        audit.Actor("system:judge"),
+        "judge.blocked",
+        "job",
+        job.id,
+        result="denied",
+        team=mission.team_id,
+        after={"mission": mission.id, "what": what[:200], "categories": categories},
+    )
+
+
 async def has_paused_jobs(db: AsyncSession, mission: Mission) -> bool:
     found = (
         await db.execute(

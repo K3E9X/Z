@@ -432,6 +432,7 @@ class Gateway:
             if verdict.verdict == JudgeVerdict.blocked:
                 job_row.control_state, job_row.control_reason = "pause", f"the judge withheld a result of {op.id}"
                 await service.set_job_status(db, job_row, JobStatus.needs_attention, "judge_blocked")
+                await service.judge_hold(db, mission_row, job_row, f"a result of {op.id}", list(verdict.categories))
                 await service.advance(db, self.state, mission_row)
                 outcome = Outcome(
                     False,

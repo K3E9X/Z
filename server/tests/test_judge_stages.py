@@ -97,11 +97,12 @@ def test_model_stage_only_raises(app: TestClient, llm: FakeLLM, jars: dict[str, 
 
 def test_guardrail_turns_the_model_stage_off(app: TestClient, llm: FakeLLM, jars: dict[str, dict[str, str]]) -> None:
     use_jar(app, jars["alice"])
-    resp = app.put(
-        "/api/v1/settings/guardrails",
-        json={"judge_injection_scan": {"value": False, "locked": False}},
-        headers=csrf(app),
-    )
+    off = {"judge_injection_scan": {"value": False, "locked": False}}
+    shipped = app.put("/api/v1/settings/guardrails", json=off, headers=csrf(app))
+    assert shipped.status_code == 409  # the shipped config locks the scan (invariant 6)
+    # a deployment that unlocked it in its own config can turn it off, and the model stage goes with it
+    app.app.state.z.config["guardrails"]["judge_injection_scan"]["locked"] = False  # type: ignore[attr-defined]
+    resp = app.put("/api/v1/settings/guardrails", json=off, headers=csrf(app))
     assert resp.status_code == 200 and resp.json()["judge_injection_scan"]["value"] is False, resp.text
     app.app.state.z.cache.clear()  # type: ignore[attr-defined]
     llm.add_rules({"match": JUDGE, "responses": [{"json": {"verdict": "blocked"}}], "repeat": True})

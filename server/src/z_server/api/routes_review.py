@@ -17,7 +17,7 @@ import jsonschema
 from sqlalchemy import or_, select
 from z_common.models import api_missions as m
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import JobStatus, OperationClass, SignalKind
+from z_common.models.enums import JobStatus, MissionStatus, OperationClass, SignalKind
 
 from z_server import events, signals
 from z_server.actions import prechecks
@@ -318,7 +318,13 @@ async def answer_question(ctx: CtxDep, id: str, body: m.AnswerRequest) -> m.Ques
         job_id=row.job_id,
         agent=row.agent,
     )
-    if job is not None and job.status == JobStatus.needs_attention.value and job.needs_attention_reason == "question":
+    if row.agent == service.JUDGE and job is not None and job.needs_attention_reason == "judge_blocked":
+        if body.answer == service.JUDGE_STOP:
+            await service.finish(ctx.db, ctx.state, mission, MissionStatus.cancelled, "stopped after a judge block")
+        else:  # the agent goes on without the withheld content
+            job.control_state, job.control_reason = "run", None
+            await service.set_job_status(ctx.db, job, JobStatus.running, "released after a judge block")
+    elif job is not None and job.status == JobStatus.needs_attention.value and job.needs_attention_reason == "question":
         still_open = (
             await ctx.db.execute(
                 select(Question.id).where(Question.job_id == job.id, Question.answer.is_(None), Question.id != row.id)

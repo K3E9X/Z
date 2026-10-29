@@ -683,6 +683,9 @@ async def _staged(ctx: JobCtx) -> workspace.Staged:
             "the judge withheld staged inputs: " + ", ".join(f.path for f in staged.blocked)[:400],
         )
         await service.set_job_status(ctx.db, job, JobStatus.needs_attention, "judge_blocked")
+        await service.judge_hold(
+            ctx.db, ctx.mission, job, "staged inputs " + ", ".join(f.path for f in staged.blocked)[:200], ["injection"]
+        )
         await service.advance(ctx.db, ctx.state, ctx.mission)
     return staged
 

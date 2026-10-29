@@ -175,6 +175,37 @@ def test_injected_ticket_is_withheld_and_pauses_the_job(app: TestClient, jars: d
     job = app.get(f"/api/v1/missions/{mission_id}/jobs").json()["items"][0]
     assert job["status"] == "needs_attention" and job["needs_attention_reason"] == "judge_blocked"
 
+    # a person sees it: a decision in Review and a judge.blocked event in History
+    review = app.get("/api/v1/review", params={"mission": mission_id}).json()
+    [item] = [i for i in review["items"] if i["kind"] == "question"]
+    assert review["counts"]["questions"] == 1 and "withheld a result of jira.issues.get" in item["question"]["text"]
+    assert item["question"]["options"] == ["Continue without it", "Stop the mission"]
+    use_jar(app, jars["alice"])
+    audit = app.get("/api/v1/audit", params={"action": "judge.blocked"}).json()["items"]
+    assert audit and audit[0]["target_id"] == job["id"]
+    # releasing it lets the agent go on without the withheld content
+    use_jar(app, jars["bob"])
+    answered = app.post(
+        f"/api/v1/questions/{item['question']['id']}/answer", json={"answer": "Continue without it"}, headers=csrf(app)
+    )
+    assert answered.status_code == 200, answered.text
+    assert runner.control()["state"] == "run"
+    assert app.get(f"/api/v1/missions/{mission_id}/jobs").json()["items"][0]["status"] == "running"
+
+
+def test_stopping_after_a_judge_block_cancels_the_mission(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    mission_id, runner = start(app, jars, [])
+    call(app, runner, "jira__issues__get", {"issueIdOrKey": "SECOPS-4795"})
+    use_jar(app, jars["bob"])
+    [item] = [
+        i for i in app.get("/api/v1/review", params={"mission": mission_id}).json()["items"] if i["kind"] == "question"
+    ]
+    stop = app.post(
+        f"/api/v1/questions/{item['question']['id']}/answer", json={"answer": "Stop the mission"}, headers=csrf(app)
+    )
+    assert stop.status_code == 200, stop.text
+    assert app.get(f"/api/v1/missions/{mission_id}").json()["status"] == "cancelled"
+
 
 def test_c2_result_raises_a_c1_mission_before_returning(
     app: TestClient, jars: dict[str, dict[str, str]], keys: RecordingKeyAdmin
