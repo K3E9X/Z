@@ -52,4 +52,17 @@ describe('Connectors', () => {
       )
     })
   })
+
+  it('shows the error when the connector detail cannot be read', async () => {
+    server.use(
+      http.get('*/api/v1/connectors/con_1', () =>
+        HttpResponse.json(
+          { type: 'urn:z:problem:not-found', title: 'Not found', status: 404, detail: 'No connector con_1' },
+          { status: 404, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    await renderRoute('/connectors', '/connectors', Connectors, { others: ['/history', '/connectors/new'] })
+    expect(await screen.findByRole('alert')).toHaveTextContent('No connector con_1')
+  })
 })

@@ -244,7 +244,18 @@ function Detail({ id }: { id: string }) {
   const [recording, setRecording] = useState(false)
   const navigate = useNavigate()
   const [result, setResult] = useState<ConnectorTestResult | null>(null)
-  if (!c.data) return <Skeleton className="h-80" />
+  if (!c.data)
+    // Loading, or the error (403, 404...) instead of a skeleton that never ends.
+    return (
+      <QueryState
+        query={c}
+        what="Connector"
+        endpoint="GET /connectors/{id}"
+        skeleton={<Skeleton className="h-80" />}
+      >
+        {() => null}
+      </QueryState>
+    )
   const con = c.data
   const read = con.credentials?.find((x) => x.purpose === 'read')
   const write = con.credentials?.find((x) => x.purpose === 'write')
