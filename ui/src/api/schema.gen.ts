@@ -2267,6 +2267,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Notification targets (Slack, Mattermost, Teams, webhook, email) and their delivery state */
+        get: operations["adminGetNotifications"];
+        /**
+         * Change notification targets
+         * @description Webhook URLs, signing keys and the SMTP password are secret references, never values.
+         */
+        put: operations["adminPutNotifications"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/notifications:test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test notification to one target */
+        post: operations["adminTestNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit:verify": {
         parameters: {
             query?: never;
@@ -3804,6 +3842,43 @@ export interface components {
             retention_days: number;
             checkpoint_minutes: number;
             forward: Record<string, unknown>;
+        };
+        /** @enum {unknown} */
+        NotificationKind: "approval_requested" | "question_asked" | "needs_attention" | "mission_succeeded" | "mission_failed" | "budget_alert" | "connector_unhealthy" | "breakglass_used";
+        /** @description Read-only delivery state of a target, reported by the notification worker. */
+        NotificationDelivery: {
+            last_sent_at?: components["schemas"]["Timestamp"] | null;
+            last_error?: string | null;
+            last_error_at?: components["schemas"]["Timestamp"] | null;
+        };
+        NotificationTarget: {
+            id: string;
+            name?: string;
+            /** @enum {unknown} */
+            kind: "slack" | "mattermost" | "teams" | "webhook" | "email";
+            enabled?: boolean;
+            events: components["schemas"]["NotificationKind"][];
+            teams?: string[];
+            content_up_to?: components["schemas"]["DataClass"];
+            /** @description Secret reference of the incoming webhook URL (it carries a token) */
+            url_ref?: string;
+            /** @description webhook: secret reference of the HMAC-SHA256 signing key */
+            secret_ref?: string;
+            to?: string[];
+            status?: components["schemas"]["NotificationDelivery"];
+        };
+        SmtpSettings: {
+            host: string;
+            port?: number;
+            starttls?: boolean;
+            username?: string;
+            /** @description Secret reference, never the value */
+            password_ref?: string;
+            from: string;
+        };
+        NotificationSettings: {
+            targets: components["schemas"]["NotificationTarget"][];
+            smtp?: components["schemas"]["SmtpSettings"] | null;
         };
         Guardrail: {
             value: unknown;
@@ -10309,6 +10384,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuditSettings"];
                 };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    adminGetNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettings"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    adminPutNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettings"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    adminTestNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    target_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Problem details */
             default: {

@@ -19,6 +19,8 @@ export type ApiToken = S['ApiToken']
 export type AuthSettings = S['AuthSettings']
 export type AuditSettings = S['AuditSettings']
 export type AuditVerify = S['AuditVerify']
+export type NotificationSettings = S['NotificationSettings']
+export type NotificationTarget = S['NotificationTarget']
 
 export type Agent = S['Agent']
 export type AgentProfile = S['AgentProfile']

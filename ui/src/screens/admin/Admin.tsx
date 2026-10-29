@@ -10,10 +10,20 @@ import { PageTitle, Tabs } from '@/components/ui'
 import { stepUpRemaining, useCan, useCurrentMe } from '@/lib/auth'
 import { useNow } from '@/lib/useMedia'
 import { GroupMappingTab, RolesTab, TeamsTab } from './AccessTabs'
+import { NotificationsTab } from './NotificationsTab'
 import { AuditTab, PlatformTab, SessionsTab, SignInTab } from './PlatformTabs'
 import { UsersTab } from './Users'
 
-type Tab = 'users' | 'teams' | 'roles' | 'mapping' | 'signin' | 'sessions' | 'audit' | 'platform'
+type Tab =
+  | 'users'
+  | 'teams'
+  | 'roles'
+  | 'mapping'
+  | 'signin'
+  | 'sessions'
+  | 'audit'
+  | 'notifications'
+  | 'platform'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'users', label: 'Users' },
   { id: 'teams', label: 'Teams' },
@@ -22,6 +32,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'signin', label: 'Sign-in' },
   { id: 'sessions', label: 'Sessions and tokens' },
   { id: 'audit', label: 'Audit log' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'platform', label: 'Platform' },
 ]
 /** The bootstrap admin only sees Sign-in and Group mapping (docs/12 §1). */
@@ -145,6 +156,7 @@ export function Admin() {
       {tab === 'signin' && <SignInTab />}
       {tab === 'sessions' && <SessionsTab />}
       {tab === 'audit' && <AuditTab verify={verify} onVerified={setVerify} />}
+      {tab === 'notifications' && <NotificationsTab />}
       {tab === 'platform' && <PlatformTab />}
     </main>
   )

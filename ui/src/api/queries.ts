@@ -83,6 +83,7 @@ export const qk = {
     sessions: ['admin', 'sessions'] as const,
     tokens: ['admin', 'tokens'] as const,
     auditSettings: ['admin', 'audit-settings'] as const,
+    notifications: ['admin', 'notifications'] as const,
   },
 }
 

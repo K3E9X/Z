@@ -646,9 +646,9 @@ function Notifications() {
         Notifications
       </h2>
       <p className="m-0 text-text-2">
-        Decisions waiting for you appear in Review and on the bell everywhere in the app. Mattermost, Slack,
-        email and webhook notifications are configured by admins (Admin → Platform); personal notification
-        preferences are not in the API yet.
+        Decisions waiting for you appear in Review and on the bell everywhere in the app. Slack, Mattermost,
+        Teams, email and signed webhook notifications are configured by admins (Admin → Notifications).
+        Personal notification preferences are not in the API yet.
       </p>
     </section>
   )
