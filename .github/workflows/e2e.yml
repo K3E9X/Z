@@ -55,6 +55,7 @@ jobs:
             echo "Z_SOCKET_PROXY_TOKEN=$(rand)"
             echo "Z_SECRET_KEY=$(rand)$(rand)"
             echo "Z_METRICS_TOKEN=$(rand)"
+            echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)"   # every compose command needs it (socket proxy)
           } >> .env
       - name: Build the runner image (started by z-server through the socket proxy, not by compose)
         run: docker build -t z-runner:local -f deploy/images/z-runner/Dockerfile .
