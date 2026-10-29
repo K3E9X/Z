@@ -77,7 +77,7 @@ export function Sidebar() {
   return (
     <nav
       aria-label="Main navigation"
-      className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-3.5 border-r border-line bg-panel px-3 py-3.5"
+      className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-3.5 bg-panel px-3 py-3.5"
     >
       <div className="flex items-center gap-2.5 rounded-btn px-2 py-1.5">
         <ZMark />
@@ -162,7 +162,7 @@ export function IconRail() {
   return (
     <nav
       aria-label="Main navigation"
-      className="sticky top-0 flex h-screen w-14 flex-none flex-col items-center gap-1.5 border-r border-line bg-panel py-3.5"
+      className="sticky top-0 flex h-screen w-14 flex-none flex-col items-center gap-1.5 bg-panel py-3.5"
     >
       <Link to="/" aria-label="Z · Mission control" className="mb-3 rounded-btn">
         <ZMark size={26} />
