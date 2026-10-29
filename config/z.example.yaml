@@ -105,7 +105,7 @@ guardrails:                     # locked values cannot be changed from the UI
   human_approval_for_writes: { value: true, locked: true }
   two_approvers_for_destructive: { value: true, locked: true }
   sandbox_network: { value: deny, locked: true }
-  judge_injection_scan: { value: true, locked: false }
+  judge_injection_scan: { value: true, locked: true }     # invariant 6: the scan cannot be turned off
   learning_requires_approval: { value: true, locked: true }
   max_steps_per_job: 120
   max_job_minutes: 60

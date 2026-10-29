@@ -375,7 +375,7 @@ e2e:compose:
     - ci/scripts/install-scanners.sh uv && export PATH="$SCANNERS_DIR/bin:$PATH"
     - uv sync --frozen --all-packages
     - cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
-    - for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD Z_METRICS_TOKEN; do echo "$k=$(openssl rand -hex 24)" >> .env; done
+    - for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD Z_METRICS_TOKEN LITELLM_DB_PASSWORD Z_SOCKET_PROXY_TOKEN; do echo "$k=$(openssl rand -hex 24)" >> .env; done
     - echo "LITELLM_MASTER_KEY=sk-$(openssl rand -hex 24)" >> .env && echo "Z_SECRET_KEY=$(openssl rand -hex 48)" >> .env
     - echo "LITELLM_SALT_KEY=sk-$(openssl rand -hex 24)" >> .env
     - docker build -t z-runner:local -f deploy/images/z-runner/Dockerfile .

@@ -51,6 +51,8 @@ jobs:
             echo "Z_APP_DB_PASSWORD=$(rand)"
             echo "LITELLM_MASTER_KEY=sk-$(rand)"
             echo "LITELLM_SALT_KEY=sk-$(rand)"
+            echo "LITELLM_DB_PASSWORD=$(rand)"
+            echo "Z_SOCKET_PROXY_TOKEN=$(rand)"
             echo "Z_SECRET_KEY=$(rand)$(rand)"
             echo "Z_METRICS_TOKEN=$(rand)"
           } >> .env
