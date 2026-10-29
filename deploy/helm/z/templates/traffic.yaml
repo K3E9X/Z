@@ -1,0 +1,61 @@
+{{- /* Everything enters through z-ui (it proxies /api, streams included); z-server when ui.enabled=false. */ -}}
+{{- $backend := ternary (include "z.ui.fullname" .) (include "z.server.fullname" .) .Values.ui.enabled }}
+{{- $port := ternary .Values.ui.port .Values.server.port .Values.ui.enabled }}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "z.fullname" . }}
+  labels:
+    {{- include "z.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $backend }}
+                port:
+                  name: http
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+---
+apiVersion: {{ .Values.httpRoute.apiVersion }}
+kind: HTTPRoute
+metadata:
+  name: {{ include "z.fullname" . }}
+  labels:
+    {{- include "z.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- required "httpRoute.parentRefs is required when httpRoute.enabled" .Values.httpRoute.parentRefs | toYaml | nindent 4 }}
+  hostnames:
+    {{- toYaml (default (list .Values.ingress.host) .Values.httpRoute.hostnames) | nindent 4 }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $backend }}
+          port: {{ $port }}
+{{- end }}

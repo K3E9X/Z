@@ -1,0 +1,27 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- $components := list (dict "component" "server" "name" (include "z.server.fullname" .) "replicas" .Values.server.replicas) (dict "component" "litellm" "name" (include "z.litellm.fullname" .) "replicas" .Values.litellm.replicas) }}
+{{- if .Values.ui.enabled }}
+{{- $components = append $components (dict "component" "ui" "name" (include "z.ui.fullname" .) "replicas" .Values.ui.replicas) }}
+{{- end }}
+{{- range $i, $c := $components }}
+{{- if $i }}
+---
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $c.name }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" $ "component" $c.component) | nindent 4 }}
+spec:
+  {{- if gt (int $c.replicas) 1 }}
+  minAvailable: 1
+  {{- else }}
+  # A single replica: allow the eviction (a drain must not hang), the pod comes back on another node.
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" $ "component" $c.component) | nindent 6 }}
+{{- end }}
+{{- end }}

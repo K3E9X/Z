@@ -1,0 +1,137 @@
+{{- $fullname := include "z.litellm.fullname" . }}
+{{- $secret := include "z.secretName" . }}
+# LiteLLM: the only component that reaches models (invariant 1). Official image pinned by digest.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "litellm") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "z.selectorLabels" (dict "root" . "component" "litellm") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.litellm.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "litellm") | nindent 4 }}
+spec:
+  replicas: {{ .Values.litellm.replicas }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "litellm") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "litellm") | nindent 8 }}
+        z.io/runner-reachable: "true"
+        z.io/postgres-client: "true"
+      annotations:
+        checksum/config: {{ toYaml .Values.config.litellm | sha256sum }}
+        {{- with .Values.litellm.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" .Values.litellm.runAsUser) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: litellm
+          image: {{ include "z.image" (dict "image" .Values.litellm.image "root" .) }}
+          imagePullPolicy: {{ .Values.litellm.image.pullPolicy }}
+          args: ["--config", "/etc/litellm/config.yaml", "--port", "{{ .Values.litellm.port }}"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.litellm.port }}
+              protocol: TCP
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: LITELLM_MASTER_KEY
+            {{- include "z.dbEnv" (dict "root" . "role" "litellm" "name" "LITELLM_DATABASE_URL") | nindent 12 }}
+            - name: DATABASE_URL
+              value: $(LITELLM_DATABASE_URL)
+            - name: INFERENCE_API_BASE
+              value: {{ .Values.litellm.inferenceApiBase | quote }}
+            - name: INFERENCE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: INFERENCE_API_KEY
+                  optional: true
+            - name: STORE_MODEL_IN_DB
+              value: "False"
+            # Read-only root filesystem: every path LiteLLM and Prisma write goes to the /tmp emptyDir.
+            - name: HOME
+              value: /tmp
+            - name: XDG_CACHE_HOME
+              value: /tmp/.cache
+            - name: NPM_CONFIG_CACHE
+              value: /tmp/.npm
+            - name: LITELLM_MIGRATION_DIR
+              value: /tmp/litellm-migrations
+            - name: LITELLM_UI_PATH
+              value: /tmp/litellm-ui
+            {{- with .Values.litellm.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.litellm.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet: { path: /health/liveliness, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health/liveliness, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          readinessProbe:
+            httpGet: { path: /health/readiness, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.litellm.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/litellm
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $fullname }}-config
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.litellm.tmpSizeLimit }}
+      {{- with .Values.litellm.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.litellm.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.litellm.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
