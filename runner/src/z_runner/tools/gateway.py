@@ -111,7 +111,8 @@ class GatewayOperationTool(ZTool):
         ctx.progress.append(f"gateway:{self.operation_id}")
         summary = text.strip().splitlines()[0][:300] if text.strip() else "(empty result)"
         judge, artifact = verdict(result)
-        wrapped = untrusted(f"gateway:{self.operation_id}", text)
+        # docs/04 §6.1: flagged content is labelled as untrusted and the agent is told.
+        wrapped = untrusted(f"gateway:{self.operation_id}", text, flagged=judge != JudgeVerdict.clean)
         return ToolResult(text=wrapped, ok=not result.isError, summary=summary, judge=judge, artifact_ref=artifact)
 
 
