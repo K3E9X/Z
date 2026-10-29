@@ -1,0 +1,10 @@
+{
+  "name": "billing-db-02",
+  "fqdn": "billing-db-02.example.internal",
+  "ip": "10.41.3.12",
+  "environment": "production",
+  "exposure": "internal",
+  "criticality": 1,
+  "owner_team": "Billing Data",
+  "data_class": "C3"
+}

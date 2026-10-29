@@ -2,6 +2,7 @@
 name: contextual-cvss
 description: Map scanner severity and context to a priority and a deadline.
 version: 1.0.0
+evals: evals/contextual-cvss.jsonl
 ---
 
 | Context | Priority | Deadline |

@@ -1,0 +1,10 @@
+{
+  "name": "vpn-edge-01",
+  "fqdn": "vpn-edge-01.example.internal",
+  "ip": "10.10.0.21",
+  "environment": "production",
+  "exposure": "internet",
+  "criticality": 1,
+  "owner_team": "Network Security",
+  "data_class": "C2"
+}

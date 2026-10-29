@@ -1,0 +1,27 @@
+{
+  "id": 7005,
+  "title": "Apache ActiveMQ OpenWire remote code execution on mq-legacy-07",
+  "date": "2026-10-26",
+  "severity": "Critical",
+  "cvssv3_score": 10.0,
+  "cve": "CVE-2023-46604",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-46604"
+    }
+  ],
+  "description": "activemq 5.15.9 answered on port 61616 of mq-legacy-07. A public exploit is available.",
+  "mitigation": "Upgrade ActiveMQ to 5.15.16 or later.",
+  "component_name": "activemq",
+  "component_version": "5.15.9",
+  "service": "mq-legacy-07",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-46604",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner",
+    "exploit:public"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "shop-front-02",
+  "fqdn": "shop-front-02.example.internal",
+  "ip": "10.30.1.22",
+  "environment": "production",
+  "exposure": "internet",
+  "criticality": 1,
+  "owner_team": "Shop Web",
+  "data_class": "C2"
+}

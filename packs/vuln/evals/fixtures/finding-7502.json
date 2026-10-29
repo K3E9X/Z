@@ -1,0 +1,22 @@
+{
+  "id": 7502,
+  "title": "SNMP default community string accepted on 10.60.12.7",
+  "date": "2026-10-26",
+  "severity": "High",
+  "cvssv3_score": 7.5,
+  "cve": null,
+  "vulnerability_ids": [],
+  "description": "An SNMP agent at 10.60.12.7 answers to the community string 'public'. The scanner did not resolve a host name.",
+  "mitigation": "Change the community string or move to SNMPv3 with authPriv.",
+  "component_name": "net-snmp",
+  "component_version": "5.9.1",
+  "service": "10.60.12.7",
+  "known_exploited": false,
+  "references": "",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

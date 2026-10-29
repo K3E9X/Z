@@ -1,0 +1,27 @@
+{
+  "id": 7401,
+  "title": "jackson-databind polymorphic deserialization on provisioning-api-02",
+  "date": "2026-10-26",
+  "severity": "High",
+  "cvssv3_score": 8.1,
+  "cve": "CVE-2017-7525",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2017-7525"
+    }
+  ],
+  "description": "jackson-databind 2.8.8 is on the classpath of the provisioning API. Public exploits exist for gadget chains. The service never enables default typing: ObjectMapper is built in ProvisioningJson.java with activateDefaultTyping absent and no @JsonTypeInfo annotation in the code base (see code-search.txt).",
+  "mitigation": "Upgrade jackson-databind to 2.9.10.8 or later.",
+  "component_name": "jackson-databind",
+  "component_version": "2.8.8",
+  "service": "provisioning-api-02",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2017-7525",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner",
+    "exploit:public"
+  ]
+}

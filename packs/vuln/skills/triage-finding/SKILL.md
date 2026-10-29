@@ -2,6 +2,7 @@
 name: triage-finding
 description: Qualify one finding in context and output a structured triage result.
 version: 1.0.0
+evals: evals/triage-finding.jsonl
 ---
 
 Input: one finding id.

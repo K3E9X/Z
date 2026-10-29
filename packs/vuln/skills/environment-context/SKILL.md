@@ -2,6 +2,7 @@
 name: environment-context
 description: Get the context of an asset that changes a finding's risk.
 version: 1.0.0
+evals: evals/environment-context.jsonl
 ---
 
 1. Query cmdb.assets.get (or cmdb.assets.search by IP) with the asset name or IP.

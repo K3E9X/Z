@@ -1,0 +1,10 @@
+{
+  "name": "radius-auth-03",
+  "fqdn": "radius-auth-03.example.internal",
+  "ip": "10.12.4.33",
+  "environment": "production",
+  "exposure": "internal",
+  "criticality": 1,
+  "owner_team": "Broadband Access",
+  "data_class": "C2"
+}

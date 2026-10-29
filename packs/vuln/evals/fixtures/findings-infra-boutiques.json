@@ -1,0 +1,216 @@
+{
+  "count": 30,
+  "next": null,
+  "results": [
+    {
+      "id": 7301,
+      "title": "Log4Shell in log4j-core on shop-front-01",
+      "severity": "Critical",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7302,
+      "title": "Outdated jQuery on shop-api-02",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7303,
+      "title": "Weak SSH MAC algorithms on pay-api-01",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7304,
+      "title": "OpenSSL DoS on shop-cms-01",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7305,
+      "title": "Missing HSTS header on shop-worker-03",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7306,
+      "title": "Text4Shell in commons-text on shop-front-01",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7307,
+      "title": "nginx resolver heap write on shop-api-02",
+      "severity": "Critical",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7308,
+      "title": "Directory listing on pay-api-01",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7309,
+      "title": "Terrapin SSH on shop-cms-01",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7310,
+      "title": "glibc ld.so overflow on shop-worker-03",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7311,
+      "title": "Log4Shell in log4j-core on shop-front-01",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7312,
+      "title": "Outdated jQuery on shop-api-02",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7313,
+      "title": "Weak SSH MAC algorithms on pay-api-01",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7314,
+      "title": "OpenSSL DoS on shop-cms-01",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7315,
+      "title": "Missing HSTS header on shop-worker-03",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7316,
+      "title": "Text4Shell in commons-text on shop-front-01",
+      "severity": "Critical",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7317,
+      "title": "nginx resolver heap write on shop-api-02",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7318,
+      "title": "Directory listing on pay-api-01",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7319,
+      "title": "Terrapin SSH on shop-cms-01",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7320,
+      "title": "glibc ld.so overflow on shop-worker-03",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7321,
+      "title": "Log4Shell in log4j-core on shop-front-01",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7322,
+      "title": "Outdated jQuery on shop-api-02",
+      "severity": "Critical",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7323,
+      "title": "Weak SSH MAC algorithms on pay-api-01",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7324,
+      "title": "OpenSSL DoS on shop-cms-01",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7325,
+      "title": "Missing HSTS header on shop-worker-03",
+      "severity": "High",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7326,
+      "title": "Text4Shell in commons-text on shop-front-01",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7327,
+      "title": "nginx resolver heap write on shop-api-02",
+      "severity": "Low",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7328,
+      "title": "Directory listing on pay-api-01",
+      "severity": "Info",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7329,
+      "title": "Terrapin SSH on shop-cms-01",
+      "severity": "Critical",
+      "product_name": "infra-boutiques",
+      "active": true
+    },
+    {
+      "id": 7330,
+      "title": "glibc ld.so overflow on shop-worker-03",
+      "severity": "Medium",
+      "product_name": "infra-boutiques",
+      "active": true
+    }
+  ]
+}

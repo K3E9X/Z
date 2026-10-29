@@ -1,0 +1,22 @@
+{
+  "id": 7008,
+  "title": "TLS 1.0 and TLS 1.1 protocols enabled on webmail-01",
+  "date": "2026-10-26",
+  "severity": "Medium",
+  "cvssv3_score": 5.3,
+  "cve": null,
+  "vulnerability_ids": [],
+  "description": "The webmail reverse proxy accepts TLS 1.0 and TLS 1.1 handshakes on port 443. No CVE applies to this configuration finding.",
+  "mitigation": "Disable TLS 1.0 and 1.1 in the nginx ssl_protocols directive.",
+  "component_name": "nginx",
+  "component_version": "1.22.1",
+  "service": "webmail-01",
+  "known_exploited": false,
+  "references": "",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

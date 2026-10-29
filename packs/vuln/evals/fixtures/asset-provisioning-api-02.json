@@ -1,0 +1,10 @@
+{
+  "name": "provisioning-api-02",
+  "fqdn": "provisioning-api-02.example.internal",
+  "ip": "10.44.2.12",
+  "environment": "production",
+  "exposure": "internal",
+  "criticality": 2,
+  "owner_team": "FTTH Provisioning",
+  "data_class": "C2"
+}

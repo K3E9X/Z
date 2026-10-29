@@ -1,0 +1,11 @@
+{
+  "name": "pay-cache-04",
+  "fqdn": "pay-cache-04.example.internal",
+  "ip": "10.20.5.14",
+  "environment": "production",
+  "exposure": "internal",
+  "criticality": 2,
+  "owner_team": null,
+  "data_class": "C2",
+  "notes": "Owner team left blank after the 2026 reorganisation; to be confirmed."
+}
