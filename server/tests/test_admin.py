@@ -217,14 +217,19 @@ def test_auth_settings_test_reports_unreachable_issuer(admin: TestClient) -> Non
 
 
 def test_breakglass_needs_totp(
-    make_client: Callable[..., TestClient], oidc: FakeGitLabOIDC, caplog: pytest.LogCaptureFixture
+    make_client: Callable[..., TestClient],
+    oidc: FakeGitLabOIDC,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = base_config(oidc.issuer, **{"auth.breakglass.enabled": True})
-    with caplog.at_level("WARNING", logger="z.startup"):
+    with caplog.at_level("DEBUG"):
         client = make_client(config, breakglass=True)
-    message = next(r.getMessage() for r in caplog.records if "BREAK-GLASS" in r.getMessage())
-    password = re.search(r"password: (\S+)", message).group(1)  # type: ignore[union-attr]
+    # shown once on stdout (Compose) or written to Z_BREAKGLASS_SECRET_FILE (Kubernetes), never logged
+    message = next(line for line in capsys.readouterr().out.splitlines() if line.startswith("break-glass:"))
+    password = re.search(r"password (\S+)", message).group(1)  # type: ignore[union-attr]
     secret = re.search(r"secret=([A-Z2-7]+)", message).group(1)  # type: ignore[union-attr]
+    assert not [r for r in caplog.records if password in r.getMessage() or secret in r.getMessage()]
     assert (
         client.post("/api/v1/auth/local/login", json={"username": "z-breakglass", "password": password}).status_code
         == 401
