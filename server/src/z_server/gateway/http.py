@@ -109,6 +109,27 @@ def prepare(base: str, source_ref: str, input_schema: dict[str, Any], args: dict
     return PreparedRequest(method, base + path, params, body, headers)
 
 
+def outcome(manifest: dict[str, Any], status: int, body: Any) -> tuple[bool, str | None]:
+    """(ok, error) of an HTTP answer: a 2xx is ok unless the manifest's `error_body` says the body reports an error
+    (Slack answers 200 with {"ok": false, "error": "channel_not_found"})."""
+    if not 200 <= status < 300:
+        return False, f"HTTP {status}"
+    rule = manifest.get("error_body") or {}
+    if not rule or not isinstance(body, dict):
+        return True, None
+
+    def field(path: str) -> Any:
+        value: Any = body
+        for part in path.split("."):
+            value = value.get(part) if isinstance(value, dict) else None
+        return value
+
+    if field(str(rule["path"])) != rule.get("equals"):
+        return True, None
+    reason = field(str(rule["message"])) if rule.get("message") else None
+    return False, str(reason or f"the tool reported an error ({rule['path']} = {rule.get('equals')!r})")[:500]
+
+
 def _retry_after(resp: httpx.Response, attempt: int) -> float:
     raw = resp.headers.get("retry-after", "")
     try:

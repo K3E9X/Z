@@ -141,16 +141,8 @@ class Gateway:
                 base = http_invoker.base_url(connector.base_url, manifest)
                 prepared = http_invoker.prepare(base, op.source_ref, op.input_schema, args)
                 result = await http_invoker.send(self.state.http, prepared, auth.headers, timeout_s=timeout_s)
-                ok = 200 <= result.status < 300
-                return Invocation(
-                    ok,
-                    result.status,
-                    result.body,
-                    result.latency_ms,
-                    auth.identity,
-                    auth.secrets,
-                    None if ok else f"HTTP {result.status}",
-                )
+                ok, error = http_invoker.outcome(manifest, result.status, result.body)
+                return Invocation(ok, result.status, result.body, result.latency_ms, auth.identity, auth.secrets, error)
             if connector.kind == "mcp":
                 res = await mcp_client.call(
                     manifest, connector.base_url, op.local_id, args, auth.headers, self.resolver, timeout_s
@@ -220,16 +212,8 @@ class Gateway:
             result = await http_invoker.send(self.state.http, prepared, auth.headers, timeout_s=timeout_s)
         except http_invoker.InvokeError as exc:
             return Invocation(False, exc.status, None, 0, auth.identity, auth.secrets, str(exc))
-        ok = 200 <= result.status < 300
-        return Invocation(
-            ok,
-            result.status,
-            result.body,
-            result.latency_ms,
-            auth.identity,
-            auth.secrets,
-            None if ok else f"HTTP {result.status}",
-        )
+        ok, error = http_invoker.outcome(connector.manifest, result.status, result.body)
+        return Invocation(ok, result.status, result.body, result.latency_ms, auth.identity, auth.secrets, error)
 
     # ---------------------------------------------------------------- agent side
 

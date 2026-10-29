@@ -246,3 +246,16 @@ def test_send_puts_the_raw_body_on_the_wire() -> None:
 
     result = asyncio.run(go())
     assert result.status == 201 and seen[0].content == b"hi" and seen[0].headers["content-type"] == "text/plain"
+
+
+def test_error_body_turns_a_2xx_error_answer_into_a_failure() -> None:
+    from z_server.gateway.http import outcome
+
+    slack = {"error_body": {"path": "ok", "equals": False, "message": "error"}}
+    assert outcome(slack, 200, {"ok": True, "messages": []}) == (True, None)
+    assert outcome(slack, 200, {"ok": False, "error": "channel_not_found"}) == (False, "channel_not_found")
+    assert outcome(slack, 200, ["not", "an", "object"]) == (True, None)
+    assert outcome(slack, 503, {"ok": True}) == (False, "HTTP 503")
+    nested = {"error_body": {"path": "result.status", "equals": "error"}}
+    assert outcome(nested, 200, {"result": {"status": "error"}})[0] is False
+    assert outcome({}, 200, {"ok": False}) == (True, None)  # no rule: the status decides

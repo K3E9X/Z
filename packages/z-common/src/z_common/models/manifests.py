@@ -344,6 +344,14 @@ class WebhookConfig(ZModel):
     secret: SecretRef | None = None
 
 
+class ErrorBody(ZModel):
+    """connector.schema.json `error_body`: a 2xx answer whose body field `path` equals `equals` is an error."""
+
+    path: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$")]
+    equals: Any
+    message: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$")] | None = None
+
+
 class CliSettings(ZModel):
     """connector.schema.json `cli` (ADR 0025)."""
 
@@ -374,6 +382,7 @@ class ConnectorManifest(ZModel):
     operations: OperationPolicy | None = None
     rate_limit: RateLimit | None = None
     health: HealthProbe | None = None
+    error_body: ErrorBody | None = None
     data_class: DataClass | None = None
     cli: CliSettings | None = None
     webhook: WebhookConfig | None = None
