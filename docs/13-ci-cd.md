@@ -49,7 +49,12 @@ In March 2026 a credential-stealing campaign overwrote `aquasecurity/trivy-actio
 | `ci/scripts/check_blocked.py`, `check_exceptions.py`, `vuln_gate.py`, `verify-signatures.sh` | blocked versions, exception expiry, severity gate, signature and SBOM verification before deploy |
 | `security/blocked-versions.yaml`, `security/exceptions.yaml`, `security/gitleaksignore` | versions CI refuses, accepted findings (owner + expiry), reviewed gitleaks fingerprints |
 
-Not built yet: ZAP baseline, kind/k3d smoke installs, license check, changelog generation (ADR 0018).
+The license check runs in the python and ui jobs, on what is really installed (`ci/scripts/check_licenses.py`,
+policy `security/licenses.yaml`: permissive and weak-copyleft allowed, strong copyleft and source-available denied,
+unknown metadata reviewed per package). Its first run excluded a closed `lmnr-claude-code-proxy` binary pulled in by
+openhands-sdk (`tool.uv.exclude-dependencies`).
+
+Not built yet: ZAP baseline, kind/k3d smoke installs, changelog generation (ADR 0018).
 
 ## 5. What the repository owner sets up
 **GitHub**
