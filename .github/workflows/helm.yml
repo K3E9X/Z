@@ -123,24 +123,32 @@ jobs:
           # ci/render-values.yaml stands for the site values (digests, the inferX CIDR): without them production refuses
           K3S=(-f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml)
           K8S=(-f deploy/helm/z/values-k8s.yaml -f deploy/helm/z/ci/render-values.yaml)
-          refuse() { if helm template z deploy/helm/z -n z "$@" >/dev/null 2>&1; then echo "accepted: $*"; exit 1; fi; }
+          # refuse EXPECTED ARGS...: the render must fail, and with EXPECTED in its error (not for another reason)
+          refuse() {
+            local want=$1 out; shift
+            if out=$(helm template z deploy/helm/z -n z "$@" 2>&1 >/dev/null); then echo "accepted: $*"; exit 1; fi
+            grep -qF -- "$want" <<< "$out" || { printf 'refused for another reason: %s\nwanted: %s\n%s\n' "$*" "$want" "$out"; exit 1; }
+          }
           accept() { helm template z deploy/helm/z -n z "$@" >/dev/null || { echo "refused: $*"; exit 1; }; }
-          refuse "${K3S[@]}" --set containerSecurityContext.readOnlyRootFilesystem=false
-          refuse "${K3S[@]}" --set runners.podSecurity.level=baseline
-          refuse "${K3S[@]}" --set runners.image.tag=latest
-          refuse "${K3S[@]}" --set server.replicas=2
-          refuse "${K8S[@]}" --set database.existingSecret=
-          refuse -f deploy/helm/z/values-k3s.yaml   # production without site values
-          refuse -f deploy/helm/z/values-k8s.yaml
-          refuse "${K3S[@]}" --set networkPolicy.litellmEgress=null
-          refuse "${K3S[@]}" --set 'networkPolicy.litellmEgress[0].to[0].ipBlock.cidr=0.0.0.0/0'
-          refuse "${K8S[@]}" --set networkPolicy.databaseEgress=null
-          refuse "${K3S[@]}" --set env=prod
-          refuse "${K3S[@]}" --set networkPolicy.enabled=false
-          refuse "${K3S[@]}" --set runners.networkPolicy.enabled=false
-          refuse "${K3S[@]}" --skip-schema-validation --set networkPolicy.enabled=false
-          refuse "${K3S[@]}" --set server.image.digest=
-          refuse "${K3S[@]}" --set litellm.image.digest=
+          LITELLM_EGRESS="env=production needs networkPolicy.litellmEgress"
+          refuse "/containerSecurityContext/readOnlyRootFilesystem': value must be true" \
+            "${K3S[@]}" --set containerSecurityContext.readOnlyRootFilesystem=false
+          refuse "/runners/podSecurity/level': value must be 'restricted'" "${K3S[@]}" --set runners.podSecurity.level=baseline
+          refuse "/runners/image/tag'" "${K3S[@]}" --set runners.image.tag=latest
+          refuse "migrate.mode=initContainer runs migrations in every z-server pod" "${K3S[@]}" --set server.replicas=2
+          refuse "postgres.embedded=false needs database.existingSecret" "${K8S[@]}" --set database.existingSecret=
+          refuse "$LITELLM_EGRESS" -f deploy/helm/z/values-k3s.yaml   # production without site values
+          refuse "$LITELLM_EGRESS" -f deploy/helm/z/values-k8s.yaml
+          refuse "$LITELLM_EGRESS" "${K3S[@]}" --set networkPolicy.litellmEgress=null
+          refuse "networkPolicy.litellmEgress must not allow 0.0.0.0/0" \
+            "${K3S[@]}" --set 'networkPolicy.litellmEgress[0].to[0].ipBlock.cidr=0.0.0.0/0'
+          refuse "needs networkPolicy.databaseEgress" "${K8S[@]}" --set networkPolicy.databaseEgress=null
+          refuse "/env': value must be one of" "${K3S[@]}" --set env=prod
+          refuse "/networkPolicy/enabled': value must be true" "${K3S[@]}" --set networkPolicy.enabled=false
+          refuse "/runners/networkPolicy/enabled': value must be true" "${K3S[@]}" --set runners.networkPolicy.enabled=false
+          refuse "networkPolicy.enabled=false is refused" "${K3S[@]}" --skip-schema-validation --set networkPolicy.enabled=false
+          refuse "set server.image.digest" "${K3S[@]}" --set server.image.digest=
+          refuse "set litellm.image.digest" "${K3S[@]}" --set litellm.image.digest=
           accept "${K3S[@]}"
           accept "${K8S[@]}"
           accept -f deploy/helm/z/values-k3s.yaml -f ci/kind/values-smoke.yaml
