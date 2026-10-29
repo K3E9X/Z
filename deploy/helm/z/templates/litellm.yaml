@@ -56,6 +56,9 @@ spec:
               containerPort: {{ .Values.litellm.port }}
               protocol: TCP
           env:
+            # the price map bundled in the image: no fetch from GitHub at start (the gateway only reaches inferX)
+            - name: LITELLM_LOCAL_MODEL_COST_MAP
+              value: "True"
             - name: LITELLM_MASTER_KEY
               valueFrom:
                 secretKeyRef:

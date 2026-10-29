@@ -42,6 +42,7 @@ services:
       INFERENCE_API_BASE: ${INFERENCE_API_BASE:-}
       INFERENCE_API_KEY: ${INFERENCE_API_KEY:-}
       STORE_MODEL_IN_DB: "False"
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"   # bundled price map: no fetch from GitHub at start
     volumes:
       - ../../config/litellm.yaml:/etc/litellm/config.yaml:ro
       - ../helm/z/files/z_inference_guard.py:/etc/litellm/z_inference_guard.py:ro   # callback (ADR 0024)
