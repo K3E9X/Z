@@ -1,2 +1,15 @@
-# Accepted security findings: id, scope, reason, owner, expires (YYYY-MM-DD). Expired entries fail CI.
-exceptions: []
+# Accepted security findings (docs/13 §2), reviewed like code. Checked by ci/scripts/check_exceptions.py:
+# every entry needs id, scope, reason, owner, expires (YYYY-MM-DD, at most 366 days ahead); expired or
+# malformed entries fail CI. Scopes: image:<name> | image:* (trivy image, dockle), deps:pypi | deps:npm |
+# deps:* (osv-scanner, pip-audit, pnpm audit, trivy fs), iac (trivy config), sast (semgrep/bandit rule id), *.
+# Leaked secrets have no exceptions: rotate them.
+#   - {id: CVE-2026-12345, scope: image:z-runner, reason: "Not reachable: ...", owner: "@K3E9X", expires: 2026-12-31}
+exceptions:
+  - id: KSV-0109
+    scope: iac
+    # trivy config reads env references as secrets in ConfigMaps z-config (client_secret: ${OIDC_CLIENT_SECRET})
+    # and z-postgres-init (PASSWORD :'app_pw'); the values come from Secrets. Ignored by id: fix the chart
+    # wording or move to per-path ignores before expiry.
+    reason: "False positive: env references in ConfigMaps z-config and z-postgres-init, values come from Secrets"
+    owner: "@K3E9X"
+    expires: 2027-01-31

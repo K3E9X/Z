@@ -1,0 +1,7 @@
+# zizmor configuration (docs/13 §3): every audit on, at every severity. Exceptions here are reviewed like code
+# (CODEOWNERS on ci/) and must say why.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin

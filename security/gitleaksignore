@@ -1,0 +1,16 @@
+# gitleaks false positives (docs/13 §1 "security"): synthetic tokens in redaction tests, test fixtures and
+# contract examples, never real credentials. Exact fingerprints (commit:file:rule:line), so nothing else is
+# hidden. Add one only after checking the value is fake, in a reviewed PR; a real leaked secret is rotated
+# and purged, never listed here. Used as: gitleaks git --gitleaks-ignore-path security/gitleaksignore
+298ef0fca88ef6ba8f34120a7af1a4be75b658d5:runner/tests/test_units.py:generic-api-key:44
+298ef0fca88ef6ba8f34120a7af1a4be75b658d5:runner/tests/test_units.py:gitlab-pat:37
+298ef0fca88ef6ba8f34120a7af1a4be75b658d5:runner/tests/test_units.py:jwt:41
+2c833b6d550b63410bd93deb88b7febeb973613d:packages/z-common/tests/test_redaction.py:jwt:16
+688ea9fa88824fe11003f373ccd5b52a9da33b24:tests/support/server.py:generic-api-key:16
+99b2ba6aa5b7e99119194024fd5fdbf651e83321:packages/z-common/tests/test_redaction.py:gitlab-pat:11
+99b2ba6aa5b7e99119194024fd5fdbf651e83321:packages/z-common/tests/test_redaction.py:jwt:16
+c39b7b69c566da7aa19db65332437eec74a68eef:server/tests/test_scheduler.py:gitlab-pat:193
+c39b7b69c566da7aa19db65332437eec74a68eef:server/tests/test_scheduler.py:gitlab-pat:199
+d73c5664f91e3fed6dcb984ad12a7848c17b8f91:runner/tests/test_job_security.py:aws-access-token:203
+d73c5664f91e3fed6dcb984ad12a7848c17b8f91:runner/tests/test_job_security.py:aws-access-token:214
+e983b9236abe00b771bb43bde5fcb080baa02549:contracts/examples/connector/invalid-secret-value.yaml:generic-api-key:4
