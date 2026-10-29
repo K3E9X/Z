@@ -220,3 +220,19 @@ def test_workplace_m365_operations_come_from_the_graph_subset(repo: Path) -> Non
     assert all(ops[t].source_ref.split(" ")[0] in {"GET", "POST"} for t in agent_tools)
     assert ops["mail.reply"].source_ref == "POST /me/messages/{message_id}/reply"
     assert ops["mail.delete"].op_class == OperationClass.destructive and not ops["mail.delete"].proposed_exposed
+
+
+def test_lint_eval_check_paths_start_at_the_job_result(packs_copy: Path) -> None:
+    path = packs_copy / "vuln/evals/vuln-analyst.jsonl"
+    path.write_text(path.read_text().replace('"path": "output.priority"', '"path": "priority"', 1))
+    assert any("check path 'priority' must start with one of output" in e for e in _errors(packs_copy))
+
+
+def test_lint_warns_on_small_eval_suites(packs_copy: Path) -> None:
+    path = packs_copy / "vuln/evals/vuln-analyst.jsonl"
+    path.write_text(path.read_text().splitlines()[0] + "\n")
+    report = lint(discover(packs_copy), packs_copy.parent)
+    assert any("vuln-analyst" in w and "eval suite has 1 cases, fewer than 10" in w for w in report.warnings)
+    skill = packs_copy / "vuln/skills/triage-finding/SKILL.md"
+    skill.write_text(skill.read_text().replace("---\n", "---\nevals: evals/nope.jsonl\n", 1))
+    assert any("eval file evals/nope.jsonl not found" in e for e in _errors(packs_copy))

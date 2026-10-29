@@ -5,7 +5,8 @@ Run: `uv run python -m z_common.packs.lint packs/`. Exit code 1 on any error (wa
 Rules
 - every manifest validates against its contract (schemas, skill front matter, eval JSONL);
 - names are unique across packs: agents, handles, skills, playbooks, connectors;
-- every agent skill exists; every agent `evals` file exists; gateway tool refs name a known connector;
+- every agent skill exists; every agent and skill `evals` file exists (suites smaller than docs/08 §6 asks are
+  warned); gateway tool refs name a known connector;
 - write or destructive operations never appear in agent tools (globs only ever match reads);
 - every playbook step agent is in the playbook team and exists;
 - `depends_on`, `fanout.over`, `inputs_from` reference earlier steps; fan-out sources have an output schema
@@ -35,6 +36,17 @@ from z_common.packs.classify import ORDER, classify, glob_match, is_glob, raise_
 
 STEP_REF = re.compile(r"^steps\.([a-z0-9_-]+)\.(output(\.[A-Za-z0-9_]+)*|outputs)$")
 PLACEHOLDER = re.compile(r"^<.*>$")
+# what eval check paths address: the job result (contracts/eval-case.schema.json, z_server.evals.result_context)
+RESULT_ROOTS = ("output", "report", "actions", "questions", "artifacts", "tool_calls", "diff")
+MIN_AGENT_CASES, MIN_SKILL_CASES = 10, 5  # docs/08 §6: minimum suite sizes for seed agents and skills
+
+
+def _suite_size(pack: Pack, rel: str, skill: str | None = None) -> int:
+    """Cases of an eval file; for a skill, the cases marked with it (all cases when none is marked)."""
+    cases = [c for _, c in pack.evals.get(rel, []) if isinstance(c, dict)]
+    if skill is not None and any(c.get("skill") for c in cases):
+        cases = [c for c in cases if c.get("skill") == skill]
+    return len(cases)
 
 
 @dataclass
@@ -155,6 +167,13 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
                     f"skill {skill.name!r} already defined in pack {skills[skill.name].name}",
                 )
             skills[skill.name] = pack
+            suite = skill.front_matter.get("evals")
+            if not suite:
+                report.warn(_rel(skill.path, repo_root), "no eval suite")
+            elif not (pack.root / str(suite)).is_file():
+                report.error(_rel(skill.path, repo_root), f"eval file {suite} not found")
+            elif (size := _suite_size(pack, str(suite), skill.name)) < MIN_SKILL_CASES:
+                report.warn(_rel(skill.path, repo_root), f"eval suite has {size} cases, fewer than {MIN_SKILL_CASES}")
         for doc in pack.agents + pack.playbooks + pack.connectors + pack.objectives:
             for problem in doc.problems:
                 report.error(_rel(doc.path, repo_root), problem)
@@ -202,6 +221,8 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
                 report.error(where, f"skill {skill!r} does not exist in any pack")
         if agent.get("evals") and not (pack.root / agent["evals"]).is_file():
             report.error(where, f"eval file {agent['evals']} not found")
+        elif agent.get("evals") and (size := _suite_size(pack, agent["evals"])) < MIN_AGENT_CASES:
+            report.warn(where, f"eval suite has {size} cases, fewer than {MIN_AGENT_CASES}")
         if not agent.get("evals"):
             report.warn(where, "no eval suite")
         for tool in agent.get("tools", []):
@@ -259,6 +280,12 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
             where = f"{_rel(pack.root, repo_root)}/{file}"
             for number, case in cases:
                 for check in case.get("checks", []) if isinstance(case, dict) else []:
+                    head = re.split(r"[.\[]", str(check.get("path", "output")), maxsplit=1)[0]
+                    if head not in RESULT_ROOTS:
+                        report.error(
+                            f"{where}:{number}",
+                            f"check path {check.get('path')!r} must start with one of {', '.join(RESULT_ROOTS)}",
+                        )
                     if check.get("type") == "json_schema":
                         schema = str(check.get("schema", ""))
                         target = (
