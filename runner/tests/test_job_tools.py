@@ -76,6 +76,34 @@ def test_documents_tool_produces_artifacts(harness: Harness) -> None:
     assert artifact_events == set(by_name)
 
 
+def test_documents_are_redacted_before_rendering(harness: Harness) -> None:
+    spec = harness.spec(output=None, tools=ALL_LOCAL)
+    key = spec.llm.api_key
+    sections = [{"heading": "Access", "paragraphs": [f"The key is {key}."], "bullets": ["password=hunter2hunter2"]}]
+    rows = [["key", key], ["token", "glpat-abcdefghijklmnopqrst1234"]]
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("documents", {"format": "docx", "name": "access", "title": "Access", "sections": sections}),
+                tool_call("documents", {"format": "xlsx", "name": "keys", "headers": ["name", "value"], "rows": rows}),
+                finish(),
+            ]
+        }
+    )
+    run = harness.run(spec)
+    assert run.completion["status"] == "succeeded"
+    assert all(r["ok"] for r in run.events("tool_result"))
+    by_name = {a["name"]: a for a in run.job.artifacts}
+    import docx
+    import openpyxl
+
+    text = "\n".join(p.text for p in docx.Document(io.BytesIO(by_name["access.docx"]["content"])).paragraphs)
+    assert key not in text and "hunter2hunter2" not in text and "The key is [REDACTED]." in text
+    sheet = openpyxl.load_workbook(io.BytesIO(by_name["keys.xlsx"]["content"])).active
+    assert [[c.value for c in row] for row in sheet.iter_rows()][1:] == [["key", "[REDACTED]"], ["token", "[REDACTED]"]]
+    assert key.encode() not in (run.workspace / "documents" / "access.docx").read_bytes()
+
+
 def test_code_tool_runs_python_without_network(harness: Harness) -> None:
     harness.llm.add_rules(
         {

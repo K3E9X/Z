@@ -356,6 +356,9 @@ class DocumentsTool(ZTool):
         return render_pptx(title, sections)
 
     def run(self, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
+        # Redact the content before rendering: a secret inside a compressed DOCX/XLSX/PPTX or a PDF cannot be found
+        # (let alone rewritten) in the rendered bytes.
+        args = ctx.redactor.strings(args)
         fmt = str(args["format"])
         module = _REQUIRES.get(fmt)
         if module and not library_available(module):
