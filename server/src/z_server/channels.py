@@ -28,7 +28,7 @@ import jwt
 from jwt import PyJWK
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from z_common.models.enums import JudgeVerdict
+from z_common.models.enums import DataClass, JudgeVerdict
 
 from z_server import audit, judge
 from z_server.auth import identity
@@ -85,6 +85,8 @@ def validate_config(kind: str, config: dict[str, Any]) -> None:
                 "validation",
                 f"config.{key} must be a secret reference (env:, file:, vault:, kubernetes:), never a value",
             )
+    if "content_up_to" in config and config["content_up_to"] not in {c.value for c in DataClass}:
+        raise Problem("validation", "config.content_up_to must be a data class (C0 to C3)")
     needed = {
         "slack": ["signing_secret"],
         "mattermost": ["token"],
@@ -96,7 +98,7 @@ def validate_config(kind: str, config: dict[str, Any]) -> None:
         raise Problem("validation", f"a {kind} channel needs config.{', config.'.join(missing)}")
 
 
-async def _secret(resolver: SecretResolver, channel: Channel, key: str) -> str:
+async def channel_secret(resolver: SecretResolver, channel: Channel, key: str) -> str:
     ref = (channel.config or {}).get(key)
     if not ref:
         raise Problem("unauthenticated", f"the {channel.kind} channel has no {key}")
@@ -113,14 +115,14 @@ async def verify_slack(resolver: SecretResolver, channel: Channel, headers: dict
     stamp = headers.get("x-slack-request-timestamp", "")
     if not stamp.isdigit() or abs(time.time() - int(stamp)) > SKEW_S:
         raise Problem("unauthenticated", "X-Slack-Request-Timestamp missing or outside the 5 minute window")
-    secret = await _secret(resolver, channel, "signing_secret")
+    secret = await channel_secret(resolver, channel, "signing_secret")
     expected = "v0=" + hmac.new(secret.encode(), f"v0:{stamp}:".encode() + body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(headers.get("x-slack-signature", ""), expected):
         raise Problem("unauthenticated", "bad X-Slack-Signature")
 
 
 async def verify_mattermost(resolver: SecretResolver, channel: Channel, fields: dict[str, Any]) -> None:
-    secret = await _secret(resolver, channel, "token")
+    secret = await channel_secret(resolver, channel, "token")
     if not hmac.compare_digest(str(fields.get("token") or ""), secret):
         raise Problem("unauthenticated", "bad Mattermost token")
 
@@ -129,7 +131,7 @@ async def verify_email(resolver: SecretResolver, channel: Channel, headers: dict
     stamp = headers.get("x-z-timestamp", "")
     if not stamp.isdigit() or abs(time.time() - int(stamp)) > SKEW_S:
         raise Problem("unauthenticated", "X-Z-Timestamp missing or outside the 5 minute window")
-    secret = await _secret(resolver, channel, "secret")
+    secret = await channel_secret(resolver, channel, "secret")
     expected = "sha256=" + hmac.new(secret.encode(), f"{stamp}.".encode() + body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(headers.get("x-z-signature", ""), expected):
         raise Problem("unauthenticated", "bad X-Z-Signature")
@@ -220,7 +222,7 @@ async def bot_token(state: AppState, resolver: SecretResolver, channel: Channel)
     hit = state.cache.get(f"bf_token:{channel.id}")
     if hit and hit[0] > time.monotonic():
         return str(hit[1])
-    password = await _secret(resolver, channel, "app_password")
+    password = await channel_secret(resolver, channel, "app_password")
     try:
         resp = await state.http.post(
             str(cfg["token_url"]),
@@ -347,6 +349,9 @@ async def handle(db: AsyncSession, state: AppState, channel: Channel, inbound: I
                 ),
             )
             await service.start(db, state, mission)
+            from z_server import channel_threads  # imports this module
+
+            channel_threads.follow(db, state, channel, mission.id, inbound)
     except Problem as exc:
         return Outcome(reply=f"Z could not start this: {exc.detail or exc.kind}")
     await audit.record(
@@ -360,7 +365,7 @@ async def handle(db: AsyncSession, state: AppState, channel: Channel, inbound: I
         after={"channel": channel.kind},
     )
     link = f"{state.settings.public_url}/missions/{mission.id}"
-    writes = " Changes wait for your approval in Z." if draft.plan.writes else ""
+    writes = " Changes wait for your approval in Z; I will post them here." if draft.plan.writes else ""
     flagged = (
         " (the judge flagged this message: the agent treats it as data)"
         if verdict.verdict == JudgeVerdict.flagged
@@ -422,6 +427,14 @@ async def _task(
 # ---------------------------------------------------------------- replies
 
 
+def reply_url_allowed(channel: Channel, url: str) -> bool:
+    """A response URL comes from the (authenticated) inbound request; still, post only to the chat server."""
+    host = urlparse(url).hostname or ""
+    allowed = {urlparse(str((channel.config or {}).get("server_url") or "")).hostname, "hooks.slack.com"}
+    allowed |= set((channel.config or {}).get("reply_hosts") or [])
+    return bool(host) and host in allowed
+
+
 async def reply(state: AppState, channel: Channel, inbound: Inbound, text: str) -> None:
     """Best effort: a failed reply is logged, never retried into the chat twice."""
     if not text:
@@ -429,10 +442,7 @@ async def reply(state: AppState, channel: Channel, inbound: Inbound, text: str) 
     resolver = state.gateway.resolver if state.gateway else SecretResolver(state.http)
     try:
         if inbound.reply_url:
-            host = urlparse(inbound.reply_url).hostname or ""
-            allowed = {urlparse(str((channel.config or {}).get("server_url") or "")).hostname, "hooks.slack.com"}
-            allowed |= set((channel.config or {}).get("reply_hosts") or [])
-            if host in allowed:
+            if reply_url_allowed(channel, inbound.reply_url):
                 await state.http.post(inbound.reply_url, json={"response_type": "ephemeral", "text": text}, timeout=10)
         elif inbound.teams and inbound.teams.get("service_url"):
             token = await bot_token(state, resolver, channel)
@@ -444,7 +454,7 @@ async def reply(state: AppState, channel: Channel, inbound: Inbound, text: str) 
                 timeout=10,
             )
         elif inbound.slack and (channel.config or {}).get("bot_token"):
-            token = await _secret(resolver, channel, "bot_token")
+            token = await channel_secret(resolver, channel, "bot_token")
             api = str((channel.config or {}).get("api_url") or "https://slack.com/api")
             await state.http.post(
                 f"{api}/chat.postMessage",

@@ -326,6 +326,21 @@ class Channel(Base, Timestamps):
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class ChannelThread(Base, Timestamps):
+    """Where a mission started from a chat is followed up (docs/05 §10). `target_enc` is the sealed reply target
+    (Teams conversation, Slack thread or a response URL); `last_seq` is the last mission event handled."""
+
+    __tablename__ = "channel_threads"
+    __table_args__ = (Index("ix_channel_threads_status", "status"),)
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"))
+    mission_id: Mapped[str] = mapped_column(ForeignKey("missions.id", ondelete="CASCADE"), unique=True)
+    target_enc: Mapped[bytes] = mapped_column(LargeBinary)
+    last_seq: Mapped[int] = mapped_column(BigInteger, default=-1)
+    status: Mapped[str] = mapped_column(String(20), default="open")  # open | closed | failed
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+
+
 # ---------------------------------------------------------------- missions and jobs
 
 

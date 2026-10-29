@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from tests.fakes.fake_gitlab_oidc import FakeGitLabOIDC
 from tests.fakes.fake_tools import FakeTools
@@ -209,3 +210,97 @@ def test_teams_activity_with_bot_framework_token(app: TestClient, tools: FakeToo
         == 401
     )
     assert app.post("/api/v1/channels/teams/messages", json=activity).status_code == 401
+
+
+def _teams_start(app: TestClient, tools: FakeTools, activity_id: str) -> str:
+    bf = tools.url_for("botframework")
+    activity = {
+        "type": "message",
+        "id": activity_id,
+        "text": "<at>Z</at> @summarizer summarise the meeting notes",
+        "from": {"id": "29:bob", "name": "Bob"},
+        "conversation": {"id": "19:general"},
+        "serviceUrl": bf,
+    }
+    token = httpx.post(f"{bf}/_fake/sign", json={"serviceUrl": bf}).json()["token"]
+    resp = app.post("/api/v1/channels/teams/messages", json=activity, headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 202, resp.text
+    return str(resp.json()["mission_id"])
+
+
+def _in_app(app: TestClient, fn: Callable[[Any], Any]) -> Any:
+    state = app.app.state.z  # type: ignore[attr-defined]
+
+    async def go() -> Any:
+        return await fn(state)
+
+    return app.portal.call(go)  # type: ignore[union-attr]
+
+
+def test_follow_ups_post_approval_cards_and_the_outcome_to_the_thread(app: TestClient, tools: FakeTools) -> None:
+    from z_server import channel_threads, events
+    from z_server.db.models import ChannelThread, Mission
+
+    mission_id = _teams_start(app, tools, "act-7")
+
+    async def emit(state: Any) -> None:
+        async with state.sessions() as db, db.begin():
+            thread = (
+                await db.execute(select(ChannelThread).where(ChannelThread.mission_id == mission_id))
+            ).scalar_one()
+            assert thread.status == "open" and b"19:general" not in thread.target_enc  # sealed
+            mission = await db.get(Mission, mission_id)
+            assert mission is not None and mission.data_class == "C2"
+            mission.data_class = "C1"  # content is posted up to the channel's cap (default C1)
+            await events.append(
+                db,
+                mission_id,
+                "action_proposed",
+                {
+                    "action_id": "act_01",
+                    "connector": "jira",
+                    "operation": "jira.issues.create",
+                    "class": "write",
+                    "summary": "Create SECOPS ticket for the patch",
+                },
+            )
+            await events.append(db, mission_id, "message", {"text": "working", "role": "agent"})
+            await events.append(
+                db,
+                mission_id,
+                "action_proposed",
+                {
+                    "action_id": "act_02",
+                    "connector": "jira",
+                    "operation": "jira.issues.delete",
+                    "class": "destructive",
+                    "summary": "Delete the duplicate",
+                },
+            )
+
+    _in_app(app, emit)
+    before = len(tools.writes("teams.reply"))
+    report = _in_app(app, channel_threads.tick)
+    assert len(report["posted"]) == 2, report
+    cards = [w["data"] for w in tools.writes("teams.reply")[before:]]
+    first = cards[0]["attachments"][0]
+    assert first["contentType"] == "application/vnd.microsoft.card.adaptive" and cards[0]["replyToId"] == "act-7"
+    content = json.dumps(first["content"])
+    assert "Create SECOPS ticket for the patch" in content
+    assert first["content"]["actions"][0]["url"].endswith("/review?action=act_01")
+    assert "two approvers, in the Z app only" in json.dumps(cards[1])
+    assert _in_app(app, channel_threads.tick)["posted"] == []  # the cursor moved: nothing twice
+
+    async def finish(state: Any) -> None:
+        async with state.sessions() as db, db.begin():
+            mission = await db.get(Mission, mission_id)
+            assert mission is not None
+            mission.status, mission.data_class = "succeeded", "C3"
+            await events.append(db, mission_id, "status", {"entity": "mission", "from": "running", "to": "succeeded"})
+
+    _in_app(app, finish)
+    report = _in_app(app, channel_threads.tick)
+    assert len(report["posted"]) == 1 and report["closed"], report
+    last = json.dumps(tools.writes("teams.reply")[-1]["data"])
+    assert "Mission succeeded" in last and "Details are in Z (data class C3)" in last
+    assert "summarise the meeting notes" not in last  # C3 content never goes to the chat
