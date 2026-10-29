@@ -285,25 +285,30 @@ export function Tabs<T extends string>({
   )
 }
 
+/** Fields are full width unless the caller sets a width. */
+function width(className: string): string {
+  return /(^|\s)w-|(^|\s)flex-1/.test(className) ? '' : 'w-full'
+}
+
 const FIELD =
-  'w-full rounded-btn border border-line-2 bg-transparent px-3 text-text placeholder:text-text-3 disabled:opacity-60'
+  'rounded-btn border border-line-2 bg-transparent px-3 text-text placeholder:text-text-3 disabled:opacity-60'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className = '', ...rest },
   ref,
 ) {
-  return <input ref={ref} className={`h-[34px] ${FIELD} ${className}`} {...rest} />
+  return <input ref={ref} className={`h-[34px] ${width(className)} ${FIELD} ${className}`} {...rest} />
 })
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className = '', ...rest }, ref) {
-    return <textarea ref={ref} className={`py-2 leading-[1.5] ${FIELD} ${className}`} {...rest} />
+    return <textarea ref={ref} className={`py-2 leading-[1.5] ${width(className)} ${FIELD} ${className}`} {...rest} />
   },
 )
 
 export function Select({ className = '', children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={`h-[34px] ${FIELD} bg-bg pr-8 ${className}`} {...rest}>
+    <select className={`h-[34px] ${width(className)} ${FIELD} bg-bg pr-8 ${className}`} {...rest}>
       {children}
     </select>
   )

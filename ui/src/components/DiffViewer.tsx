@@ -40,7 +40,7 @@ export function toFiles(patches: StructuredPatch[]): DiffFile[] {
           removed++
           lines.push({ kind: 'del', text, oldNo: o++, newNo: null })
         } else if (c === '\\') {
-          lines.push({ kind: 'meta', text: raw, oldNo: null, newNo: null })
+          // "\ No newline at end of file": not a change, not shown
         } else {
           lines.push({ kind: 'ctx', text, oldNo: o++, newNo: n++ })
         }
