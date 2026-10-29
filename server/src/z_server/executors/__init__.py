@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 
 class ExecutorError(RuntimeError):
     pass
+
+
+MAX_TOOL_OUTPUT = 1024 * 1024  # bytes of stdout kept from a cli tool run (the rest is cut, `truncated` is set)
+
+
+@dataclass
+class ToolRun:
+    """One cli connector call (ADR 0025): a tool container run to completion."""
+
+    exit_code: int | None  # None when it was stopped at the timeout
+    stdout: str
+    stderr: str
+    timed_out: bool = False
+    truncated: bool = False
+
+
+class ToolSandbox(Protocol):
+    async def run_tool(self, image: str, argv: list[str], env: dict[str, str], timeout_s: float) -> ToolRun:
+        """Run `image` with `argv` as its command (after the ENTRYPOINT, if any) in a hardened, network-restricted container."""
 
 
 class Executor(Protocol):

@@ -5,12 +5,14 @@ tmpfs workspace, runners network only, CPU/memory/pids limits."""
 
 from __future__ import annotations
 
+import asyncio
+import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
-from z_server.executors import ExecutorError
+from z_server.executors import MAX_TOOL_OUTPUT, ExecutorError, ToolRun
 
 API_VERSION = "v1.43"
 LABEL = "io.z.job"
@@ -26,12 +28,21 @@ class DockerLimits:
 
 
 @dataclass
+class ToolLimits:
+    memory_bytes: int = 512 * 1024**2
+    nano_cpus: int = 1_000_000_000
+    pids: int = 256
+    tmp_size: str = "128m"
+
+
+@dataclass
 class DockerExecutor:
     base_url: str  # http://docker-socket-proxy:2375 or unix:///var/run/docker.sock
     image: str
     network: str = "z_runners"
     runtime: str | None = None  # e.g. runsc for gVisor
     limits: DockerLimits = field(default_factory=DockerLimits)
+    tool_limits: ToolLimits = field(default_factory=ToolLimits)
     name: str = "docker"
     _client: httpx.AsyncClient | None = None
 
@@ -118,6 +129,70 @@ class DockerExecutor:
     async def stop(self, ref: str) -> None:
         await self._call("POST", f"/containers/{ref}/stop", params={"t": 10})
         await self._call("DELETE", f"/containers/{ref}", params={"force": "true"})
+
+    def tool_spec(self, run_id: str, image: str, argv: list[str], env: dict[str, str]) -> dict[str, Any]:
+        """A cli tool container (socket proxy profile z-tool-*): the runner hardening, user 65534, /tmp only."""
+        limits = self.tool_limits
+        host: dict[str, Any] = {
+            "NetworkMode": self.network,
+            "ReadonlyRootfs": True,
+            "CapDrop": ["ALL"],
+            "SecurityOpt": ["no-new-privileges:true"],
+            "Tmpfs": {"/tmp": f"rw,nosuid,nodev,noexec,size={limits.tmp_size},uid=65534,gid=65534"},  # noqa: S108
+            "Memory": limits.memory_bytes,
+            "NanoCpus": limits.nano_cpus,
+            "PidsLimit": limits.pids,
+            "Privileged": False,
+            "RestartPolicy": {"Name": "no"},
+        }
+        if self.runtime:
+            host["Runtime"] = self.runtime
+        full_env = {**env, "HOME": "/tmp"}  # noqa: S108 - inside the tool container
+        return {
+            "Image": image,
+            "Cmd": list(argv),
+            "Env": [f"{k}={v}" for k, v in sorted(full_env.items())],
+            "User": "65534:65534",
+            "WorkingDir": "/tmp",  # noqa: S108
+            "Labels": {LABEL: f"tool:{run_id}"},
+            "HostConfig": host,
+        }
+
+    async def run_tool(self, image: str, argv: list[str], env: dict[str, str], timeout_s: float) -> ToolRun:
+        run_id = secrets.token_hex(8)
+        created = await self._call(
+            "POST",
+            "/containers/create",
+            params={"name": f"z-tool-{run_id}"},
+            json=self.tool_spec(run_id, image, argv, env),
+        )
+        if created.status_code != 201:
+            raise ExecutorError(f"tool container create refused ({created.status_code}): {created.text[:300]}")
+        container = str(created.json()["Id"])
+        try:
+            started = await self._call("POST", f"/containers/{container}/start")
+            if started.status_code not in {204, 304}:
+                raise ExecutorError(f"tool container start refused ({started.status_code}): {started.text[:300]}")
+            exit_code: int | None = None
+            timed_out = False
+            try:
+                waited = await asyncio.wait_for(
+                    self._call("POST", f"/containers/{container}/wait", timeout=timeout_s + 5), timeout_s
+                )
+                exit_code = int(waited.json().get("StatusCode", -1)) if waited.status_code == 200 else -1
+            except TimeoutError:
+                timed_out = True
+                await self._call("POST", f"/containers/{container}/stop", params={"t": 1})
+            out = await self._call("GET", f"/containers/{container}/logs", params={"stdout": 1, "stderr": 0})
+            err = await self._call("GET", f"/containers/{container}/logs", params={"stdout": 0, "stderr": 1})
+            stdout = demux(out.content) if out.status_code == 200 else ""
+            stderr = demux(err.content) if err.status_code == 200 else ""
+        finally:
+            await self._call("DELETE", f"/containers/{container}", params={"force": "true"})
+        truncated = len(stdout.encode()) > MAX_TOOL_OUTPUT
+        if truncated:
+            stdout = stdout.encode()[:MAX_TOOL_OUTPUT].decode("utf-8", errors="ignore")
+        return ToolRun(exit_code, stdout, stderr[-4000:], timed_out, truncated)
 
 
 def demux(raw: bytes) -> str:

@@ -14,15 +14,18 @@ library), with the pod's service account token and CA, so the same code runs on 
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import re
+import secrets
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-from z_server.executors import ExecutorError
+from z_server.executors import MAX_TOOL_OUTPUT, ExecutorError, ToolRun
 
 SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
 LABEL = "z.io/job"
@@ -233,6 +236,124 @@ class KubernetesExecutor:
             if term:
                 text += f"\n[exit code {term.get('exitCode')}, {term.get('reason', '')}]"
         return text
+
+    # ---------------------------------------------------------------- cli tools (ADR 0025)
+
+    def tool_manifests(
+        self, run_id: str, image: str, argv: list[str], env: dict[str, str], timeout_s: float
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """(Secret, Job) of one tool run: every env value (credentials) in the Secret, uid 65534, /tmp only."""
+        name = f"z-tool-{run_id}"
+        secret = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {"name": name, "namespace": self.namespace, "labels": {LABEL: name}},
+            "type": "Opaque",
+            "data": {k: base64.b64encode(v.encode()).decode() for k, v in env.items()},
+        }
+        container_env = [{"name": "HOME", "value": "/tmp"}] + [  # noqa: S108 - emptyDir inside the pod
+            {"name": k, "valueFrom": {"secretKeyRef": {"name": name, "key": k}}} for k in sorted(env)
+        ]
+        pod: dict[str, Any] = {
+            "restartPolicy": "Never",
+            "automountServiceAccountToken": False,
+            "enableServiceLinks": False,
+            "securityContext": {
+                "runAsNonRoot": True,
+                "runAsUser": 65534,
+                "runAsGroup": 65534,
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
+            "containers": [
+                {
+                    "name": "tool",
+                    "image": image,
+                    "imagePullPolicy": "IfNotPresent",
+                    "args": list(argv),
+                    "workingDir": "/tmp",  # noqa: S108
+                    "env": container_env,
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "readOnlyRootFilesystem": True,
+                        "privileged": False,
+                        "runAsNonRoot": True,
+                        "capabilities": {"drop": ["ALL"]},
+                        "seccompProfile": {"type": "RuntimeDefault"},
+                    },
+                    "resources": {
+                        "limits": {"cpu": "1", "memory": "512Mi", "ephemeral-storage": "256Mi"},
+                        "requests": {"cpu": "100m", "memory": "64Mi"},
+                    },
+                    "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}],  # noqa: S108
+                }
+            ],
+            "volumes": [{"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}}],
+        }
+        if self.runtime_class:
+            pod["runtimeClassName"] = self.runtime_class
+        labels = {LABEL: name, "app.kubernetes.io/name": "z-tool", "app.kubernetes.io/part-of": "z"}
+        job = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {"name": name, "namespace": self.namespace, "labels": labels},
+            "spec": {
+                "backoffLimit": 0,
+                "ttlSecondsAfterFinished": 300,
+                "activeDeadlineSeconds": int(timeout_s) + 10,
+                "template": {"metadata": {"labels": labels}, "spec": pod},
+            },
+        }
+        return secret, job
+
+    async def run_tool(self, image: str, argv: list[str], env: dict[str, str], timeout_s: float) -> ToolRun:
+        run_id = secrets.token_hex(8)
+        name, ns = f"z-tool-{run_id}", self.namespace
+        secret, job = self.tool_manifests(run_id, image, argv, env, timeout_s)
+        created = await self._call("POST", f"/api/v1/namespaces/{ns}/secrets", json=secret)
+        if created.status_code not in (200, 201):
+            raise ExecutorError(f"tool secret create refused ({created.status_code}): {created.text[:300]}")
+        try:
+            started = await self._call("POST", f"/apis/batch/v1/namespaces/{ns}/jobs", json=job)
+            if started.status_code not in (200, 201):
+                raise ExecutorError(f"tool job create refused ({started.status_code}): {started.text[:300]}")
+            deadline = time.monotonic() + timeout_s
+            pod_name, exit_code, timed_out = None, None, False
+            while True:
+                pods = await self._call(
+                    "GET", f"/api/v1/namespaces/{ns}/pods", params={"labelSelector": f"{LABEL}={name}"}
+                )
+                items = (pods.json().get("items") or []) if pods.status_code == 200 else []
+                if items:
+                    pod_name = items[-1]["metadata"]["name"]
+                    for st in (items[-1].get("status") or {}).get("containerStatuses") or []:
+                        term = (st.get("state") or {}).get("terminated")
+                        if term:
+                            exit_code = int(term.get("exitCode", -1))
+                if exit_code is not None:
+                    break
+                if time.monotonic() > deadline:
+                    timed_out = True
+                    break
+                await asyncio.sleep(1)
+            stdout = ""
+            if pod_name:
+                log = await self._call(
+                    "GET",
+                    f"/api/v1/namespaces/{ns}/pods/{pod_name}/log",
+                    params={"container": "tool", "limitBytes": MAX_TOOL_OUTPUT + 1},
+                )
+                stdout = log.text if log.status_code == 200 else ""
+        finally:
+            await self._call(
+                "DELETE", f"/apis/batch/v1/namespaces/{ns}/jobs/{name}", params={"propagationPolicy": "Background"}
+            )
+            await self._call("DELETE", f"/api/v1/namespaces/{ns}/secrets/{name}")
+        truncated = len(stdout.encode()) > MAX_TOOL_OUTPUT
+        if truncated:
+            stdout = stdout.encode()[:MAX_TOOL_OUTPUT].decode("utf-8", errors="ignore")
+        # the pod log mixes stdout and stderr: on failure the whole log is the diagnosis
+        stderr = stdout[-4000:] if exit_code not in (0, None) else ""
+        return ToolRun(exit_code, stdout, stderr, timed_out, truncated)
 
     async def stop(self, ref: str) -> None:
         ns = self.namespace

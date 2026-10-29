@@ -120,3 +120,39 @@ def test_refused_job_cleans_up_its_secret() -> None:
 
     asyncio.run(go())
     assert fake.objects == {}
+
+
+class FakeToolKube(FakeKube):
+    """Pods of z-tool-* jobs terminate with exit 0 and print JSON."""
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET" and path.endswith("/pods") and "z-tool-" in request.url.params["labelSelector"]:
+            self.calls.append(("GET", path))
+            done = {"containerStatuses": [{"state": {"terminated": {"exitCode": 0}}}]}
+            return httpx.Response(200, json={"items": [{"metadata": {"name": "tool-pod"}, "status": done}]})
+        if request.method == "GET" and path.endswith("/tool-pod/log"):
+            self.calls.append(("GET", path))
+            assert request.url.params["container"] == "tool"
+            return httpx.Response(200, text='{"items": []}')
+        return super().__call__(request)
+
+
+def test_tool_run_keeps_credentials_in_a_secret_and_cleans_up() -> None:
+    fake = FakeToolKube()
+    ex = executor(fake)
+    image = "registry.example/kubectl@sha256:" + "b" * 64
+    secret, job = ex.tool_manifests("abc123", image, ["get", "pods"], {"KUBE_TOKEN": "tok-1"}, 30)
+    pod = job["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+    assert "tok-1" not in json.dumps(job)  # the credential is only in the Secret
+    assert base64.b64decode(secret["data"]["KUBE_TOKEN"]).decode() == "tok-1"
+    assert pod["securityContext"]["runAsUser"] == 65534 and pod["automountServiceAccountToken"] is False
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["securityContext"]["capabilities"] == {"drop": ["ALL"]}
+    assert container["args"] == ["get", "pods"] and job["spec"]["activeDeadlineSeconds"] == 40
+    run = asyncio.run(ex.run_tool(image, ["get", "pods", "-o", "json"], {"KUBE_TOKEN": "tok-1"}, 30))
+    assert run.exit_code == 0 and json.loads(run.stdout) == {"items": []} and not run.timed_out
+    deleted = [p for m, p in fake.calls if m == "DELETE"]
+    assert any("/jobs/z-tool-" in p for p in deleted) and any("/secrets/z-tool-" in p for p in deleted)
+    assert not [k for k in fake.objects if "z-tool-" in k]  # nothing left behind
