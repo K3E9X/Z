@@ -38,7 +38,10 @@ packages:
   - { ecosystem: pypi, name: agent-client-protocol, license: Apache-2.0, reason: "no license field; the wheel ships the Apache 2.0 text" }
   - { ecosystem: pypi, name: tiktoken, license: MIT, reason: "License field holds the full MIT text" }
   - { ecosystem: pypi, name: socksio, license: MIT, reason: "metadata says UNKNOWN; the wheel ships the MIT text" }
-  - { ecosystem: pypi, name: python-dateutil, license: "Apache-2.0 AND BSD-3-Clause", reason: "metadata says Dual License; Apache 2.0 for new code, BSD 3-clause for older code" }
+  - ecosystem: pypi
+    name: python-dateutil
+    license: "Apache-2.0 AND BSD-3-Clause"
+    reason: "metadata says Dual License; Apache 2.0 for new code, BSD 3-clause for older code"
   - { ecosystem: pypi, name: func-timeout, license: LGPL-3.0-only, reason: "metadata says LGPLv2; the wheel ships the LGPL 3.0 text; used unmodified" }
 # Z's own workspace packages.
 ignore:

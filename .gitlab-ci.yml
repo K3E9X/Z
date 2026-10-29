@@ -475,7 +475,8 @@ release:notes:
   script:
     - command -v git >/dev/null || { apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null; }
     - git fetch --tags --quiet || true
-    - python3 ci/scripts/changelog.py --to "$CI_COMMIT_TAG" --from "$(git describe --tags --abbrev=0 --match 'v*.*.*' "$CI_COMMIT_TAG^" 2>/dev/null || git rev-list --max-parents=0 HEAD)" --version "$CI_COMMIT_TAG" > release-notes.md
+    - previous=$(git describe --tags --abbrev=0 --match 'v*.*.*' "$CI_COMMIT_TAG^" 2>/dev/null || git rev-list --max-parents=0 HEAD)
+    - python3 ci/scripts/changelog.py --to "$CI_COMMIT_TAG" --from "$previous" --version "$CI_COMMIT_TAG" > release-notes.md
     - |
       cat >> release-notes.md <<EOF
       ### Images and verification
