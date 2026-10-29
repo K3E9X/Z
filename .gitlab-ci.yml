@@ -194,7 +194,8 @@ security:repo:
     - |
       set -- ; while read -r id; do set -- "$@" --exclude-rule "$id"; done < .exc/sast
       semgrep scan --metrics=off --error --severity ERROR --disable-version-check \
-        --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes --exclude .cache "$@"
+        --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes --exclude .cache \
+        --exclude 'packs/*/evals/fixtures' "$@"
     - skips=$(paste -sd, .exc/sast)
     - bandit -q -r server/src runner/src cli/src packages/z-common/src deploy/images ci/scripts
       --severity-level high --confidence-level high ${skips:+--skip "$skips"}

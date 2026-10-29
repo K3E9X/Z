@@ -155,7 +155,8 @@ jobs:
           excludes=()
           while read -r id; do excludes+=(--exclude-rule "$id"); done < "$RUNNER_TEMP/exc/sast"
           semgrep scan --metrics=off --error --severity ERROR --disable-version-check \
-            --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes "${excludes[@]}"
+            --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes \
+            --exclude 'packs/*/evals/fixtures' "${excludes[@]}"  # fixtures: vulnerable sample code agents review
       - name: bandit (high severity, high confidence)
         run: |
           skips=$(paste -sd, "$RUNNER_TEMP/exc/sast")

@@ -50,7 +50,7 @@ z-browser = { workspace = true }
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["ui", "design", "poc", "docs", "*.md", "**/alembic/versions", ".claude"]
+extend-exclude = ["ui", "design", "poc", "docs", "*.md", "**/alembic/versions", ".claude", "packs/*/evals/fixtures"]  # fixtures: sample code agents fix, data
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "C4", "SIM", "RUF"]
