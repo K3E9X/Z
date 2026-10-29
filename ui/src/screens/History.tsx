@@ -194,6 +194,8 @@ export function History() {
   const range = search.range && RANGES[search.range] ? search.range : '24h'
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [pages, setPages] = useState<AuditEvent[][]>([])
+  // next_cursor of the last older page loaded (undefined: none loaded yet, null: reached the oldest).
+  const [older, setOlder] = useState<string | null | undefined>(undefined)
   const [q, setQ] = useState(search.q ?? '')
   const type = (search.type ?? 'all') as AuditCategory | 'all'
   const hours = RANGES[range]?.hours ?? null
@@ -231,6 +233,7 @@ export function History() {
 
   const set = (patch: Record<string, string | number | undefined>) => {
     setPages([])
+    setOlder(undefined)
     setCursor(undefined)
     void navigate({ to: '/history', search: { ...search, ...patch }, replace: true })
   }
@@ -265,14 +268,16 @@ export function History() {
       setExporting(false)
     }
   }
+  const nextOlder = older === undefined ? audit.data?.next_cursor : older
   const loadOlder = async () => {
-    const next = audit.data?.next_cursor
+    const next = nextOlder
     if (!next) return
     try {
       const page = await unwrap(
         api.GET('/audit', { params: { query: { limit: 200, cursor: next, ...(from ? { from } : {}) } } }),
       )
       setPages((p) => [...p, page.items])
+      setOlder(page.next_cursor ?? null)
       setCursor(undefined)
       if (!page.next_cursor) toast.info('This is the oldest event in the range.')
     } catch (e) {
@@ -406,7 +411,7 @@ export function History() {
                     })}
                   </tbody>
                 </table>
-                {audit.data?.next_cursor && (
+                {nextOlder && (
                   <Button size="sm" className="mt-3" onClick={() => void loadOlder()}>
                     Load older events
                   </Button>
