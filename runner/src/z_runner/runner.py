@@ -520,6 +520,12 @@ class Runner:
             before.mkdir()
             with archive.open("rb") as fh:
                 extract_tar(fh, before, self.config.archive_limits)
+            # Files the judge blocked were removed before the agent started: they are not a change of the agent.
+            staged = getattr(getattr(self, "context", None), "staged", None)
+            for rel in staged.blocked if staged is not None else []:
+                target = Path(os.path.normpath(before / rel))
+                if target.is_relative_to(before) and (target.is_symlink() or target.is_file()):
+                    target.unlink()
             for name in excluded:
                 target = before / name
                 if target.is_dir() and not target.is_symlink():
