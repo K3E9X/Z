@@ -113,6 +113,8 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   bodies past the preview (all OpenAPI writes), RFC 2047 encoded words decoded into hidden recipients, calendar
   ownership by `organizer.self`, `..` calendar ids, Chat reply previews; M365 events no longer count as
   idempotent. Lesson: a preview is only as good as the closed schema of everything the writer sends.
+- Personal connections now record the account of each grant (`openid email`, ID token claims) and refuse read
+  and write grants of different accounts; the identity field had never been filled.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
   operation could be approved (422). The pack linter now refuses it (the connector API already did).
 - Trap: `pkill -f <pattern>` with the pattern in the same command line kills the shell (exit 144): kill by PID.

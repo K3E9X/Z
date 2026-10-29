@@ -88,17 +88,22 @@ def jars(app: TestClient, oidc: FakeGitLabOIDC) -> dict[str, dict[str, str]]:
     return jars
 
 
-def connect(app: TestClient, connector: str, purpose: str) -> None:
+def consent(app: TestClient, connector: str, purpose: str, account: str | None = None) -> httpx.Response:
     start = app.post(f"/api/v1/me/connections/{connector}/oauth/start", json={"purpose": purpose}, headers=csrf(app))
     assert start.status_code == 200, start.text
     url = start.json()["redirect_url"]
     query = parse_qs(urlparse(url).query)
     assert query["access_type"] == ["offline"] and "consent" in query["prompt"][0].split()
     assert "offline_access" not in query["scope"][0] and "include_granted_scopes" not in query
-    consent = httpx.get(url, follow_redirects=False)
-    assert consent.status_code == 302, consent.text
-    back = urlparse(consent.headers["location"])
-    done = app.get(f"{back.path}?{back.query}", follow_redirects=False)
+    assert {"openid", "email"} <= set(query["scope"][0].split())  # the account of each grant is recorded
+    given = httpx.get(url + (f"&login_hint={account}" if account else ""), follow_redirects=False)
+    assert given.status_code == 302, given.text
+    back = urlparse(given.headers["location"])
+    return app.get(f"{back.path}?{back.query}", follow_redirects=False)
+
+
+def connect(app: TestClient, connector: str, purpose: str) -> None:
+    done = consent(app, connector, purpose)
     assert done.headers["location"] == f"/settings/connections?connected={connector}", done.headers
 
 
@@ -381,3 +386,40 @@ def test_a_chat_reply_into_another_spaces_thread_is_refused() -> None:
     op = SimpleNamespace(local_id="messages.create")
     with pytest.raises(WriteError, match="not in the space"):
         asyncio.run(GoogleChat().apply(None, None, op, action, {}))  # type: ignore[arg-type]
+
+
+def test_read_and_write_grants_must_be_the_same_account(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    from z_server.db.models import Credential
+
+    use_jar(app, jars["bob"])
+    connect(app, "google", "read")  # as alice@example.test (the fake's default account)
+    other = consent(app, "google", "write", account="mallory@example.test")
+    assert "connect%20both%20with%20the%20same%20account" in other.headers["location"].replace("+", "%20")
+    connect(app, "google", "write")
+    [conn] = app.get("/api/v1/me/connections").json()
+    assert conn["status"] == "active" and conn["write_scopes"]
+    state = app.app.state.z  # type: ignore[attr-defined]
+
+    async def identities() -> set[str | None]:
+        async with state.sessions() as db:
+            return {
+                c.identity for c in (await db.execute(select(Credential).where(Credential.scope == "user"))).scalars()
+            }
+
+    assert app.portal.call(identities) == {"alice@example.test"}  # type: ignore[union-attr]
+    events = app.get("/api/v1/audit", params={"action": "connection.failed"}).json()["items"]
+    assert any((e.get("after") or {}).get("reason") == "account mismatch" for e in events)
+
+
+def test_the_account_comes_from_the_id_token_claims() -> None:
+    import json as _json
+
+    from z_server.gateway.oauth import identity_of
+
+    def token(claims: dict[str, str]) -> str:
+        return "e30." + base64.urlsafe_b64encode(_json.dumps(claims).encode()).rstrip(b"=").decode() + ".s"
+
+    assert identity_of({"id_token": token({"email": "Alice@Example.test"})}) == "alice@example.test"
+    assert identity_of({"id_token": token({"preferred_username": "bob@contoso.test"})}) == "bob@contoso.test"
+    assert identity_of({}) is None and identity_of({"id_token": "not-a-jwt"}) is None
+    assert identity_of({"id_token": "a.!!!.c"}) is None

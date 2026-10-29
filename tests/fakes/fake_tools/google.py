@@ -16,6 +16,7 @@ import base64
 import copy
 import email
 import hashlib
+import json
 import secrets
 import time
 from email import policy
@@ -29,6 +30,7 @@ from .errors import FakeToolError
 from .state import Store
 
 APPS = {"read-client": "read-secret", "write-client": "write-secret"}
+OPENID = {"openid", "email", "profile"}  # accepted in short form
 AUTH = "https://www.googleapis.com/auth/"
 USER = "alice@example.test"
 SPACE = "AAAAspace01"
@@ -139,8 +141,9 @@ def routers(store: Store) -> list[APIRouter]:
         scopes = scope.split()
         if client_id not in APPS or response_type != "code" or code_challenge_method != "S256":
             raise HTTPException(400, "bad authorize request")
-        if any(not s.startswith(AUTH) for s in scopes):  # e.g. offline_access: Error 400 invalid_scope
-            raise HTTPException(400, f"invalid_scope: {' '.join(s for s in scopes if not s.startswith(AUTH))}")
+        unknown = [s for s in scopes if not s.startswith(AUTH) and s not in OPENID]
+        if unknown:  # e.g. offline_access: Error 400 invalid_scope
+            raise HTTPException(400, f"invalid_scope: {' '.join(unknown)}")
         if include_granted_scopes == "true":
             raise HTTPException(400, "this fake refuses include_granted_scopes: Z must never merge grants")
         code = "code-" + secrets.token_urlsafe(12)
@@ -164,6 +167,10 @@ def routers(store: Store) -> list[APIRouter]:
             "expires_in": 3599,
             "scope": " ".join(sorted(grant["scopes"])),
         }
+        if "openid" in grant["scopes"]:  # unsigned here: Z reads only the claims of a token-endpoint answer
+            claims = {"iss": "https://accounts.google.com", "sub": "1" + grant["user"], "email": grant["user"]}
+            part = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+            body["id_token"] = f"eyJhbGciOiJub25lIn0.{part}.sig"
         if with_refresh:
             rt = "1//" + secrets.token_urlsafe(16)
             refresh[rt] = grant

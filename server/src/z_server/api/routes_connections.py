@@ -128,6 +128,22 @@ async def oauth_callback(
         ctx.db.add(conn)
         await ctx.db.flush()
     old_id = conn.read_credential_id if purpose == "read" else conn.write_credential_id
+    identity = oauth.identity_of(tokens)
+    other_id = conn.write_credential_id if purpose == "read" else conn.read_credential_id
+    other = await ctx.db.get(Credential, other_id) if other_id else None
+    if identity and other is not None and other.identity and other.identity != identity:
+        # a mission would read one account and write as another: both grants must be the same account
+        await ctx.audit(
+            "connection.failed",
+            "connector",
+            connector.id,
+            result="denied",
+            after={"reason": "account mismatch", "purpose": purpose},
+        )
+        return _back(
+            f"the {purpose} connection used {identity}, the other one {other.identity}: connect both with the same "
+            "account (revoke the connection first to switch accounts)"
+        )
     granted = str(tokens.get("scope") or " ".join(oauth.scopes_for(connector.manifest, purpose))).split()
     cred = Credential(
         id=new_id("crd"),
@@ -137,7 +153,7 @@ async def oauth_callback(
         owner_user_id=user_id,
         backend="sealed",
         ref="",
-        identity=str(tokens.get("id_token_upn") or tokens.get("upn") or "") or None,
+        identity=identity,
         scopes=granted,
         expires_at=oauth.expiry(tokens),
     )

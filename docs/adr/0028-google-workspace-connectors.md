@@ -26,7 +26,9 @@ chat v1) and `accounts.google.com/.well-known/openid-configuration`.
    Google's, sends no `offline_access`, asks `access_type=offline` with `prompt=select_account consent`, never
    `include_granted_scopes` (read and write grants must not merge), and sends no scope on the code exchange or the
    refresh. A Google connector with a `client_credentials` flow is refused (lint and API). Without `provider`:
-   `microsoft` when `tenant_id` is set, as before.
+   `microsoft` when `tenant_id` is set, as before. On both platforms Z adds `openid email`, records each grant's
+   account from the ID token of the token response, and refuses a read or write grant whose account differs from
+   the other one: a mission must not read one mailbox and write as another (before, `identity` stayed empty).
 2. **Two connectors in the `workplace` pack**, delegated only (`credentials: user` steps):
    - `google` (`www.googleapis.com`): Gmail messages and threads, Calendar events, Drive file metadata and
      `drive.files.get_text` (export of Docs as text/plain, Sheets as text/csv); writes `gmail.messages.send`,

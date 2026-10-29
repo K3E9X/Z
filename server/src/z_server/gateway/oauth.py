@@ -9,6 +9,9 @@
   configured scopes, the app-only scope is `<API origin>/.default` (the Microsoft identity platform convention).
 - Endpoints come from the connector's `oauth.authorize_url` / `token_url`, or from `oauth.tenant_id` for the
   Microsoft identity platform, or are Google's for `oauth.provider: google`.
+- On the Microsoft and Google identity platforms Z also asks `openid email` and records the account of each grant
+  from the ID token (received directly from the token endpoint over TLS, OIDC Core §3.1.3.7): the read and write
+  grants of one connection must be the same account.
 - A refresh token is asked for with the `offline_access` scope, except on Google (no such scope: `access_type=offline`
   and `prompt=consent`, so a second consent still returns one; ADR 0028).
 """
@@ -93,9 +96,33 @@ def scopes_for(manifest: dict[str, Any], purpose: str) -> list[str]:
     return [str(s) for s in f.get("scopes") or []]
 
 
+IDENTITY_SCOPES = ("openid", "email")
+
+
 def _scope(manifest: dict[str, Any], purpose: str) -> str:
     wanted = scopes_for(manifest, purpose)
+    if provider(manifest) in {"google", "microsoft"}:
+        wanted = [*wanted, *(s for s in IDENTITY_SCOPES if s not in wanted)]
     return " ".join(wanted if provider(manifest) == "google" else [*wanted, "offline_access"])
+
+
+def identity_of(tokens: dict[str, Any]) -> str | None:
+    """The account of a grant, from the ID token of the token response (its claims only: it came straight from the
+    token endpoint over TLS). None when the provider sent no ID token."""
+    raw = tokens.get("id_token")
+    if not isinstance(raw, str) or raw.count(".") != 2:
+        return None
+    payload = raw.split(".")[1]
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(claims, dict):
+        return None
+    for claim in ("email", "preferred_username", "upn"):
+        if isinstance(claims.get(claim), str) and claims[claim]:
+            return str(claims[claim]).strip().lower()
+    return None
 
 
 def authorize_url(manifest: dict[str, Any], purpose: str, state: str, challenge: str, redirect_uri: str) -> str:
