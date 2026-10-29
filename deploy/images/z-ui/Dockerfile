@@ -24,6 +24,14 @@ RUN pnpm check:api && pnpm build
 
 FROM ${NGINX_IMAGE}
 LABEL org.opencontainers.image.title="z-ui" org.opencontainers.image.source="https://github.com/K3E9X/Z"
+# Alpine security fixes published after the pinned base was built (the image scan blocks on fixable criticals).
+# APK_MIRROR can point at an internal mirror.
+ARG APK_MIRROR=""
+USER root
+RUN --mount=type=secret,id=extra_ca \
+    if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi; \
+    if [ -n "$APK_MIRROR" ]; then sed -i "s#https\?://dl-cdn.alpinelinux.org/alpine#${APK_MIRROR}#" /etc/apk/repositories; fi; \
+    apk upgrade --no-cache
 COPY deploy/images/z-ui/nginx.conf /etc/nginx/nginx.conf
 COPY deploy/images/z-ui/default.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/images/z-ui/security-headers.conf /etc/nginx/snippets/security-headers.conf
