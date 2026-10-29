@@ -50,3 +50,15 @@ In March 2026 a credential-stealing campaign overwrote `aquasecurity/trivy-actio
 | `security/blocked-versions.yaml`, `security/exceptions.yaml`, `security/gitleaksignore` | versions CI refuses, accepted findings (owner + expiry), reviewed gitleaks fingerprints |
 
 Not built yet: ZAP baseline, kind/k3d smoke installs, license check, changelog generation (ADR 0018).
+
+## 5. What the repository owner sets up
+**GitHub**
+- Allow Actions to create GHCR packages (`packages: write`); for a private repo decide whether packages are public or deploys get a pull secret.
+- Protect `main` and `v*` tags; required checks: `guard`, `lint`, `python`, `ui`, `security`, plus image builds and e2e when they run.
+- Point the chart's image repositories (`server`, `runners`, `ui`, `browser`) to `ghcr.io/k3e9x/*` or the GitLab registry.
+
+**GitLab (internal mirror)**
+- Protected variables: `COSIGN_PRIVATE_KEY` (file), `COSIGN_PASSWORD` (masked), `COSIGN_PUBLIC_KEY` (file), `KUBE_CONTEXT_STAGING`, `KUBE_CONTEXT_PRODUCTION` (GitLab agent for Kubernetes contexts), `VALUES_STAGING`, `VALUES_PRODUCTION` (files: a separate runners namespace for staging if both share a cluster, and an image pull secret), `RELEASE_ALLOWED_SIGNERS` (SSH keys allowed to sign release tags).
+- Optional: internal PyPI, npm and Debian mirrors, a scanner download mirror (`SCANNERS_MIRROR`), a trivy database mirror, `COSIGN_TLOG=true` if signatures may go to the public transparency log.
+- Protect the `staging` and `production` environments (approval on production) and `v*` tags.
+- Runners: an unprivileged runner where Buildah's chroot isolation works; qemu binfmt (flag F) for arm64 or `BUILD_PLATFORMS=linux/amd64`; a runner tagged `z-e2e` with Docker and python3 for the compose e2e.
