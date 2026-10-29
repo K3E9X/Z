@@ -12,14 +12,16 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
 
 from z_server import audit, events
-from z_server.db.models import ActionApproval, Connector, Mission, Operation, ProposedAction
+from z_server.db.models import ActionApproval, Artifact, Connector, Mission, Operation, ProposedAction
 from z_server.gateway.core import Gateway
 from z_server.gateway.writers import Applied, WriteError, idempotent, writer_for
 from z_server.missions import service
@@ -88,6 +90,25 @@ async def _preconditions(db: Any, action: ProposedAction) -> tuple[Connector, Op
     return connector, op
 
 
+async def _artifacts(db: Any, action: ProposedAction) -> dict[str, bytes]:
+    """Bytes of the artifacts the payload references; only artifacts of the action's own mission."""
+    out: dict[str, bytes] = {}
+    for key, value in action.payload.items():
+        if not key.endswith("_artifact") or not isinstance(value, str):
+            continue
+        row = await db.get(Artifact, value)
+        if row is None or row.mission_id != action.mission_id:
+            raise WriteError(f"{key} is not an artifact of this mission")
+        path = Path(row.storage_path)
+        if not path.is_file():
+            raise WriteError(f"{key} content is missing from storage")
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != row.sha256:
+            raise WriteError(f"{key} changed after it was reviewed")
+        out[key] = data
+    return out
+
+
 async def _finish(state: AppState, action_id: str, status: str, result: dict[str, Any], runs_as: str | None) -> None:
     async with state.sessions() as db, db.begin():
         action = await db.get(ProposedAction, action_id, with_for_update=True)
@@ -124,6 +145,11 @@ async def apply(state: AppState, gateway: Gateway, action_id: str, *, recovering
         except WriteError as exc:
             await _finish(state, action_id, "failed", {"error": str(exc)}, None)
             return "failed"
+        try:
+            files = await _artifacts(db, action)
+        except WriteError as exc:
+            await _finish(state, action_id, "failed", {"error": str(exc)}, None)
+            return "failed"
         db.expunge_all()
     writer = writer_for(connector, op)
     try:
@@ -140,7 +166,7 @@ async def apply(state: AppState, gateway: Gateway, action_id: str, *, recovering
                 None,
             )
             return "failed"
-        applied: Applied = await writer.apply(gateway, connector, op, action)
+        applied: Applied = await writer.apply(gateway, connector, op, action, files)
     except WriteError as exc:
         await _finish(state, action_id, "failed", {"error": str(exc)[:1000]}, None)
         return "failed"

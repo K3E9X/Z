@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.parse import quote
 
 from z_server.db.models import Connector, Operation, ProposedAction
-from z_server.gateway import adf
+from z_server.gateway import adf, git
 from z_server.gateway import http as http_invoker
+from z_server.gateway.auth import material
 from z_server.gateway.core import Gateway, Invocation
 
 
@@ -31,7 +33,9 @@ class Writer(Protocol):
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
     ) -> dict[str, Any] | None: ...
 
-    async def apply(self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction) -> Applied: ...
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied: ...
 
 
 def action_label(action: ProposedAction) -> str:
@@ -122,7 +126,9 @@ class JiraCloud:
             return None
         return None  # updates and transitions are idempotent: applying again is safe
 
-    async def apply(self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction) -> Applied:
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
         p = action.payload
         if op.local_id == "issues.create":
             fields = await self._fields(
@@ -161,7 +167,160 @@ class JiraCloud:
                 inv,
                 {"issue": p["issue"], "comment_id": inv.body.get("id"), "url": self._browse(gw, connector, p["issue"])},
             )
-        return await Generic().apply(gw, connector, op, action)
+        return await Generic().apply(gw, connector, op, action, files)
+
+
+def marker(action: ProposedAction) -> str:
+    return f"<!-- z-action:{action.id} -->"
+
+
+class GitLab:
+    """GitLab REST v4 + git. Issues and notes carry an invisible `z-action` marker; a merge request is found
+    again by its z/* source branch. The patch is pushed with the write token by the git helper."""
+
+    def _project(self, project: str) -> str:
+        return quote(str(project), safe="")
+
+    async def _user_id(self, gw: Gateway, connector: Connector, username: str) -> int:
+        inv = await gw.send(connector, "GET", "/api/v4/users", "write", params={"username": username.lstrip("@")})
+        _fail(inv, "assignee lookup")
+        users = inv.body if isinstance(inv.body, list) else []
+        if len(users) != 1:
+            raise WriteError(f"assignee {username!r} is not a single GitLab user")
+        return int(users[0]["id"])
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        p = action.payload
+        project = self._project(p["project"])
+        if op.local_id == "merge_requests.create":
+            inv = await gw.send(
+                connector,
+                "GET",
+                f"/api/v4/projects/{project}/merge_requests",
+                "write",
+                params={"state": "opened", "source_branch": p["source_branch"]},
+            )
+            _fail(inv, "idempotency lookup")
+            for mr in inv.body or []:
+                if mr.get("source_branch") == p["source_branch"]:
+                    return {"iid": mr["iid"], "url": mr.get("web_url"), "recovered": True}
+            return None
+        if op.local_id == "issues.create":
+            inv = await gw.send(
+                connector,
+                "GET",
+                f"/api/v4/projects/{project}/issues",
+                "write",
+                params={"search": f"z-action:{action.id}", "in": "description", "state": "all"},
+            )
+            _fail(inv, "idempotency lookup")
+            for issue in inv.body or []:
+                if marker(action) in (issue.get("description") or ""):
+                    return {"iid": issue["iid"], "url": issue.get("web_url"), "recovered": True}
+            return None
+        if op.local_id == "notes.create":
+            kind, iid = (
+                ("merge_requests", p["merge_request_iid"]) if p.get("merge_request_iid") else ("issues", p["issue_iid"])
+            )
+            inv = await gw.send(
+                connector, "GET", f"/api/v4/projects/{project}/{kind}/{iid}/notes", "write", params={"per_page": 100}
+            )
+            _fail(inv, "idempotency lookup")
+            for note in inv.body or []:
+                if marker(action) in (note.get("body") or ""):
+                    return {"note_id": note["id"], "recovered": True}
+            return None
+        return None
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        p = action.payload
+        project = self._project(p["project"])
+        if op.local_id == "issues.create":
+            body: dict[str, Any] = {
+                "title": p["title"],
+                "description": f"{p.get('description') or ''}\n\n{marker(action)}",
+            }
+            if p.get("labels"):
+                body["labels"] = ",".join(p["labels"])
+            if p.get("due_date"):
+                body["due_date"] = p["due_date"]
+            if p.get("assignee"):
+                body["assignee_ids"] = [await self._user_id(gw, connector, p["assignee"])]
+            inv = await gw.send(connector, "POST", f"/api/v4/projects/{project}/issues", "write", json_body=body)
+            _fail(inv, "create issue")
+            return Applied(inv, {"iid": inv.body["iid"], "url": inv.body.get("web_url")})
+        if op.local_id == "notes.create":
+            kind, iid = (
+                ("merge_requests", p["merge_request_iid"])
+                if p.get("merge_request_iid")
+                else ("issues", p.get("issue_iid"))
+            )
+            if iid is None:
+                raise WriteError("a note needs merge_request_iid or issue_iid")
+            inv = await gw.send(
+                connector,
+                "POST",
+                f"/api/v4/projects/{project}/{kind}/{iid}/notes",
+                "write",
+                json_body={"body": f"{p['body']}\n\n{marker(action)}"},
+            )
+            _fail(inv, "add note")
+            return Applied(
+                inv,
+                {
+                    "note_id": inv.body.get("id"),
+                    "target": f"{p['project']}{'!' if kind == 'merge_requests' else '#'}{iid}",
+                },
+            )
+        if op.local_id == "merge_requests.create":
+            patch = files.get("patch_artifact")
+            if not patch:
+                raise WriteError("the patch artifact is missing")
+            auth = await material(connector.manifest, "write", gw.resolver)
+            token = auth.secrets[0] if auth.secrets else None
+            if not token:
+                raise WriteError("the GitLab write credential is unavailable")
+            base = http_invoker.base_url(connector.base_url, connector.manifest)
+            try:
+                sha = await git.push_patch(
+                    base,
+                    p["project"],
+                    p["target_branch"],
+                    p["source_branch"],
+                    bytes(patch),
+                    f"{p['title']}\n\nProposed by Z agent {action.agent}, approved in Z ({action.id}).",
+                    token,
+                    ("Z", "z-bot@noreply.invalid"),
+                )
+            except git.GitError as exc:
+                raise WriteError(str(exc)) from exc
+            body = {
+                "source_branch": p["source_branch"],
+                "target_branch": p["target_branch"],
+                "title": p["title"],
+                "description": f"{p.get('description') or ''}\n\n{marker(action)}",
+                "remove_source_branch": True,
+            }
+            if p.get("labels"):
+                body["labels"] = ",".join(p["labels"])
+            inv = await gw.send(
+                connector, "POST", f"/api/v4/projects/{project}/merge_requests", "write", json_body=body
+            )
+            _fail(inv, "create merge request")
+            return Applied(
+                inv,
+                {
+                    "iid": inv.body["iid"],
+                    "url": inv.body.get("web_url"),
+                    "commit": sha,
+                    "source_branch": p["source_branch"],
+                },
+            )
+        return await Generic().apply(gw, connector, op, action, files)
 
 
 class Generic:
@@ -170,7 +329,9 @@ class Generic:
     ) -> dict[str, Any] | None:
         return None
 
-    async def apply(self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction) -> Applied:
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
         inv = await gw.invoke(connector, op, dict(action.payload), "write")
         _fail(inv, op.id)
         body = inv.body if isinstance(inv.body, dict) else {"response": inv.body}
@@ -186,6 +347,8 @@ class Generic:
 def writer_for(connector: Connector, op: Operation) -> Writer:
     if connector.kind in {"rest", "openapi"} and op.id.startswith("jira."):
         return JiraCloud()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("gitlab."):
+        return GitLab()
     return Generic()
 
 

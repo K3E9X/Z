@@ -6,7 +6,9 @@ Layout in /workspace: uploaded inputs at `<name>`, earlier step artifacts at `st
 
 from __future__ import annotations
 
+import hashlib
 import io
+import shutil
 import tarfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,8 +20,12 @@ from z_common.models.enums import JobStatus, JudgeVerdict, WorkspaceMode
 from z_common.models.manifests import MissionPlan
 
 from z_server import judge
-from z_server.db.models import Artifact, Job, Mission
+from z_server.db.models import Artifact, Connector, Job, Mission
 from z_server.errors import Problem
+from z_server.gateway import git
+from z_server.gateway import http as http_invoker
+from z_server.gateway.auth import AuthError, material
+from z_server.state import AppState
 
 MAX_WORKSPACE_BYTES = 512 * 1024 * 1024
 RUNNER_UID = 10001
@@ -36,6 +42,8 @@ class StagedFile:
 @dataclass
 class Staged:
     files: list[StagedFile] = field(default_factory=list)
+    repo: str | None = None
+    commit: str | None = None
 
     @property
     def delivered(self) -> list[StagedFile]:
@@ -52,6 +60,8 @@ class Staged:
                 for f in self.files
             ],
             flagged=[f.path for f in self.files if f.verdict.verdict != JudgeVerdict.clean],
+            repo=self.repo,
+            commit=self.commit,
         )
 
     def archive(self) -> bytes:
@@ -74,16 +84,58 @@ def _unique(path: str, taken: set[str]) -> str:
     return candidate
 
 
-async def stage(db: AsyncSession, mission: Mission, job: Job) -> Staged:
+MAX_REPO_FILES = 20_000
+SKIP_DIRS = {".git"}
+
+
+async def _clone(db: AsyncSession, state: AppState, job: Job) -> Staged:
+    """git_clone: the repository is cloned server-side with the connector's read token; the runner receives a
+    plain tree (no .git, no token). `repo` is `group/project`, optionally `connector:group/project@ref`."""
+    raw = str((job.input or {}).get("repo") or "")
+    if not raw:
+        raise Problem("conflict", "this step has workspace git_clone but no repo")
+    connector_name, _, rest = raw.rpartition(":") if ":" in raw and not raw.startswith("http") else ("gitlab", "", raw)
+    repo, _, ref = rest.partition("@")
+    connector = (
+        await db.execute(select(Connector).where(Connector.name == (connector_name or "gitlab")))
+    ).scalar_one_or_none()
+    if connector is None or not connector.enabled or connector.review_status != "approved":
+        raise Problem("conflict", f"connector {connector_name or 'gitlab'} is not approved and enabled for cloning")
+    try:
+        auth = await material(connector.manifest, "read", state.gateway.resolver)
+        base = http_invoker.base_url(connector.base_url, connector.manifest)
+        checkout = await git.clone(base, repo, ref or None, auth.secrets[0] if auth.secrets else None)
+    except (AuthError, git.GitError, http_invoker.InvokeError) as exc:
+        raise Problem("unavailable", f"could not clone {repo}: {exc}") from exc
+    staged, total = Staged(repo=f"{connector.name}:{repo}", commit=checkout.commit), 0
+    try:
+        for path in sorted(checkout.path.rglob("*")):
+            rel = path.relative_to(checkout.path)
+            if rel.parts[0] in SKIP_DIRS or path.is_symlink() or not path.is_file():
+                continue
+            if len(staged.files) >= MAX_REPO_FILES:
+                raise Problem("validation", f"repository has more than {MAX_REPO_FILES} files", status=413)
+            data = path.read_bytes()
+            total += len(data)
+            if total > MAX_WORKSPACE_BYTES:
+                raise Problem("validation", f"workspace larger than {MAX_WORKSPACE_BYTES} bytes", status=413)
+            staged.files.append(
+                StagedFile(rel.as_posix(), data, hashlib.sha256(data).hexdigest(), judge.scan_bytes(data))
+            )
+    finally:
+        shutil.rmtree(checkout.path.parent, ignore_errors=True)
+    return staged
+
+
+async def stage(db: AsyncSession, mission: Mission, job: Job, state: AppState | None = None) -> Staged:
     step = next((s for s in MissionPlan.model_validate(mission.plan).steps if s.id == job.step_id), None)
     mode = step.workspace if step else WorkspaceMode.none
     if mode == WorkspaceMode.none:
         raise Problem("conflict", "this step has no workspace")
     if mode == WorkspaceMode.git_clone:
-        raise Problem(
-            "unavailable",
-            "git_clone workspaces are served by the tool gateway clone helper, not enabled on this server yet",
-        )
+        if state is None or state.gateway is None:
+            raise Problem("unavailable", "the clone helper needs the tool gateway")
+        return await _clone(db, state, job)
     sources: list[tuple[str, Artifact]] = []
     inputs = (
         (

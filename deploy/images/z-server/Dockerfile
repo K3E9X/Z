@@ -1,5 +1,6 @@
 # z-server: one image, every entrypoint (api, all, migrate, ...). Non-root, read-only root filesystem friendly.
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+ARG RUNTIME_IMAGE=${PYTHON_IMAGE}
 
 FROM ${PYTHON_IMAGE} AS build
 # Optional: internal package mirror (docs/13 §3) and a CA for TLS-intercepting proxies, passed as a BuildKit
@@ -20,9 +21,23 @@ RUN --mount=type=secret,id=extra_ca \
     if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi; \
     uv sync --frozen --no-dev --package z-server --no-editable --python /usr/local/bin/python3.12
 
-FROM ${PYTHON_IMAGE}
+FROM ${RUNTIME_IMAGE}
 LABEL org.opencontainers.image.title="z-server" org.opencontainers.image.source="https://github.com/K3E9X/Z"
-RUN groupadd --gid 10001 z && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin z \
+# git for the clone helper (git_clone workspaces) and the merge request helper. APT_MIRROR can point at an
+# internal mirror; a RUNTIME_IMAGE that already has git skips the install.
+ARG APT_MIRROR=https://deb.debian.org
+RUN --mount=type=secret,id=extra_ca \
+    if ! command -v git >/dev/null; then \
+      if [ -s /run/secrets/extra_ca ]; then \
+        cp /run/secrets/extra_ca /usr/local/share/ca-certificates/extra-ca.crt && update-ca-certificates >/dev/null; \
+      fi; \
+      sed -i "s#http://deb.debian.org#${APT_MIRROR}#g" /etc/apt/sources.list.d/debian.sources \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends git \
+      && rm -f /usr/local/share/ca-certificates/extra-ca.crt && update-ca-certificates --fresh >/dev/null \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi \
+    && groupadd --gid 10001 z && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin z \
     && mkdir -p /data/artifacts && chown -R 10001:10001 /data
 COPY --from=build /app/.venv /app/.venv
 COPY contracts /app/contracts

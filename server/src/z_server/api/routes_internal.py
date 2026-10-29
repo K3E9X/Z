@@ -606,7 +606,7 @@ def job_out(job: Job) -> mm.Job:
 
 
 async def _staged(ctx: JobCtx) -> workspace.Staged:
-    staged = await workspace.stage(ctx.db, ctx.mission, ctx.job)
+    staged = await workspace.stage(ctx.db, ctx.mission, ctx.job, ctx.state)
     job = ctx.job
     for f in staged.files:
         if f.verdict.verdict != JudgeVerdict.clean:
