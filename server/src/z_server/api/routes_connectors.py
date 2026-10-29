@@ -441,3 +441,14 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
     return m.ConnectorDraft.model_validate(
         {"manifest": manifest, "operations": [o.dump() for o in ops], "warnings": warnings}
     )
+
+
+@router.operation("recordBrowserFlow", status_code=201)
+async def record_browser_flow(ctx: CtxDep, body: dict[str, Any]) -> m.Connector:
+    """Browser connectors are recorded and replayed by the z-browser worker, which is not part of this build:
+    say so instead of pretending (docs/05 browser connectors)."""
+    raise Problem(
+        "unavailable",
+        "recording a browser flow needs the z-browser worker, which is not deployed yet; "
+        "use an OpenAPI, REST or MCP connector for this application",
+    )
