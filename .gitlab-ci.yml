@@ -367,7 +367,22 @@ e2e:compose:
   needs: [guard]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [server/**/*, runner/**/*, browser/**/*, packages/**/*, deploy/**/*, config/**/*, tests/e2e/**/*, tests/fakes/**/*, uv.lock]
+      changes:
+        - server/**/*
+        - runner/**/*
+        - browser/**/*
+        - packages/**/*
+        - cli/**/*
+        - packs/**/*
+        - contracts/**/*
+        - ui/**/*
+        - deploy/**/*
+        - config/**/*
+        - tests/e2e/**/*
+        - tests/fakes/**/*
+        - tests/unit/test_socket_proxy.py
+        - pyproject.toml
+        - uv.lock
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   variables:
     COMPOSE: docker compose --env-file ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml -f ../../tests/e2e/compose.e2e.yml

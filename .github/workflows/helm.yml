@@ -8,10 +8,10 @@
 name: helm
 on:
   pull_request:
-    paths: ["deploy/helm/**", ".github/workflows/helm.yml"]
+    paths: ["deploy/helm/**", "ci/kind/**", ".github/workflows/helm.yml"]
   push:
     branches: [main]
-    paths: ["deploy/helm/**", ".github/workflows/helm.yml"]
+    paths: ["deploy/helm/**", "ci/kind/**", ".github/workflows/helm.yml"]
 permissions:
   contents: read
 concurrency:

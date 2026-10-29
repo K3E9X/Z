@@ -6,10 +6,10 @@
 name: chart-policy
 on:
   pull_request:
-    paths: ["deploy/helm/**", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
+    paths: ["deploy/helm/**", "security/kubescape-exceptions.json", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
   push:
     branches: [main]
-    paths: ["deploy/helm/**", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
+    paths: ["deploy/helm/**", "security/kubescape-exceptions.json", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
 permissions:
   contents: read
 concurrency:

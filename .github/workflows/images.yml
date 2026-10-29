@@ -20,6 +20,10 @@ on:
       - "packages/**"
       - "ui/**"
       - "contracts/**"
+      - "packs/**"              # baked into z-server (the seed)
+      - "docs/**"               # z-server serves the documentation of its version (GET /docs)
+      - "deploy/README.md"
+      - "deploy/helm/z/README.md"
       - "pyproject.toml"
       - "uv.lock"
       - "ci/scripts/**"
