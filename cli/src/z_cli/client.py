@@ -10,6 +10,7 @@ Errors map to exit codes (docs/10 §3):
 from __future__ import annotations
 
 import json as jsonlib
+import os
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any
@@ -167,7 +168,9 @@ class _Base:
 
     @property
     def web_url(self) -> str:
-        return self.url
+        """Links for people: the web app, which is the API's origin behind an ingress; Z_WEB_URL when they differ
+        (compose: the API on :8000, the web app on :8080)."""
+        return (os.environ.get("Z_WEB_URL") or self.url).rstrip("/")
 
 
 class Api(_Base):

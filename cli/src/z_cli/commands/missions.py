@@ -306,7 +306,7 @@ def _finish(final: dict[str, Any], output_format: str, follower: ms.Follower) ->
             )
         )
     if status in ms.ATTENTION:
-        url = follower.api.url
+        url = follower.api.web_url
         what = "accept its plan" if status == "planned" else f"a decision ({final.get('waiting_reason') or 'review'})"
         output.note(f"Mission {final['id']} needs {what}: `z review --mission {final['id']}` or {url}/review", "z.wait")
 

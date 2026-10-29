@@ -64,7 +64,7 @@ z config add staging https://z-staging.example --use · z config use default · 
 z --profile staging missions list
 ```
 
-Environment: `Z_URL`, `Z_TOKEN`, `Z_PROFILE`, `Z_CONFIG_DIR`, `Z_KEYRING=off`, `NO_COLOR=1`.
+Environment: `Z_URL`, `Z_TOKEN`, `Z_PROFILE`, `Z_CONFIG_DIR`, `Z_KEYRING=off`, `NO_COLOR=1`, `Z_WEB_URL` (links to the web app when it is not the API origin, e.g. compose: `http://127.0.0.1:8080`).
 
 ## The interactive session (`z`)
 
