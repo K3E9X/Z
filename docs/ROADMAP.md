@@ -55,7 +55,6 @@ Not built yet, although the spec describes them:
 - The agent builder's "test on a sample mission" step.
 - Phase C e2e on Compose: 2 tests against about 18 scenarios in BUILD §4; most are in-process server tests.
 - `ACCEPTANCE.md` (BUILD §4 step 6).
-- Permission matrix test: 7 sample routes × 6 roles (`server/tests/test_access.py`), not every route × role; route-has-a-permission is checked for all routes separately.
 - ZAP scan: passive, unauthenticated, web app only.
 - TUI tests are Textual pilot tests, not snapshot tests.
 - Observability: OpenTelemetry traces, JSON logs and Langfuse export (docs/02 §3).

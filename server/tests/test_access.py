@@ -53,6 +53,52 @@ def test_permission_matrix(
             assert resp.json()["type"] == "urn:z:problem:forbidden"
 
 
+def _allowed(role: str, permission: str) -> bool:
+    from z_server.rbac import ALL, IMPLIES, role_permissions
+
+    granted = role_permissions(role)
+    return ALL in granted or bool(({permission} | IMPLIES.get(permission, frozenset())) & granted)
+
+
+def test_every_route_denies_the_roles_without_its_permission(
+    client: TestClient, jars: dict[str, dict[str, str]]
+) -> None:
+    """docs/12 §6: every contract operation for every built-in role. A role without the route's permission gets
+    403 forbidden before anything runs; a role with it is never refused for that permission (it may still get
+    404, 409 or 422 for the made-up ids and empty bodies used here)."""
+    import re
+
+    from z_common.contracts import openapi
+    from z_server.api.framework import contract_operations
+
+    streams = {
+        op["operationId"]
+        for item in openapi()["paths"].values()
+        for op in item.values()
+        if "text/event-stream" in str(op.get("responses", {}).get("200", {}).get("content", {}))
+    }
+    ops = [
+        o
+        for o in contract_operations().values()
+        if o.permission not in {"public", "authenticated", "hmac", "job_token", "service"}
+        and o.operation_id not in streams
+    ]
+    assert len(ops) > 100
+    wrong = []
+    for role, jar in jars.items():
+        use_jar(client, jar)
+        headers = csrf(client)
+        for op in ops:
+            path = re.sub(r"\{[^}]+\}", "nope", op.path)
+            body = None if op.method in {"GET", "DELETE"} else {}
+            resp = client.request(op.method, path, json=body, headers=headers)
+            forbidden = resp.status_code == 403 and resp.json().get("type") == "urn:z:problem:forbidden"
+            missing = forbidden and f"missing permission {op.permission}" in resp.json().get("detail", "")
+            if _allowed(role, op.permission) == missing:
+                wrong.append((role, op.operation_id, op.permission, resp.status_code, resp.text[:120]))
+    assert wrong == [], wrong
+
+
 def test_unauthenticated_is_401_problem(client: TestClient) -> None:
     resp = client.get("/api/v1/admin/users")
     assert resp.status_code == 401
