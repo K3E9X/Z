@@ -30,7 +30,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 |---|---|
 | Learning loop: signals, proposals, shadow replay, apply/rollback | doing (all but shadow replay; see ADR 0014) |
 | Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | todo |
-| `z top`, sessions, `z mcp serve`, themes | doing (`z top`, sessions and themes done; `z mcp serve` pending) |
+| `z top`, sessions, `z mcp serve`, themes | done (`/mcp` on z-server and `z mcp serve` share one tool table, ADR 0022) |
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | todo |
 | Trace replay, Evals, Analytics screens | todo |
 | Agent builder | todo |
@@ -39,7 +39,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | todo |
 | Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies; approval cards pending; ADR 0015) |
 | Personal (delegated) connections | todo |
-| Notifications (Mattermost, Slack, email, webhook) | todo |
+| Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications; ADR 0023; personal preferences later) |
 | kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | todo |
 
 ## v2 — later

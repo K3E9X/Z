@@ -23,3 +23,5 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0019 — Take-over works on the checkpoint, not inside the runner](0019-take-over.md)
 - [0020 — GraphQL and database connectors run declared documents only](0020-graphql-and-database-connectors.md)
 - [0021 — Audit checkpoints and forwarding run in one leader-elected worker](0021-audit-checkpoints-and-forwarding.md)
+- [0022 — Z as an MCP server: four tools, each one a REST operation called as the user](0022-z-as-an-mcp-server.md)
+- [0023 — Notifications go through a transactional outbox to admin-configured targets](0023-notifications-outbox.md)
