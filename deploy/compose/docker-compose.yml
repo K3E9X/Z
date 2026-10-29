@@ -159,7 +159,7 @@ secrets:
   extra_ca:
     # CA bundle of a TLS-intercepting proxy, if any (build time only). The default is an empty file inside the
     # project: Compose bake asks for an extra grant to read /dev/null.
-    file: ${Z_EXTRA_CA:-./empty-ca.pem}
+    file: ${Z_EXTRA_CA:-./no-extra-ca}
 
 volumes:
   pgdata: {}
