@@ -101,6 +101,8 @@ export type UsageSeries = S['UsageSeries']
 export type Budget = S['Budget']
 export type Provider = S['Provider']
 export type InferenceCredential = S['InferenceCredential']
+export type DocSummary = S['DocSummary']
+export type Doc = S['Doc']
 export type RoutingPolicy = S['RoutingPolicy']
 
 export type Signal = S['Signal']

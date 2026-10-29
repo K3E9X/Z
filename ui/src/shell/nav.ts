@@ -77,6 +77,7 @@ export const NAV: NavItem[] = [
     shortcut: 'G I',
     permission: 'usage:read',
   },
+  { to: '/docs', label: 'Documentation', icon: 'doc', group: 'configure', shortcut: 'G D' },
   { to: '/settings', label: 'Settings', icon: 'settings', group: 'configure', shortcut: 'G S' },
   { to: '/admin', label: 'Admin', icon: 'admin', group: 'configure', permission: 'users:manage' },
 ]

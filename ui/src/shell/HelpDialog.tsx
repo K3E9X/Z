@@ -21,6 +21,7 @@ const GROUPS: { title: string; keys: [string[], string][] }[] = [
       [['G', 'P'], 'Playbooks'],
       [['G', 'A'], 'Agents and skills'],
       [['G', 'H'], 'History and audit'],
+      [['G', 'D'], 'Documentation'],
       [['G', 'L'], 'Learning'],
       [['G', 'C'], 'Connectors'],
       [['G', 'I'], 'Inference and usage'],

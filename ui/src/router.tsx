@@ -184,6 +184,18 @@ const signin = createRoute({
   }),
 })
 
+const docs = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs',
+  component: lazyRouteComponent(() => import('./screens/Docs'), 'Docs'),
+})
+
+const docPage = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs/$slug',
+  component: lazyRouteComponent(() => import('./screens/Docs'), 'Docs'),
+})
+
 const routeTree = rootRoute.addChildren([
   missionControl,
   newMission,
@@ -203,6 +215,8 @@ const routeTree = rootRoute.addChildren([
   connectorBuilder,
   inference,
   history,
+  docs,
+  docPage,
   settings,
   admin,
   signin,

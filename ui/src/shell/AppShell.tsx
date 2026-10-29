@@ -133,6 +133,7 @@ export function AppShell() {
     'g l': go('/learning'),
     'g c': go('/connectors'),
     'g i': go('/inference'),
+    'g d': go('/docs'),
     'g s': go('/settings'),
     'g n': go('/missions/new'),
   })
