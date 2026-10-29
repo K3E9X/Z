@@ -286,6 +286,7 @@ secrets:
   existingSecret: ""
   zSecretKey: ""
   litellmMasterKey: ""
+  litellmSaltKey: ""       # encrypts LiteLLM's stored credentials (the inferX key set from Z); empty: generated once and kept
   oidcClientSecret: ""
   inferenceApiKey: ""
   metricsToken: ""         # bearer token for GET /metrics (empty: generated once and kept)
@@ -463,17 +464,23 @@ config:
   litellm:
     model_list:
       - model_name: z-heavy
-        litellm_params: { model: "openai/glm-5-3-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/glm-5-3-nvfp4", api_base: os.environ/INFERENCE_API_BASE, litellm_credential_name: inferx }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-fast
-        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, litellm_credential_name: inferx }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-judge
-        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/qwen3-8-27b-nvfp4", api_base: os.environ/INFERENCE_API_BASE, litellm_credential_name: inferx }
         model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
       - model_name: z-embed
-        litellm_params: { model: "openai/<EMBEDDING_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        litellm_params: { model: "openai/<EMBEDDING_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, litellm_credential_name: inferx }
         model_info: { mode: embedding, provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+    # The inferX key (ADR 0027): INFERENCE_API_KEY by default; an admin can replace it from Z (Inference → inferX
+    # key), and LiteLLM then keeps it encrypted in its database (LITELLM_SALT_KEY), also across restarts.
+    credential_list:
+      - credential_name: inferx
+        credential_values: { api_key: os.environ/INFERENCE_API_KEY }
+        credential_info: { description: inferX project key (environment default) }
     litellm_settings:
       drop_params: true
       request_timeout: 600

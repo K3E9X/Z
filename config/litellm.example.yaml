@@ -15,7 +15,7 @@ model_list:
     litellm_params:
       model: openai/glm-5-3-nvfp4           # openai/ prefix = OpenAI-compatible endpoint; pinned, not the `pro` category
       api_base: os.environ/INFERENCE_API_BASE
-      api_key: os.environ/INFERENCE_API_KEY
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
     model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
 
   # Fast: triage at scale, extraction, browsing
@@ -23,7 +23,7 @@ model_list:
     litellm_params:
       model: openai/qwen3-8-27b-nvfp4        # text + vision; pinned, not the `medium` category
       api_base: os.environ/INFERENCE_API_BASE
-      api_key: os.environ/INFERENCE_API_KEY
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
     model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
 
   # Judge: injection scan, pre-action checks, routing, classification, eval grading
@@ -31,7 +31,7 @@ model_list:
     litellm_params:
       model: openai/qwen3-8-27b-nvfp4        # the smallest shared model today
       api_base: os.environ/INFERENCE_API_BASE
-      api_key: os.environ/INFERENCE_API_KEY
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
     model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
 
   # Embeddings: memory and skill search
@@ -39,7 +39,7 @@ model_list:
     litellm_params:
       model: openai/<EMBEDDING_MODEL_ID>     # no shared embeddings model in the catalogue yet: memory search stays off until one is opened
       api_base: os.environ/INFERENCE_API_BASE
-      api_key: os.environ/INFERENCE_API_KEY
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
     model_info: { mode: embedding, provider_name: inferx, data_classes: [C0, C1, C2, C3] }
 
   # --- Optional external providers. Keep commented unless enabled in config/z.yaml ---
@@ -59,6 +59,13 @@ model_list:
   #     model: mistral/<MISTRAL_MODEL_ID>
   #     api_key: os.environ/MISTRAL_API_KEY
   #   model_info: { provider_name: mistral, data_classes: [C0, C1] }
+
+# The inferX key (ADR 0027). Default: INFERENCE_API_KEY. An admin can replace it from Z (Inference → inferX key):
+# LiteLLM then keeps it encrypted in its database (LITELLM_SALT_KEY) and that one wins, also after a restart.
+credential_list:
+  - credential_name: inferx
+    credential_values: { api_key: os.environ/INFERENCE_API_KEY }
+    credential_info: { description: inferX project key (environment default) }
 
 litellm_settings:
   drop_params: true            # ignore params a model does not support instead of failing

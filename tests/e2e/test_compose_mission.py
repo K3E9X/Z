@@ -121,3 +121,18 @@ def test_summarize_file_runs_in_a_hardened_runner(api: httpx.Client) -> None:
     llm_requests = httpx.get(f"{LLM}/_fake/requests").json()
     # every model call went through LiteLLM to the inference endpoint, with a model of the configured list
     assert llm_requests and {r["model"] for r in llm_requests} <= configured_models(), llm_requests
+
+
+def test_the_inferx_key_set_from_z_reaches_the_gateway(api: httpx.Client) -> None:
+    """ADR 0027 on the real LiteLLM image: the key goes through LiteLLM's credentials API and is the one LiteLLM
+    sends upstream from the next call; Z answers with its fingerprint only."""
+    key = "ixk_" + "e2e0ab12" * 8
+    httpx.delete(f"{LLM}/_fake/requests", timeout=10).raise_for_status()
+    saved = api.put("/inference/credential", json={"api_key": key})
+    assert saved.status_code == 200, saved.text
+    out = saved.json()
+    assert out["source"] == "ui" and out["check"]["ok"] is True, out
+    assert key not in saved.text and len(out["fingerprint"]) == 12
+    sent = [r["headers"].get("authorization", "") for r in httpx.get(f"{LLM}/_fake/requests", timeout=10).json()]
+    assert sent and all(h == f"Bearer {key}" for h in sent), "the check did not go out with the new key"
+    assert api.get("/inference/credential").json()["source"] == "ui"

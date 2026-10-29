@@ -41,7 +41,8 @@ services:
       DATABASE_URL: postgresql://z:${POSTGRES_PASSWORD}@postgres:5432/litellm
       INFERENCE_API_BASE: ${INFERENCE_API_BASE:-}
       INFERENCE_API_KEY: ${INFERENCE_API_KEY:-}
-      STORE_MODEL_IN_DB: "False"
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?set LITELLM_SALT_KEY in .env (encrypts the stored inferX key; never change it)}
+      STORE_MODEL_IN_DB: "True"   # reload the credentials set through the API (the inferX key from Z, ADR 0027)
       LITELLM_LOCAL_MODEL_COST_MAP: "True"   # bundled price map: no fetch from GitHub at start
     volumes:
       - ../../config/litellm.yaml:/etc/litellm/config.yaml:ro

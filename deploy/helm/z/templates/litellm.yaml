@@ -75,8 +75,16 @@ spec:
                   name: {{ $secret }}
                   key: INFERENCE_API_KEY
                   optional: true
+            # credentials set through the API (the inferX key from Z, ADR 0027) are reloaded from the database at
+            # start only when this is on; Z adds no model through the API
             - name: STORE_MODEL_IN_DB
-              value: "False"
+              value: "True"
+            - name: LITELLM_SALT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: LITELLM_SALT_KEY
+                  optional: true   # existing Secrets without it: LiteLLM falls back to the master key (do not rotate it then)
             # Read-only root filesystem: every path LiteLLM and Prisma write goes to the /tmp emptyDir.
             - name: HOME
               value: /tmp
