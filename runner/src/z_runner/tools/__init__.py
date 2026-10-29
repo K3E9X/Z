@@ -18,8 +18,9 @@ from z_runner.tools.shell import CodeTool, TerminalTool
 log = logging.getLogger("z_runner.tools")
 
 OUTPUT_FILE = "result.json"
+REPORT_FILE = "report.md"  # the job's report for people (JobComplete.report_artifact), any agent may write it
 
-__all__ = ["OUTPUT_FILE", "ToolContext", "ToolResult", "ToolSet", "ZTool", "build_toolset"]
+__all__ = ["OUTPUT_FILE", "REPORT_FILE", "ToolContext", "ToolResult", "ToolSet", "ZTool", "build_toolset"]
 
 
 def build_toolset(spec: JobSpec, gateway: GatewayClient) -> ToolSet:
@@ -29,8 +30,8 @@ def build_toolset(spec: JobSpec, gateway: GatewayClient) -> ToolSet:
         tools.append(ReadTool())
     if "edit" in local:
         tools.append(EditTool())
-    elif spec.output is not None:
-        tools.append(EditTool(only_paths=frozenset({OUTPUT_FILE})))
+    else:  # no edit tool: the agent can still write its report, and its output file when the step has one
+        tools.append(EditTool(only_paths=frozenset({REPORT_FILE, *([OUTPUT_FILE] if spec.output is not None else [])})))
     if "terminal" in local:
         if spec.workspace.mode in (WorkspaceMode.files, WorkspaceMode.git_clone):
             tools.append(TerminalTool())

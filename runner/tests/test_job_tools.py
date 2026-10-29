@@ -255,3 +255,24 @@ def test_events_stream_live_during_a_long_step(harness: Harness) -> None:
     assert (
         received["terminal"] - received["tool_call"] >= 2.0
     )  # the call was visible while the command ran (4 s; slack for a loaded machine)
+
+
+def test_an_agent_without_edit_writes_its_report_and_nothing_else(harness: Harness) -> None:
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("edit", {"command": "write", "path": "notes.md", "content": "sneaky"}),
+                tool_call("edit", {"command": "write", "path": "report.md", "content": "# Answer\nTwo findings.\n"}),
+                finish(),
+            ]
+        }
+    )
+    spec = harness.spec(output=None, tools={"local": ["read"], "builtins": [], "gateway": []})
+    run = harness.run(spec)
+    assert run.completion["status"] == "succeeded"
+    first = harness.llm.requests()[0]["body"]
+    assert "report.md" in json.dumps(first["messages"])  # the task asks for the report
+    by_name = {a["name"]: a for a in run.job.artifacts}
+    assert by_name["report.md"]["kind"] == "report" and run.completion["report_artifact"]
+    assert "notes.md" not in by_name
+    assert "may only write report.md" in json.dumps(harness.llm.requests()[1]["body"]["messages"])

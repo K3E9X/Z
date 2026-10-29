@@ -269,7 +269,8 @@ def test_workspace_plugins_and_agents_md_are_never_loaded(harness: Harness, tmp_
     assert run.completion["status"] == "succeeded"
     first = harness.llm.requests()[0]["body"]
     assert marker not in json.dumps(first["messages"][0])
-    assert {t["function"]["name"] for t in first["tools"]} == {"read", "ask_human", "search_memory", "finish", "think"}
+    names = {t["function"]["name"] for t in first["tools"]}
+    assert names == {"read", "edit", "ask_human", "search_memory", "finish", "think"}  # edit: report.md only
 
 
 def test_stock_sdk_would_load_workspace_plugins(tmp_path: Path) -> None:

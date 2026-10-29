@@ -24,7 +24,7 @@ v1 ships `OpenHandsBackend` (OpenHands Software Agent SDK: LLM configured with L
 ### Neutral tool names
 | Name | Becomes |
 |---|---|
-| `read`, `edit` | Workspace file tools (inside `/workspace` only) |
+| `read`, `edit` | Workspace file tools (inside `/workspace` only). Without `edit`, an agent still gets an `edit` limited to `report.md` (and `result.json` when the step has an output), ADR 0029 |
 | `terminal` | Sandboxed shell, only with `git_clone` or `files` workspaces |
 | `browser` | Lists the flows of `browser`-kind connectors attached to the mission. Flows run **gateway-side** in the `z-browser` worker (Playwright + Chromium, egress only to the target apps); the runner receives results and screenshots, never the session |
 | `gateway:<connector>.<operation-glob>` | Operations listed by the gateway MCP server for this job |

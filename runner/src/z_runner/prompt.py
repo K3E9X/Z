@@ -12,6 +12,7 @@ import yaml
 from z_common.models.api_internal import JobSpec, MemorySnippet, SkillBundle
 
 from z_runner.redaction import Redactor
+from z_runner.tools import REPORT_FILE
 from z_runner.tools.base import ToolSet
 from z_runner.workspace import PRIVATE_DIR, StagedInputs
 
@@ -120,6 +121,11 @@ def task_message(spec: JobSpec, staged: StagedInputs, output_file: str) -> str:
             + ", ".join(f"{w.operation} ({w.class_})" for w in spec.writes)
             + "."
         )
+    parts.append(
+        f"# Report\nBefore you finish, write `{REPORT_FILE}` in the workspace root: a short Markdown report for the "
+        "person who started the mission (answer first, then what you did, your sources, and what you could not do "
+        "or verify). It is shown to them and kept with the mission."
+    )
     if spec.output is not None:
         parts.append(
             f"# Output\nWrite your result as a JSON object to `{output_file}` in the workspace root, then call "

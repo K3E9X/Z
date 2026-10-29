@@ -33,7 +33,7 @@ from z_runner.guardrails import LoopDetector
 from z_runner.output import OutputSchemaError, check_output
 from z_runner.prompt import guide_message, repair_message, task_message
 from z_runner.redaction import Redactor
-from z_runner.tools import OUTPUT_FILE, build_toolset
+from z_runner.tools import OUTPUT_FILE, REPORT_FILE, build_toolset
 from z_runner.tools.base import ToolContext
 from z_runner.tools.gateway import GatewayClient
 from z_runner.workspace import (
@@ -62,7 +62,6 @@ EXIT_BOOTSTRAP = 10
 EXIT_COMPLETE_FAILED = 11
 EXIT_INTERRUPTED = 12
 
-REPORT_FILE = "report.md"
 PATCH_NAME = "changes.patch"
 MAX_PATCH = 20 * 1024 * 1024
 

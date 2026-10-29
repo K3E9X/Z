@@ -111,12 +111,12 @@ class EditTool(ZTool):
     }
 
     def __init__(self, only_paths: frozenset[str] | None = None) -> None:
-        """`only_paths`: when the agent profile has no `edit` tool but the step has an output, the runner still
-        lets it write the output file (and nothing else)."""
+        """`only_paths`: when the agent profile has no `edit` tool, the runner still lets it write its report and
+        the step output file (and nothing else)."""
         self.only_paths = only_paths
         if only_paths:
             self.description = (
-                "Write the step output file. Only these paths can be written: "
+                "Write your report (and the step output file, when the step has one). Only these paths can be written: "
                 + ", ".join(sorted(only_paths))
                 + ". command=write replaces the whole file with `content`."
             )
