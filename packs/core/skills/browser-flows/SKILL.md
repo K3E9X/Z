@@ -2,6 +2,7 @@
 name: browser-flows
 description: Run recorded browser flows safely.
 version: 1.0.0
+evals: evals/browser-flows.jsonl
 ---
 
 1. Run only flows listed in your tools. Pass parameters exactly.

@@ -2,6 +2,7 @@
 name: agent-design
 description: Design a least-privilege agent profile from a description.
 version: 1.0.0
+evals: evals/agent-design.jsonl
 ---
 
 1. Identify the job in one sentence and the objects the agent will look after.

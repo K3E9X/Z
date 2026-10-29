@@ -2,6 +2,7 @@
 name: mission-planning
 description: Turn a request into a plan of steps with agents, fan-out and named writes.
 version: 1.0.0
+evals: evals/mission-planning.jsonl
 ---
 
 1. Restate the goal in one sentence.
