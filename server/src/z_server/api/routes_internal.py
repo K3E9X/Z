@@ -40,6 +40,7 @@ from z_server.ids import new_id
 from z_server.llm.litellm import LlmKeyError
 from z_server.missions import service, specs, workspace
 from z_server.missions.service import utcnow
+from z_server.scheduler import queue
 from z_server.state import AppState
 
 router = InternalRouter()
@@ -611,6 +612,15 @@ async def complete_job(ctx: JobCtxDep, id: str, body: m.JobComplete) -> mm.Job:
     job.steps_done = max(job.steps_done, body.steps)
     if body.error:
         job.error = {"class": body.error.class_, "message": body.error.message[:2000]}
+    if (
+        status == JobStatus.failed
+        and body.error is not None
+        and body.error.class_ in queue.TRANSIENT_ERRORS
+        and job.attempt < job.max_attempts
+    ):
+        await queue.requeue(ctx.db, job, f"model gateway unavailable ({body.error.class_})")
+        await service.advance(ctx.db, ctx.state, mission)
+        return job_out(job)
     elif status == JobStatus.succeeded:
         job.error = None  # a retried job that finally succeeded keeps no stale error
     await service.set_job_status(ctx.db, job, status, reason)

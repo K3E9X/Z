@@ -305,6 +305,40 @@ def test_pause_resume_cancel_and_guide(
     assert sum(1 for c in keys.calls if c[0] == "delete") == 1
 
 
+def test_a_model_gateway_outage_requeues_the_job_until_its_attempts_run_out(
+    app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
+) -> None:
+    h = as_user(app, jars, "bob")
+    mission_id = summarize_mission(app, h, b"hello")
+    runner = start_runner(app, executor, mission_id)
+    runner.checkpoint(3, b"state-at-3")
+    outage = {"class": "llm_unavailable", "message": "503 outside_time_window"}
+    requeued = runner.complete(status="failed", error=outage)
+    assert requeued.status_code == 200 and requeued.json()["status"] == "queued", requeued.text
+    assert requeued.json()["attempt"] == 2 and requeued.json()["resume_from_step"] == 3
+    assert app.get(f"/api/v1/missions/{mission_id}").json()["status"] not in {"failed", "succeeded"}
+    job = only_job(app, mission_id)
+    state = app.app.state.z  # type: ignore[attr-defined]
+    for _ in range(5):  # more than any job's max_attempts
+        if only_job(app, mission_id)["status"] != "queued":
+            break
+
+        async def due() -> None:
+            from z_server.db.models import Job
+
+            async with state.sessions() as db, db.begin():
+                row = await db.get(Job, job["id"])
+                assert row is not None
+                row.available_at = datetime.now(UTC)
+
+        app.portal.call(due)  # type: ignore[union-attr]
+        runner = start_runner(app, executor, mission_id)
+        runner.complete(status="failed", error=outage)
+    final = only_job(app, mission_id)
+    assert final["status"] == "failed" and final["error"]["class"] == "llm_unavailable"
+    assert app.get(f"/api/v1/missions/{mission_id}").json()["status"] == "failed"
+
+
 def test_failed_job_retry_reopens_the_mission(
     app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor, keys: RecordingKeyAdmin
 ) -> None:

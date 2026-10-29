@@ -22,6 +22,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JobStatus, MissionStatus
 from z_common.redaction import Redactor
 
@@ -147,6 +148,22 @@ async def dispatch(state: AppState, executor: Executor, worker: str) -> list[str
 LOG_TAIL_CHARS = 4000
 
 
+# Job error classes worth another attempt (runner StepResult.error_class): the model gateway was rate limited,
+# timed out or unavailable (inferX 429, 503 outside its time window, no capacity, maintenance), after LiteLLM's
+# own retries. Configuration errors (llm_auth, a key with no model) are not retried: they need an admin.
+TRANSIENT_ERRORS = frozenset({"llm_unavailable"})
+
+
+async def requeue(db: AsyncSession, job: Job, reason: str) -> None:
+    """Back to the queue from its last checkpoint, with backoff; the caller checked the attempts left."""
+    job.attempt += 1
+    job.resume_from_step = job.checkpoint_step
+    job.available_at = service.utcnow() + timedelta(seconds=BACKOFF_S[min(job.attempt - 2, len(BACKOFF_S) - 1)])
+    job.lease_owner = job.lease_expires_at = job.executor_ref = None
+    job.bootstrap_token_hash = job.session_token_hash = None
+    await service.set_job_status(db, job, JobStatus.queued, f"retry {job.attempt}: {reason}")
+
+
 async def requeue_or_fail(state: AppState, job_id: str, reason: str, log_tail: str = "") -> str:
     """`log_tail` (the runner's last output, redacted here) is kept in the job error for diagnosis."""
     async with state.sessions() as db, db.begin():
@@ -163,12 +180,7 @@ async def requeue_or_fail(state: AppState, job_id: str, reason: str, log_tail: s
             await service.set_job_status(db, job, JobStatus.failed, reason)
             outcome = "failed"
         else:
-            job.attempt += 1
-            job.resume_from_step = job.checkpoint_step
-            job.available_at = service.utcnow() + timedelta(seconds=BACKOFF_S[min(job.attempt - 2, len(BACKOFF_S) - 1)])
-            job.lease_owner = job.lease_expires_at = job.executor_ref = None
-            job.bootstrap_token_hash = job.session_token_hash = None
-            await service.set_job_status(db, job, JobStatus.queued, f"retry {job.attempt}: {reason}")
+            await requeue(db, job, reason)
             outcome = "requeued"
         if mission is not None:
             await service.advance(db, state, mission)
