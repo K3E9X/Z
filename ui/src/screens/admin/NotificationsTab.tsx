@@ -58,8 +58,7 @@ function TargetDialog({
       ? 'Already used'
       : null
   const email = t.kind === 'email'
-  const invalid =
-    !!idError || t.events.length === 0 || (email ? !(t.to ?? []).length : !t.url_ref?.trim())
+  const invalid = !!idError || t.events.length === 0 || (email ? !(t.to ?? []).length : !t.url_ref?.trim())
   return (
     <Dialog
       open
@@ -97,7 +96,9 @@ function TargetDialog({
           )}
         </Field>
         <Field label="Name">
-          {(id) => <Input id={id} value={t.name ?? ''} onChange={(e) => setT({ ...t, name: e.target.value })} />}
+          {(id) => (
+            <Input id={id} value={t.name ?? ''} onChange={(e) => setT({ ...t, name: e.target.value })} />
+          )}
         </Field>
         <Field label="Kind" hint={KINDS.find((k) => k.id === t.kind)?.hint}>
           {(id, d) => (
@@ -121,7 +122,9 @@ function TargetDialog({
               id={id}
               aria-describedby={d}
               value={t.content_up_to ?? 'C1'}
-              onChange={(e) => setT({ ...t, content_up_to: e.target.value as NotificationTarget['content_up_to'] })}
+              onChange={(e) =>
+                setT({ ...t, content_up_to: e.target.value as NotificationTarget['content_up_to'] })
+              }
             >
               {['C0', 'C1', 'C2', 'C3'].map((c) => (
                 <option key={c} value={c}>
@@ -259,9 +262,9 @@ export function NotificationsTab() {
                 </Button>
               </div>
               <p className="m-0 text-text-2">
-                Approvals, questions, jobs needing attention, mission outcomes, budget alerts, unreachable connectors
-                and break-glass sign-ins, delivered at least once with retries. Links open Z; approving always
-                happens in Z.
+                Approvals, questions, jobs needing attention, mission outcomes, budget alerts, unreachable
+                connectors and break-glass sign-ins, delivered at least once with retries. Links open Z;
+                approving always happens in Z.
               </p>
               {data.targets.length === 0 && (
                 <p className="m-0 rounded-panel border border-dashed border-line-2 px-4 py-6 text-center text-text-3">
@@ -286,9 +289,13 @@ export function NotificationsTab() {
                         {t.events.map((e) => EVENTS.find((x) => x.id === e)?.label ?? e).join(' · ')}
                       </span>
                       {t.status?.last_error ? (
-                        <span className="text-meta text-err">Last delivery failed: {t.status.last_error}</span>
+                        <span className="text-meta text-err">
+                          Last delivery failed: {t.status.last_error}
+                        </span>
                       ) : t.status?.last_sent_at ? (
-                        <span className="text-meta text-ok">Last delivered {relative(t.status.last_sent_at)}</span>
+                        <span className="text-meta text-ok">
+                          Last delivered {relative(t.status.last_sent_at)}
+                        </span>
                       ) : null}
                     </div>
                     <Button busy={testing === t.id} onClick={() => void test(t.id)}>
@@ -396,7 +403,12 @@ export function NotificationsTab() {
                     editing === 'new'
                       ? [...data.targets, t]
                       : data.targets.map((x) => (x.id === t.id ? t : x))
-                  if (await save({ ...data, targets }, editing === 'new' ? 'Adding a target' : 'Editing a target'))
+                  if (
+                    await save(
+                      { ...data, targets },
+                      editing === 'new' ? 'Adding a target' : 'Editing a target',
+                    )
+                  )
                     setEditing(null)
                 }}
               />

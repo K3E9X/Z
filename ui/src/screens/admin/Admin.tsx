@@ -15,15 +15,7 @@ import { AuditTab, PlatformTab, SessionsTab, SignInTab } from './PlatformTabs'
 import { UsersTab } from './Users'
 
 type Tab =
-  | 'users'
-  | 'teams'
-  | 'roles'
-  | 'mapping'
-  | 'signin'
-  | 'sessions'
-  | 'audit'
-  | 'notifications'
-  | 'platform'
+  'users' | 'teams' | 'roles' | 'mapping' | 'signin' | 'sessions' | 'audit' | 'notifications' | 'platform'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'users', label: 'Users' },
   { id: 'teams', label: 'Teams' },
