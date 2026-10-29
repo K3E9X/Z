@@ -40,9 +40,12 @@ class RecordingExecutor:
 
 
 def dispatch(client: TestClient, executor: RecordingExecutor) -> list[str]:
+    """What a scheduler tick dispatches: runners of earlier runs are reaped first, as in `tick`."""
     from z_server.scheduler.queue import dispatch as run
+    from z_server.scheduler.queue import reap
 
     state = client.app.state.z  # type: ignore[attr-defined]
+    client.portal.call(reap, state, executor)  # type: ignore[union-attr]
     return client.portal.call(run, state, executor, "test-worker")  # type: ignore[union-attr,no-any-return]
 
 
