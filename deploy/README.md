@@ -12,7 +12,7 @@ cp config/z.example.yaml config/z.yaml
 docker build -f deploy/images/z-server/Dockerfile -t z-server:local .
 docker compose --env-file .env -f deploy/compose/docker-compose.yml up -d --wait
 docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # one-time password
-curl -s http://127.0.0.1:8080/readyz
+curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0.1:8080 (z-ui)
 ```
 
 - Behind a TLS-intercepting proxy, pass its CA at build time only:

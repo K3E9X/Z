@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 pytestmark = pytest.mark.e2e
-Z = os.environ.get("Z_E2E_URL", "http://127.0.0.1:8080")
+Z = os.environ.get("Z_E2E_URL", "http://127.0.0.1:8000")  # z-server (the web app is z-ui on :8080)
 LLM = os.environ.get("Z_E2E_LLM_URL", "http://127.0.0.1:8090")
 NOTES = b"# Release 2.4\n\nVersion 2.4 adds single sign-on. Password login is removed for staff.\n"
 SUMMARY = {

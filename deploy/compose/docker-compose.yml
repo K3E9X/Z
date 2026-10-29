@@ -1,5 +1,5 @@
-# Z on Docker Compose (docs/11 §1). Step 1 of the build: postgres, litellm, z-server.
-# The UI, egress proxy and z-browser are added by the next build steps.
+# Z on Docker Compose (docs/11 §1): postgres, litellm, z-server, z-ui (web on :8080), docker-socket-proxy.
+# The egress proxy and z-browser are added by later build steps.
 #   cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
 #   docker compose -f deploy/compose/docker-compose.yml up -d
 name: z
@@ -98,12 +98,29 @@ services:
       - ../../config/z.yaml:/etc/z/z.yaml:ro
       - artifacts:/data/artifacts
     tmpfs: ["/tmp:size=64m"]
-    ports: ["127.0.0.1:${Z_PORT:-8080}:8000"]
+    ports: ["127.0.0.1:${Z_API_PORT:-8000}:8000"]   # CLI and API on the host; browsers use z-ui
     depends_on:
       z-migrate: { condition: service_completed_successfully }
       litellm: { condition: service_healthy }
       docker-socket-proxy: { condition: service_healthy }
     networks: [edge, core, runners]
+    <<: *hardening
+
+  z-ui:
+    # The web app (unprivileged nginx, uid 101): static files, /api and SSE proxied to z-server.
+    build:
+      context: ../..
+      dockerfile: deploy/images/z-ui/Dockerfile
+      secrets: [extra_ca]
+    image: z-ui:local
+    environment:
+      Z_SERVER_UPSTREAM: z-server:8000
+      Z_UI_PORT: "8080"
+    tmpfs: ["/tmp:size=16m,uid=101,gid=101"]
+    ports: ["127.0.0.1:${Z_PORT:-8080}:8080"]
+    depends_on:
+      z-server: { condition: service_started }
+    networks: [edge]
     <<: *hardening
 
 secrets:

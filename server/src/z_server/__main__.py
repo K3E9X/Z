@@ -34,6 +34,8 @@ def _serve(host: str, port: int, workers: bool) -> int:
         proxy_headers=True,
         forwarded_allow_ips=os.environ.get("Z_TRUSTED_PROXIES", "127.0.0.1"),
         log_level="info",
+        # open SSE streams would hold a graceful shutdown forever; clients resume with Last-Event-ID
+        timeout_graceful_shutdown=int(os.environ.get("Z_SHUTDOWN_GRACE_S", "10")),
     )
     return 0
 
