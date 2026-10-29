@@ -71,6 +71,22 @@ services:
     <<: *hardening
     restart: "no"
 
+  z-seed:
+    # Loads the packs baked into the image into the catalog (idempotent, audited), as the Helm seed Job does.
+    image: z-server:local
+    command: ["seed"]
+    env_file: [../../.env]
+    environment:
+      DATABASE_URL: postgresql://z_app:${Z_APP_DB_PASSWORD}@postgres:5432/z   # application role
+      Z_CONFIG: /etc/z/z.yaml
+    volumes:
+      - ../../config/z.yaml:/etc/z/z.yaml:ro
+    depends_on:
+      z-migrate: { condition: service_completed_successfully }
+    networks: [core]
+    <<: *hardening
+    restart: "no"
+
   docker-socket-proxy:
     # The only path to the Docker API: runner containers only, hardening checked on every create (invariant 13).
     build:
@@ -102,7 +118,7 @@ services:
     tmpfs: ["/tmp:size=64m"]
     ports: ["127.0.0.1:${Z_API_PORT:-8000}:8000"]   # CLI and API on the host; browsers use z-ui
     depends_on:
-      z-migrate: { condition: service_completed_successfully }
+      z-seed: { condition: service_completed_successfully }
       litellm: { condition: service_healthy }
       docker-socket-proxy: { condition: service_healthy }
     networks: [edge, core, runners]
