@@ -174,7 +174,9 @@ function AgentRows({
                 void navigate({ to: '/missions/$id', params: { id: m.id } })
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void navigate({ to: '/missions/$id', params: { id: m.id } })
+                if (e.key !== 'Enter' || e.target !== e.currentTarget) return
+                e.preventDefault()
+                void navigate({ to: '/missions/$id', params: { id: m.id } })
               }}
               className={`${grid} cursor-pointer items-center rounded-btn px-2.5 py-[var(--row-y)] ${isSel ? 'bg-raised' : 'hover:bg-panel'}`}
             >
@@ -399,8 +401,13 @@ export function MissionControl() {
       const prev = activeList[Math.max(0, i - 1)]
       if (prev) select(prev.id)
     },
-    enter: () => {
-      if (selectedId) void navigate({ to: '/missions/$id', params: { id: selectedId } })
+    // Enter opens the selected mission only when nothing is focused: on a link, a button or a row it
+    // keeps its own meaning (a focused row opens its own mission).
+    enter: (e) => {
+      const t = e.target
+      if (!selectedId || (t !== document.body && t !== document.documentElement)) return false
+      void navigate({ to: '/missions/$id', params: { id: selectedId } })
+      return true
     },
   })
 

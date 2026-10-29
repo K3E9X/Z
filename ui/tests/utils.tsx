@@ -54,3 +54,34 @@ export async function renderRouted(ui: ReactNode, opts: { me?: Me } = {}) {
   await router.load()
   return out
 }
+
+/**
+ * Render a screen at its real route path (useSearch/useParams with `from`) inside a memory router.
+ * `others` are extra paths it may navigate to; each renders `<p>route: {path}</p>`.
+ */
+export async function renderRoute(
+  path: string,
+  url: string,
+  Screen: () => ReactNode,
+  opts: { me?: Me; others?: string[] } = {},
+) {
+  const { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } =
+    await import('@tanstack/react-router')
+  const root = createRootRoute()
+  const page = createRoute({
+    getParentRoute: () => root,
+    path,
+    validateSearch: (s: Record<string, unknown>) => s,
+    component: Screen,
+  })
+  const others = (opts.others ?? []).map((p) =>
+    createRoute({ getParentRoute: () => root, path: p, component: () => <p>route: {p}</p> }),
+  )
+  const router = createRouter({
+    routeTree: root.addChildren([page, ...others]),
+    history: createMemoryHistory({ initialEntries: [url] }),
+  })
+  const out = renderWithProviders(<RouterProvider router={router as never} />, opts)
+  await router.load()
+  return { ...out, router }
+}
