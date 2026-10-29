@@ -556,7 +556,50 @@ schemas = {
         ["job_id"],
     ),
     "TakeOverSession": obj(
-        {"job_id": S, "terminal_url": S, "expires_at": TS, "mode": S}, ["job_id", "terminal_url", "expires_at", "mode"]
+        {"job_id": S, "terminal_url": S, "expires_at": TS, "mode": S}, ["job_id", "terminal_url", "expires_at", "mode"],
+        desc="terminal_url opens the take-over page of the web app: the paused workspace as files (read, and edit in read_write).",
+    ),
+    "TakeOverFile": obj(
+        {
+            "path": S,
+            "size": I,
+            "origin": {"type": "string", "enum": ["staged", "agent", "human"]},
+            "deleted": B,
+        },
+        ["path", "size", "origin", "deleted"],
+    ),
+    "TakeOverWorkspace": obj(
+        {
+            "job_id": S,
+            "mode": {"type": "string", "enum": ["read_only", "read_write"]},
+            "by": S,
+            "expires_at": TS,
+            "files": arr(ref("TakeOverFile")),
+            "truncated": B,
+        },
+        ["job_id", "mode", "by", "expires_at", "files", "truncated"],
+    ),
+    "TakeOverFileContent": obj(
+        {
+            "path": S,
+            "encoding": {"type": "string", "enum": ["utf-8", "base64"]},
+            "content": S,
+            "size": I,
+            "origin": {"type": "string", "enum": ["staged", "agent", "human"]},
+        },
+        ["path", "encoding", "content", "size", "origin"],
+    ),
+    "TakeOverEdit": obj(
+        {
+            "path": {"type": "string", "minLength": 1, "maxLength": 512},
+            "content": {"type": "string", "maxLength": 1500000},
+            "encoding": {"type": "string", "enum": ["utf-8", "base64"], "default": "utf-8"},
+        },
+        ["path", "content"],
+    ),
+    "TakeOverFinish": obj({"resume": {"type": "boolean", "default": True}}),
+    "TakeOverResult": obj(
+        {"job_id": S, "edited": arr(S), "restarted": B, "resumed": B}, ["job_id", "edited", "restarted", "resumed"]
     ),
     "SaveAsPlaybook": obj({"name": ext(C + "Slug"), "description": S, "domain": S}, ["name"]),
     "Job": obj(
@@ -1883,6 +1926,68 @@ op(
     req=ref("TakeOver"),
     resp=ref("TakeOverSession"),
     params=["id"],
+)
+TAKE_OVER = "/missions/{id}/take-over/{job_id}"
+op(
+    "get",
+    TAKE_OVER + "/files",
+    "getTakeOverWorkspace",
+    "missions:control",
+    "B1",
+    "Files of a workspace being taken over",
+    "missions",
+    resp=ref("TakeOverWorkspace"),
+    params=["id", "job_id"],
+    desc="The paused workspace rebuilt from its staged inputs and the job checkpoint, with the edits of this take-over. Only the person who took it over, while the session lasts.",
+)
+op(
+    "get",
+    TAKE_OVER + "/file",
+    "getTakeOverFile",
+    "missions:control",
+    "B1",
+    "Read one file of a workspace being taken over",
+    "missions",
+    resp=ref("TakeOverFileContent"),
+    params=["id", "job_id"],
+    query=["path"],
+)
+op(
+    "put",
+    TAKE_OVER + "/file",
+    "putTakeOverFile",
+    "missions:control",
+    "B1",
+    "Write one file (read_write take-over)",
+    "missions",
+    req=ref("TakeOverEdit"),
+    resp=ref("TakeOverFile"),
+    params=["id", "job_id"],
+)
+op(
+    "delete",
+    TAKE_OVER + "/file",
+    "deleteTakeOverFile",
+    "missions:control",
+    "B1",
+    "Delete one file (read_write take-over)",
+    "missions",
+    params=["id", "job_id"],
+    query=["path"],
+    status=204,
+)
+op(
+    "post",
+    TAKE_OVER + "/finish",
+    "finishTakeOver",
+    "missions:control",
+    "B1",
+    "End a take-over",
+    "missions",
+    req=ref("TakeOverFinish"),
+    resp=ref("TakeOverResult"),
+    params=["id", "job_id"],
+    desc="Edits are folded into the job checkpoint and the job restarts from it (the agent is told which files a person changed); without edits the job simply resumes. resume=false keeps it paused.",
 )
 op(
     "get",

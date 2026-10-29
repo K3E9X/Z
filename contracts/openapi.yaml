@@ -767,6 +767,187 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /missions/{id}/take-over/{job_id}/files:
+    get:
+      operationId: getTakeOverWorkspace
+      tags:
+      - missions
+      summary: Files of a workspace being taken over
+      x-permission: missions:control
+      x-owner: B1
+      description: The paused workspace rebuilt from its staged inputs and the job checkpoint, with the edits of this take-over. Only the person who took it over, while the session lasts.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeOverWorkspace'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /missions/{id}/take-over/{job_id}/file:
+    get:
+      operationId: getTakeOverFile
+      tags:
+      - missions
+      summary: Read one file of a workspace being taken over
+      x-permission: missions:control
+      x-owner: B1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeOverFileContent'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      operationId: putTakeOverFile
+      tags:
+      - missions
+      summary: Write one file (read_write take-over)
+      x-permission: missions:control
+      x-owner: B1
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TakeOverEdit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeOverFile'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: deleteTakeOverFile
+      tags:
+      - missions
+      summary: Delete one file (read_write take-over)
+      x-permission: missions:control
+      x-owner: B1
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /missions/{id}/take-over/{job_id}/finish:
+    post:
+      operationId: finishTakeOver
+      tags:
+      - missions
+      summary: End a take-over
+      x-permission: missions:control
+      x-owner: B1
+      x-audit: true
+      description: Edits are folded into the job checkpoint and the job restarts from it (the agent is told which files a person changed); without edits the job simply resumes. resume=false keeps it paused.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TakeOverFinish'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeOverResult'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /missions/{id}/events:
     get:
       operationId: streamMissionEvents
@@ -6651,6 +6832,115 @@ components:
       - terminal_url
       - expires_at
       - mode
+      additionalProperties: false
+      description: 'terminal_url opens the take-over page of the web app: the paused workspace as files (read, and edit in read_write).'
+    TakeOverFile:
+      type: object
+      properties:
+        path: *id001
+        size: *id006
+        origin:
+          type: string
+          enum:
+          - staged
+          - agent
+          - human
+        deleted: *id007
+      required:
+      - path
+      - size
+      - origin
+      - deleted
+      additionalProperties: false
+    TakeOverWorkspace:
+      type: object
+      properties:
+        job_id: *id001
+        mode:
+          type: string
+          enum:
+          - read_only
+          - read_write
+        by: *id001
+        expires_at: *id005
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/TakeOverFile'
+        truncated: *id007
+      required:
+      - job_id
+      - mode
+      - by
+      - expires_at
+      - files
+      - truncated
+      additionalProperties: false
+    TakeOverFileContent:
+      type: object
+      properties:
+        path: *id001
+        encoding:
+          type: string
+          enum:
+          - utf-8
+          - base64
+        content: *id001
+        size: *id006
+        origin:
+          type: string
+          enum:
+          - staged
+          - agent
+          - human
+      required:
+      - path
+      - encoding
+      - content
+      - size
+      - origin
+      additionalProperties: false
+    TakeOverEdit:
+      type: object
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 512
+        content:
+          type: string
+          maxLength: 1500000
+        encoding:
+          type: string
+          enum:
+          - utf-8
+          - base64
+          default: utf-8
+      required:
+      - path
+      - content
+      additionalProperties: false
+    TakeOverFinish:
+      type: object
+      properties:
+        resume:
+          type: boolean
+          default: true
+      additionalProperties: false
+    TakeOverResult:
+      type: object
+      properties:
+        job_id: *id001
+        edited:
+          type: array
+          items: *id001
+        restarted: *id007
+        resumed: *id007
+      required:
+      - job_id
+      - edited
+      - restarted
+      - resumed
       additionalProperties: false
     SaveAsPlaybook:
       type: object
