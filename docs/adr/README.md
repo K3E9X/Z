@@ -13,3 +13,8 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0009 — The learning loop proposes; humans apply](0009-learning-needs-approval.md)
 - [0010 — GitLab as the identity provider (OIDC), roles from GitLab groups](0010-gitlab-oidc-identity.md)
 - [0011 — Details fixed while writing contracts v1](0011-contract-v1-details.md)
+- [0012 — Details fixed while building missions, scheduler and review](0012-missions-slice-details.md)
+- [0013 — Judge stages: pattern floor, raise-only model, pre-action checks](0013-judge-stages.md)
+- [0014 — Learning loop and evals: how they run for real](0014-learning-and-evals.md)
+- [0015 — Personal OAuth connections and chat/mail channels](0015-connections-and-channels.md)
+- [0016 — Browser connectors: reviewed flows replayed by z-browser](0016-browser-flows.md)

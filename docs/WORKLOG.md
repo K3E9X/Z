@@ -66,7 +66,18 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   routes tried to read a Bot Connector JWT as a Z token. Lesson: after a worker restart dockerd can fail on a
   stale containerd: `pkill -9 containerd; rm -f /var/run/docker.pid; nohup dockerd &`.
 
+- B3 (cont.): browser connectors (ADR 0016): `flows` in the connector contract, shared validation
+  (`z_common.connectors.browser`), the `z-browser` worker package (Playwright 1.63, fresh context per run, route
+  guard), gateway `browser` kind with screenshots as artifacts, executor writes with the write account, builder
+  import `source: browser` + UI flow editor, example connector `packs/archi-isp/connectors/fwconsole.yaml`, fake
+  FW Console web UI. Image on Microsoft's Playwright base (pinned by digest), compose profile `browser`, Helm
+  `browser.enabled`. Found by testing: Playwright's route handler is not called for redirect hops, so an
+  allowlisted page could 302 the browser anywhere; the guard now fetches without following redirects and
+  checks each Location. Also fixed: the builder dropped the draft's auth when no secret was typed.
+
 Lessons / traps:
+- Playwright: `page.route`/`context.route` do not see redirect hops; never rely on them alone for egress.
+- The z-browser image is ~3.7 GB (base includes all engines): prune docker before building here.
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
   `uv sync --all-packages`.
 - This sandbox blocks deb.debian.org: build the runner with
