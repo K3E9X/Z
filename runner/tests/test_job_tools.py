@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import tarfile
 import time
-import zipfile
 from pathlib import Path
 
 import pytest
@@ -65,9 +64,10 @@ def test_documents_tool_produces_artifacts(harness: Harness) -> None:
     assert "Weekly report" in [p.text for p in document.paragraphs]
     assert document.tables[0].cell(1, 1).text == "critical"
     assert by_name["report.pdf"]["content"].startswith(b"%PDF")
-    with zipfile.ZipFile(io.BytesIO(by_name["findings.xlsx"]["content"])) as xlsx:
-        sheet = xlsx.read("xl/worksheets/sheet1.xml").decode()
-    assert "1001" in sheet and "<v>9.8</v>" in sheet
+    import openpyxl
+
+    sheet = openpyxl.load_workbook(io.BytesIO(by_name["findings.xlsx"]["content"])).active
+    assert [[c.value for c in row] for row in sheet.iter_rows()] == [["id", "cvss"], ["1001", 9.8], ["1002", 7.5]]
     assert "| 1002 | 7.5 |" in by_name["summary.md"]["content"].decode()
     assert (run.workspace / "documents" / "report.docx").is_file()
     svg_error = [e for e in run.events("validation_error") if e["errors"][0]["path"] == "content"]
