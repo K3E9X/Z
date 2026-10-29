@@ -200,6 +200,8 @@ security:repo:
     - bandit -q -r server/src runner/src cli/src packages/z-common/src deploy/images ci/scripts
       --severity-level high --confidence-level high ${skips:+--skip "$skips"}
     - trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln --ignorefile .exc/deps --skip-dirs .cache .
+    # Dockerfiles and the chart (trivy's Helm renderer). Compose is not a trivy format: tests/unit/test_compose_hardening.py
+    # checks it; hook Jobs, browser and egress proxy are scanned on the `helm template` output in chart:check.
     - |
       for v in k3s k8s; do
         trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile .exc/iac \
@@ -346,7 +348,7 @@ chart:check:
     SCANNERS_BLOCKED_CHECKED: "1" # no python3 in this image; the guard job checked versions.lock
   script:
     - export PATH="$SCANNERS_DIR/bin:$PATH"
-    - ci/scripts/install-scanners.sh kubeconform kube-score kubescape
+    - ci/scripts/install-scanners.sh kubeconform kube-score kubescape trivy
     - |
       set -e
       for v in k3s k8s; do
@@ -355,6 +357,13 @@ chart:check:
         kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
         kube-score score --output-format ci "rendered-$v.yaml" || true   # report only (docs/13)
         kubescape scan framework nsa,cis-v1.10.0 "rendered-$v.yaml" --exceptions security/kubescape-exceptions.json --compliance-threshold 85
+        # trivy on what helm renders: the hook Jobs (left out by trivy's own Helm renderer), browser and egress proxy
+        helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml \
+          --set browser.enabled=true --set egressProxy.enabled=true \
+          --set 'config.z.egress.mirrors[0]=https://pypi.mirror.example' --output-dir "trivy-$v" > /dev/null
+        grep -q 'helm.sh/hook' "trivy-$v/z/templates/jobs.yaml"
+        kubeconform -strict -summary -ignore-missing-schemas "trivy-$v"
+        trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile .exc/iac "trivy-$v"
       done
     - helm package deploy/helm/z -d chart/
   artifacts:

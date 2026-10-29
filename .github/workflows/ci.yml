@@ -189,7 +189,10 @@ jobs:
         run: |
           trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln \
             --ignorefile "$RUNNER_TEMP/exc/deps" .
-      - name: trivy config (Dockerfiles, compose, Helm chart with k3s and Kubernetes values)
+      # Dockerfiles and the chart through trivy's Helm renderer. Trivy does not read Compose files (they show as
+      # "not scanned"): tests/unit/test_compose_hardening.py checks them. Hook Jobs and the optional browser and
+      # egress proxy are scanned on the `helm template` output in helm.yml.
+      - name: trivy config (Dockerfiles, Helm chart with k3s and Kubernetes values)
         run: |
           for v in k3s k8s; do
             echo "::group::$v"
