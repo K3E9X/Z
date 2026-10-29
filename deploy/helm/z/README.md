@@ -250,7 +250,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `runners.networkPolicy.reachablePorts` | `[8000, 4000]` | ports runners may open on reachable pods |
 | `runners.networkPolicy.extraEgress` | `[]` | extra egress rules for runners |
 | `dns.namespace`, `dns.podLabels` | `kube-system`, `k8s-app: kube-dns` | DNS peer of the runner policy |
-| `cluster.podCIDR`, `cluster.serviceCIDR` | `10.42.0.0/16`, `10.43.0.0/16` | cluster ranges (k3s defaults) the egress proxy never reaches |
+| `cluster.podCIDR`, `cluster.serviceCIDR` | `10.42.0.0/16`, `10.43.0.0/16` (k8s values: `""`, `10.96.0.0/12`) | cluster ranges the egress proxy never reaches; podCIDR is the default of `server.trustedProxies` |
 | `egressProxy.egressTo` | `[]` (`0.0.0.0/0`) | proxy egress peers; `0.0.0.0/0` gets metadata, cluster and RFC 1918 `except` |
 | `egressProxy.privateAllow` | `[]` | private ranges the proxy may reach (internal mirrors) |
 | `ui.enabled`, `ui.replicas`, `ui.image` | `true`, `1`, `ghcr.io/k3e9x/z-ui` | web app |
