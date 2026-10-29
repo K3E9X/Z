@@ -259,3 +259,13 @@ def test_error_body_turns_a_2xx_error_answer_into_a_failure() -> None:
     nested = {"error_body": {"path": "result.status", "equals": "error"}}
     assert outcome(nested, 200, {"result": {"status": "error"}})[0] is False
     assert outcome({}, 200, {"ok": False}) == (True, None)  # no rule: the status decides
+
+
+@pytest.mark.parametrize("value", ["..", ".", ""])
+def test_path_parameters_cannot_be_dot_segments(value: str) -> None:
+    from z_server.gateway.http import InvokeError, prepare
+
+    with pytest.raises(InvokeError, match="cannot be"):
+        prepare("https://jira.example.internal", "GET /rest/api/3/issue/{key}", {}, {"key": value})
+    ok = prepare("https://jira.example.internal", "GET /rest/api/3/issue/{key}", {}, {"key": "a/../b"})
+    assert ok.url.endswith("/issue/a%2F..%2Fb")

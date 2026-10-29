@@ -77,7 +77,10 @@ def prepare(base: str, source_ref: str, input_schema: dict[str, Any], args: dict
         name = match.group(1)
         if name not in remaining:
             raise InvokeError(f"missing path parameter {name}")
-        return quote(str(remaining.pop(name)), safe="")
+        value = str(remaining.pop(name))
+        if value in {"", ".", ".."}:  # a dot segment would move the call to another endpoint of the tool
+            raise InvokeError(f"path parameter {name} cannot be {value!r}")
+        return quote(value, safe="")
 
     path = PARAM.sub(fill, path)
     params: dict[str, Any] = {}
