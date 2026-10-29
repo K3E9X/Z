@@ -24,9 +24,9 @@ from z_common.redaction import Redactor
 from z_server import artifacts, audit, events, judge, judge_model
 from z_server.crypto import token_hash
 from z_server.db.models import Connector, Job, Mission, Operation
-from z_server.gateway import adf, mcp_client
+from z_server.gateway import adf, mcp_client, oauth
 from z_server.gateway import http as http_invoker
-from z_server.gateway.auth import AuthError, Purpose, material
+from z_server.gateway.auth import AuthError, AuthMaterial, Purpose, material
 from z_server.gateway.limits import CallStats, SlidingWindow, replica_share
 from z_server.gateway.secrets import SecretResolver
 from z_server.llm.litellm import LlmKeyError
@@ -104,6 +104,22 @@ class Gateway:
 
     # ---------------------------------------------------------------- shared invocation
 
+    async def auth(self, connector: Connector, purpose: Purpose) -> AuthMaterial:
+        """Credential headers for one call: the acting user's delegated grant (user-scope steps and actions),
+        an app-only OAuth token, or a static secret."""
+        user = oauth.ACTING_USER.get()
+        try:
+            if user is not None:
+                token, identity = await oauth.user_token(self.state, self.resolver, connector, purpose, user)
+                return AuthMaterial({"Authorization": f"Bearer {token}"}, identity, [token])
+            if oauth.flow(connector.manifest, purpose, "service") is not None:
+                token = await oauth.service_token(self.state.http, self.resolver, connector.manifest, purpose)
+                app = oauth.flow(connector.manifest, purpose, "service") or {}
+                return AuthMaterial({"Authorization": f"Bearer {token}"}, f"app:{app.get('app')}", [token])
+        except oauth.OAuthError as exc:
+            raise AuthError(str(exc)) from exc
+        return await material(connector.manifest, purpose, self.resolver)
+
     async def invoke(
         self,
         connector: Connector,
@@ -115,7 +131,7 @@ class Gateway:
         """Call one operation with the credential of `purpose`. Never raises for tool-side failures."""
         manifest = connector.manifest
         try:
-            auth = await material(manifest, purpose, self.resolver)
+            auth = await self.auth(connector, purpose)
         except AuthError as exc:
             return Invocation(False, None, None, 0, None, error=str(exc))
         started = time.monotonic()
@@ -176,7 +192,7 @@ class Gateway:
     ) -> Invocation:
         """A request built by a connector adapter (executor writes, idempotency lookups) on an HTTP connector."""
         try:
-            auth = await material(connector.manifest, purpose, self.resolver)
+            auth = await self.auth(connector, purpose)
         except AuthError as exc:
             return Invocation(False, None, None, 0, None, error=str(exc))
         try:
@@ -269,7 +285,15 @@ class Gateway:
                 if wait_s:
                     await self._deny(job, mission, op.id, "rate_limit", f"{key.split(':')[0]} limit {limit}/min")
                     return Outcome(False, f"Rate limited: retry {op.id} in {wait_s:.0f} s.")
-        inv = await self.invoke(connector, op, args, "read")
+        step: dict[str, Any] = next(
+            (st for st in (mission.plan or {}).get("steps", []) if st.get("id") == job.step_id), {}
+        )
+        user_scope = step.get("credentials") == "user"
+        acting = oauth.ACTING_USER.set(mission.created_by if user_scope else None)
+        try:
+            inv = await self.invoke(connector, op, args, "read")
+        finally:
+            oauth.ACTING_USER.reset(acting)
         self.stats.record(connector.name, inv.latency_ms, inv.ok)
         known = [*inv.secrets, token]
         if mission.llm_key_enc:

@@ -3,7 +3,7 @@
 - Claim: `approved` actions, `FOR UPDATE SKIP LOCKED`, moved to `applying` in the same transaction.
 - Defence in depth, checked again right before the write: enough distinct approvers, the operation still
   exists, is still exposed and still a write of an approved, enabled connector; the credential scope is
-  available (user-scope delegated grants arrive with personal connections).
+  available; user-scope actions use the write grant of the person they run as (personal connections).
 - Idempotency: adapters first look for an earlier application (Jira: the z-<action> label or the `z` comment
   property). An action found `applying` after a crash is recovered: found -> applied, idempotent operation ->
   applied again, otherwise -> failed with "outcome unknown" so a human checks the tool (never a blind retry).
@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 
 from z_server import audit, events
 from z_server.db.models import ActionApproval, Artifact, Connector, Mission, Operation, ProposedAction
+from z_server.gateway import oauth
 from z_server.gateway.core import Gateway
 from z_server.gateway.writers import Applied, WriteError, idempotent, writer_for
 from z_server.missions import service
@@ -85,8 +86,8 @@ async def _preconditions(db: Any, action: ProposedAction) -> tuple[Connector, Op
         raise WriteError("the operation no longer exists")
     if not (op.exposed and connector.enabled and connector.review_status == "approved") or op.op_class == "read":
         raise WriteError("the operation is no longer exposed for writes")
-    if (action.runs_as or {}).get("scope") == "user":
-        raise WriteError("user-scope credentials need a personal connection, not available on this server yet")
+    if (action.runs_as or {}).get("scope") == "user" and not (action.runs_as or {}).get("user_id"):
+        raise WriteError("a user-scope action has no user to act as")
     return connector, op
 
 
@@ -152,6 +153,9 @@ async def apply(state: AppState, gateway: Gateway, action_id: str, *, recovering
             return "failed"
         db.expunge_all()
     writer = writer_for(connector, op)
+    runs_as = action.runs_as or {}
+    # user-scope actions use the write grant of the person they run as (the mission starter), nobody else's
+    acting = oauth.ACTING_USER.set(str(runs_as["user_id"]) if runs_as.get("scope") == "user" else None)
     try:
         found = await writer.lookup(gateway, connector, op, action)
         if found is not None:
@@ -174,6 +178,8 @@ async def apply(state: AppState, gateway: Gateway, action_id: str, *, recovering
         log.exception("executor crashed on %s", action_id)
         await _finish(state, action_id, "failed", {"error": f"executor error: {type(exc).__name__}"}, None)
         return "failed"
+    finally:
+        oauth.ACTING_USER.reset(acting)
     await _finish(state, action_id, "applied", applied.result, applied.invocation.identity)
     return "applied"
 
