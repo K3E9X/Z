@@ -1,4 +1,4 @@
-"""`z admin`: users, teams, roles, group mapping, sessions, tokens, audit (docs/12 §3).
+"""`z admin`: users, teams, roles, group mapping, sessions, tokens, audit, the inferX key (docs/12 §3).
 
 Every admin write needs a fresh step-up on the server and is audited with before/after values. The CLI
 shows what will change before it asks.
@@ -7,6 +7,8 @@ shows what will change before it asks.
 from __future__ import annotations
 
 import json
+import re
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -33,6 +35,10 @@ groups_app = typer.Typer(help="GitLab group → role and team mapping (with dry 
 sessions_app = typer.Typer(help="Active web sessions and CLI tokens of everyone.", no_args_is_help=True)
 tokens_app = typer.Typer(help="Personal API tokens of everyone.", no_args_is_help=True)
 audit_app = typer.Typer(help="Audit search and chain verification.", no_args_is_help=True)
+inference_key_app = typer.Typer(
+    help="The inferX key the model gateway uses: status, set (read hidden, never an argument), check.",
+    no_args_is_help=True,
+)
 app.add_typer(users_app, name="users")
 app.add_typer(teams_app, name="teams")
 app.add_typer(roles_app, name="roles")
@@ -41,6 +47,7 @@ app.add_typer(groups_app, name="mapping", help="Alias of `z admin groups`.", hid
 app.add_typer(sessions_app, name="sessions")
 app.add_typer(tokens_app, name="tokens")
 app.add_typer(audit_app, name="audit")
+app.add_typer(inference_key_app, name="inference-key")
 
 
 def _api() -> Api:
@@ -694,3 +701,55 @@ def admin_audit_search(
 def admin_audit_verify(as_json: JsonOpt = False) -> int:
     """Verify the hash chain and the signed checkpoints."""
     return audit_cmds.verify(as_json)
+
+
+INFERX_KEY = re.compile(r"^ixk_[0-9a-fA-F]{64}$")
+
+
+def _key_summary(c: dict[str, Any]) -> str:
+    where = {
+        "ui": f"set from Z by {c.get('updated_by') or '?'} ({when(c['updated_at']) if c.get('updated_at') else '?'})",
+        "env": "from the deployment (INFERENCE_API_KEY)",
+        "none": "no key: the models cannot be called",
+        "unknown": "the model gateway does not answer",
+    }[str(c["source"])]
+    lines = [f"inferX key: {where}"]
+    if c.get("fingerprint"):
+        lines.append(f"fingerprint {c['fingerprint']}")
+    check = c.get("check")
+    if check:
+        lines.append(f"last check: {'ok' if check['ok'] else 'failed'} ({check['model']}) {check['detail']}")
+    return "\n".join(lines)
+
+
+def _key_out(result: dict[str, Any], as_json: bool) -> int:
+    if as_json:
+        output.print_json(result)
+    else:
+        output.out().print(_key_summary(result))
+    check = result.get("check") or {}
+    return 0 if check.get("ok", True) else 1
+
+
+@command(inference_key_app, "status")
+def inference_key_status(as_json: JsonOpt = False) -> int:
+    """Where the key comes from, its fingerprint and the last check (never the key)."""
+    return _key_out(_api().get("/inference/credential"), as_json)
+
+
+@command(inference_key_app, "set")
+def inference_key_set(
+    no_check: Annotated[bool, typer.Option("--no-check", help="Do not call a model with the new key.")] = False,
+    as_json: JsonOpt = False,
+) -> int:
+    """Set or replace the key: typed hidden, or read from stdin (`... | z admin inference-key set`)."""
+    key = sys.stdin.readline().strip() if not sys.stdin.isatty() else typer.prompt("inferX key", hide_input=True)
+    if not INFERX_KEY.match(key):
+        raise UsageError("an inferX key is ixk_ followed by 64 hexadecimal characters")
+    return _key_out(_api().put("/inference/credential", {"api_key": key, "test": not no_check}), as_json)
+
+
+@command(inference_key_app, "check")
+def inference_key_check(as_json: JsonOpt = False) -> int:
+    """Call one model through the gateway with the current key."""
+    return _key_out(_api().post("/inference/credential:test"), as_json)

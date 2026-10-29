@@ -183,3 +183,19 @@ def test_config_profiles_and_completions(tmp_path: Path) -> None:
         assert script.exit_code == 0 and "_Z_COMPLETE" in script.output
     assert "_ZCTL_COMPLETE" in cli("completions", "bash", "--prog", "zctl", env=env).output
     assert cli("--version", env=env).output.startswith("z 0.")
+
+
+def test_admin_inference_key_reads_the_key_hidden_never_as_an_argument(z: Z, live: LiveServer) -> None:
+    alice = z.as_user("alice")
+    key = "ixk_" + "0123456789abcdef" * 4
+    status = alice("admin", "inference-key", "status")
+    assert status.exit_code == 0 and "no key" in plain(status.output)
+    refused = alice("admin", "inference-key", "set", input="sk-not-inferx\n")
+    assert refused.exit_code == 2 and "ixk_" in plain(refused.output)
+    live.fresh_step_up("alice")
+    saved = alice("admin", "inference-key", "set", "--json", input=key + "\n")
+    assert saved.exit_code == 0, saved.output
+    out = json.loads(saved.output)
+    assert out["source"] == "ui" and len(out["fingerprint"]) == 12 and key not in saved.output
+    shown = plain(alice("admin", "inference-key", "status").output)
+    assert out["fingerprint"] in shown and key not in shown
