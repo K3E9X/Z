@@ -54,7 +54,8 @@ export function emitApiError(e: ApiError): void {
 
 export function makeClient(fetchImpl?: (input: Request) => Promise<Response>) {
   const c = createClient<paths>({
-    baseUrl: API_BASE,
+    // Absolute same-origin URL: Request() needs one outside a browser document (tests).
+    baseUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}`,
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
     // Resolve fetch at call time (test interceptors patch globalThis.fetch after import).
@@ -103,7 +104,7 @@ export async function rawFetch(path: string, init: RequestInit = {}): Promise<Re
   }
   let res: Response
   try {
-    res = await fetch(API_BASE + path, { ...init, method, headers, credentials: 'same-origin' })
+    res = await fetch(`${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}${path}`, { ...init, method, headers, credentials: 'same-origin' })
   } catch (e) {
     const err = new ApiError(0, {
       type: 'urn:z:problem:unavailable',

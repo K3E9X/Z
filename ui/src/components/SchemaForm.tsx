@@ -3,7 +3,7 @@
  * multi-line when maxLength > 200), numbers, integers, booleans, string arrays, nested objects.
  * Defaults pre-fill, `required` and bounds are validated before submit; the server validates again.
  */
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { Checkbox, Input, Select, Textarea } from './ui'
 
 export interface JsonSchema {
@@ -171,22 +171,7 @@ function FieldFor({
       />
     )
   } else if (t === 'array') {
-    const arr = Array.isArray(value) ? (value as unknown[]).map(str) : []
-    control = (
-      <Input
-        {...common}
-        value={arr.join(', ')}
-        placeholder="Comma-separated"
-        onChange={(e) => {
-          const items = e.target.value
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-          const it = schema.items ? typeOf(schema.items) : 'string'
-          onChange(it === 'number' || it === 'integer' ? items.map(Number) : items)
-        }}
-      />
-    )
+    control = <ArrayInput common={common} value={value} itemType={schema.items ? typeOf(schema.items) : 'string'} onChange={onChange} />
   } else if ((schema.maxLength ?? 0) > 200) {
     control = (
       <Textarea
@@ -229,6 +214,36 @@ function FieldFor({
         </span>
       )}
     </div>
+  )
+}
+
+/** Comma-separated list: keeps the raw text while typing so separators are not swallowed. */
+function ArrayInput({
+  common,
+  value,
+  itemType,
+  onChange,
+}: {
+  common: Record<string, unknown>
+  value: unknown
+  itemType: string
+  onChange: (v: unknown) => void
+}) {
+  const [text, setText] = useState(() => (Array.isArray(value) ? (value as unknown[]).map(str).join(', ') : ''))
+  return (
+    <Input
+      {...common}
+      value={text}
+      placeholder="Comma-separated"
+      onChange={(e) => {
+        setText(e.target.value)
+        const items = e.target.value
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean)
+        onChange(itemType === 'number' || itemType === 'integer' ? items.map(Number) : items)
+      }}
+    />
   )
 }
 
