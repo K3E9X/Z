@@ -21,7 +21,7 @@ from z_common.models.enums import DataClass, JobStatus, JudgeVerdict, OperationC
 from z_common.models.manifests import AgentProfile
 from z_common.redaction import Redactor
 
-from z_server import artifacts, audit, events, judge
+from z_server import artifacts, audit, events, judge, judge_model
 from z_server.crypto import token_hash
 from z_server.db.models import Connector, Job, Mission, Operation
 from z_server.gateway import adf, mcp_client
@@ -285,7 +285,9 @@ class Gateway:
                 if text and text != "null"
                 else f"{op.id} failed ({inv.error})."
             )
-        verdict = judge.scan(text)
+        verdict = await judge_model.review(
+            self.state, text, judge.scan(text), owner=(mission.created_by, mission.team_id or "")
+        )
         return await self._finish(job, mission, connector, op, inv, args, text, body, verdict)
 
     async def _finish(

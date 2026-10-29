@@ -600,7 +600,7 @@ GUARDRAIL_TEXT = {
     "human_approval_for_writes": "Every external write needs a human approval",
     "two_approvers_for_destructive": "Destructive actions need two distinct approvers",
     "sandbox_network": "Runners have no network except Z and the package mirrors",
-    "judge_injection_scan": "The judge scans tool results and staged inputs for injection",
+    "judge_injection_scan": "The judge model double-checks tool results and staged inputs (the pattern scan always runs)",
     "learning_requires_approval": "Learning proposals are applied only by a human",
     "max_steps_per_job": "Hard step limit per job",
     "max_job_minutes": "Hard wall time per job",
