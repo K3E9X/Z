@@ -49,6 +49,15 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   date comparisons. Fixed: plans with forward or circular dependencies hung forever; Review showed every
   suggestion to everyone; test Postgres containers leaked their volumes (7 GB, disk full).
 
+- B6 (night run, cont.): judge model stage (raise-only, fenced input, guardrail controls it; ADR 0013),
+  pre-action checks in Review (injection, data class, fields, duplicates; a blocked payload cannot be
+  approved), routing policy API with versioned rules used by intake, learning signals derived from events,
+  eval runs as real missions (writes captured, questions auto-answered, checks + rubric grading), learner
+  proposals with before/after eval gates, apply/reject/try, learning worker (ADR 0014). Contract: config
+  `judge`, `inference.planner_model`, `learning.run_as|min_signals`. Migration 0002 (eval missions,
+  candidates). Lesson: editing config/z.example.yaml during a test run broke 77 tests (the schema had no
+  `judge` key) - change the contract first, never edit config while the suite runs.
+
 Lessons / traps:
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
   `uv sync --all-packages`.

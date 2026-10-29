@@ -13,7 +13,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper done; personal OAuth, channels, browser pending) |
 | CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | doing (sub-agent) |
-| Judge, routing policy (key allowlists), evals, memory | B6 | doing (deterministic judge stage, key allowlists per class and raise on C2+ done; z-judge model stage, evals, memory approval pending) |
+| Judge, routing policy (key allowlists), evals, memory | B6 | doing (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates and apply/try done; shadow replay, agent builder and memory retrieval in job specs pending) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
 | Inference monitor (inferX health on the Inference screen) | B1 | done (API: LiteLLM health, model info, Prometheus/DCGM queries; web pending) |
 | Named agents (rename, handle, avatar, duplicate) | B1, B5 | doing (API done; web pending) |
@@ -28,7 +28,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 ## v1.1 — complete (BUILD P1)
 | Item | Status |
 |---|---|
-| Learning loop: signals, proposals, shadow replay, apply/rollback | todo |
+| Learning loop: signals, proposals, shadow replay, apply/rollback | doing (all but shadow replay; see ADR 0014) |
 | Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | todo |
 | `z top`, sessions, `z mcp serve`, themes | doing (`z top`, sessions and themes done; `z mcp serve` pending) |
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | todo |
