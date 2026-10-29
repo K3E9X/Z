@@ -1,5 +1,5 @@
 name: bulk-dependency-upgrade
-version: 2.1.0
+version: 2.1.1
 domain: code
 description: Upgrade a dependency across a group of repositories, run the tests, review, and prepare one merge request each.
 inputs:
@@ -23,7 +23,8 @@ steps:
     agent: reviewer
     depends_on: [upgrade]
     fanout: { over: steps.upgrade.outputs, concurrency: 6 }
-    prompt: Apply security-review to the patch for {{ item.repo }}.
+    workspace: files   # stages the upgrade patches (steps/upgrade/) so the reviewer can read them
+    prompt: Apply security-review to the patch for {{ item.repo }} (artifact {{ item.patch_artifact }}, staged under steps/upgrade/).
     output: { schema: schemas/review-result.json }
   - id: propose
     agent: dev-engineer
