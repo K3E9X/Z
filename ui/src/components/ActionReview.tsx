@@ -302,7 +302,13 @@ export function ActionReview({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+      {/* Focusable so the keyboard scrolls it (Review's arrow keys leave a focused pane alone). */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Write details"
+        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto focus:outline-none"
+      >
         <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
           <div className="text-meta text-text-3">
             Mission “{mission?.title ?? action.mission_id}” ·{' '}

@@ -13,7 +13,7 @@ import { Button, Checkbox, Kbd, Skeleton, Tabs } from '@/components/ui'
 import { JsonView } from '@/components/previews'
 import { useCan } from '@/lib/auth'
 import { compactNumber, relative, shortAge } from '@/lib/format'
-import { MOD, useHotkeys } from '@/lib/hotkeys'
+import { MOD, ownsNavigationKeys, useHotkeys } from '@/lib/hotkeys'
 import { playbookTitle } from '@/lib/mission'
 import { useIsMobile } from '@/lib/useMedia'
 
@@ -44,6 +44,7 @@ function ListRow({
     <li className="relative">
       <button
         type="button"
+        data-review-row
         onClick={onSelect}
         aria-current={selected ? 'true' : undefined}
         className={`flex w-full flex-col gap-0.5 rounded-panel px-3 py-2.5 pr-10 text-left ${selected ? 'bg-raised' : 'hover:bg-panel'}`}
@@ -74,7 +75,12 @@ function QuestionDetail({ item, agents }: { item: ReviewItem; agents: AgentIndex
   const q = item.question
   if (!q) return null
   return (
-    <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label="Question"
+      className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto focus:outline-none"
+    >
       <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
         <div className="text-meta text-text-3">
           Mission “{item.mission_title}” ·{' '}
@@ -130,7 +136,12 @@ function SuggestionDetail({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Suggestion"
+        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto focus:outline-none"
+      >
         <div className="flex flex-col gap-1.5 border-b border-line px-8 pt-6 pb-5">
           <div className="text-meta text-text-3">
             Suggested by {agents.label(s.agent)} · {relative(s.created_at)}
@@ -232,10 +243,23 @@ export function Review() {
       replace: true,
     })
   }
-  const move = (d: 1 | -1) => {
+  const move = (d: 1 | -1, focusRow = false) => {
     const idx = items.findIndex((i) => reviewItemId(i) === selectedId)
-    const next = items[Math.max(0, Math.min(items.length - 1, idx + d))]
-    if (next) select(reviewItemId(next))
+    const n = Math.max(0, Math.min(items.length - 1, idx + d))
+    const next = items[n]
+    if (!next) return
+    select(reviewItemId(next))
+    // Moving with the keyboard inside the list keeps focus on the selected row.
+    if (focusRow) document.querySelectorAll<HTMLElement>('[data-review-list] [data-review-row]')[n]?.focus()
+  }
+  // In the list the arrows move between rows; elsewhere they stay with the focused control or
+  // scroll the focused pane (the detail), and only move the selection when nothing claims them.
+  const arrow = (d: 1 | -1) => (e: KeyboardEvent) => {
+    const inList = e.target instanceof Element && !!e.target.closest('[data-review-list]')
+    if (inList && !(e.target instanceof HTMLElement && e.target.hasAttribute('data-review-row'))) return false
+    if (!inList && ownsNavigationKeys(e.target)) return false
+    move(d, inList)
+    return true
   }
   const afterDecision = () => {
     // Optimistic removal already happened; select what is now in the same place.
@@ -244,10 +268,16 @@ export function Review() {
     const next = rest[Math.min(idx, rest.length - 1)]
     select(next ? reviewItemId(next) : null)
   }
-  useHotkeys({ j: () => move(1), k: () => move(-1), arrowdown: () => move(1), arrowup: () => move(-1) })
+  useHotkeys({
+    j: () => move(1),
+    k: () => move(-1),
+    arrowdown: arrow(1),
+    arrowup: arrow(-1),
+  })
 
   const list = (
     <section
+      data-review-list
       aria-label="Waiting for review"
       className="flex min-h-0 w-full flex-col border-line md:w-[320px] md:flex-none md:border-r"
     >

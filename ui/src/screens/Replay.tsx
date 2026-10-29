@@ -12,7 +12,7 @@ import { EmptyState, QueryState } from '@/components/states'
 import { StatusText } from '@/components/StatusMark'
 import { Button, Select } from '@/components/ui'
 import { clock, clockDuration, compactNumber } from '@/lib/format'
-import { useHotkeys } from '@/lib/hotkeys'
+import { navKey, useHotkeys } from '@/lib/hotkeys'
 import { planSteps } from '@/lib/mission'
 import { missionStatus } from '@/lib/status'
 import { emptyTimeline, reduceEvents } from '@/lib/timeline'
@@ -76,12 +76,13 @@ export function Replay() {
     }
   }, [playing, speed, events.length])
 
+  // Not on a focused button, field or slider, nor inside a pane that scrolls: there the keys keep their meaning.
   useHotkeys({
-    space: () => setPlaying((p) => !p),
-    arrowright: () => setPos(Math.min(events.length - 1, idx + 1)),
-    arrowleft: () => setPos(Math.max(0, idx - 1)),
-    home: () => setPos(0),
-    end: () => setPos(events.length - 1),
+    space: navKey(() => setPlaying((p) => !p)),
+    arrowright: navKey(() => setPos(Math.min(events.length - 1, idx + 1))),
+    arrowleft: navKey(() => setPos(Math.max(0, idx - 1))),
+    home: navKey(() => setPos(0)),
+    end: navKey(() => setPos(events.length - 1)),
   })
 
   const lastOf = <K extends ZEvent['type']>(type: K) => {
@@ -223,7 +224,13 @@ export function Replay() {
                     <h2 className="m-0 text-ui font-medium">Activity</h2>
                     <span className="text-sm text-text-3">{upto.items.length} items so far</span>
                   </div>
-                  <div ref={list} className="scrollbar-thin max-h-[560px] overflow-y-auto">
+                  <div
+                    ref={list}
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Activity at this point"
+                    className="scrollbar-thin max-h-[560px] overflow-y-auto"
+                  >
                     {recent.map((it) => (
                       <TimelineRow key={it.key} item={it} timeline={upto} agents={agents} showAgent />
                     ))}

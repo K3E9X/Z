@@ -20,6 +20,43 @@ export function isTyping(target: EventTarget | null): boolean {
   return false
 }
 
+/** Elements that give arrows, Space, Home and End their own meaning (activate, move a slider, a tab...). */
+const OWN_KEYS =
+  'button, a[href], input, select, textarea, summary, [contenteditable=""], [contenteditable="true"], ' +
+  '[role="button"], [role="slider"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], ' +
+  '[role="menuitem"], [role="option"], [role="listbox"], [role="textbox"]'
+
+function scrolls(el: Element): boolean {
+  const s = getComputedStyle(el)
+  return (
+    (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight) ||
+    (/(auto|scroll)/.test(s.overflowX) && el.scrollWidth > el.clientWidth)
+  )
+}
+
+/**
+ * Whether the focused element keeps arrows, Space, Home and End: a control or a form field, or an element
+ * inside a pane that scrolls (the keys scroll it).
+ */
+export function ownsNavigationKeys(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target.closest(OWN_KEYS)) return true
+  for (let el: Element | null = target; el && el !== document.body; el = el.parentElement) {
+    if (el === document.documentElement) break
+    if (scrolls(el)) return true
+  }
+  return false
+}
+
+/** A screen-level arrow/Space/Home/End binding that leaves the key alone where it already means something. */
+export function navKey(fn: () => void): (e: KeyboardEvent) => boolean {
+  return (e) => {
+    if (ownsNavigationKeys(e.target)) return false
+    fn()
+    return true
+  }
+}
+
 export function eventKey(e: KeyboardEvent): string {
   const mod = e.metaKey || e.ctrlKey
   let k = e.key.toLowerCase()
