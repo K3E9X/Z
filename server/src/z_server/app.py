@@ -41,6 +41,8 @@ from z_server.events import EventHub
 from z_server.gateway.mcp_server import PATH as GATEWAY_PATH
 from z_server.gateway.mcp_server import GatewayEndpoint
 from z_server.llm.litellm import KeyAdmin, LiteLLMKeyAdmin
+from z_server.mcp_endpoint import PATH as MCP_PATH
+from z_server.mcp_endpoint import ZMcpEndpoint
 from z_server.security import SecurityHeaders
 from z_server.settings import Settings
 from z_server.startup import prepare
@@ -77,6 +79,7 @@ def create_app(
     """`workers=True` (z-server all) also runs the scheduler and the identity re-evaluation in this process."""
     settings.check()
     gateway_endpoint = GatewayEndpoint(None)  # type: ignore[arg-type]  # bound to the Gateway in the lifespan
+    z_mcp = ZMcpEndpoint()  # bound to the app and its state in the lifespan
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -97,6 +100,7 @@ def create_app(
 
         state.gateway = Gateway.create(state)
         gateway_endpoint.gateway = state.gateway
+        z_mcp.app, z_mcp.state = app, state
         await state.hub.start()
         if run_startup:
             await prepare(state)
@@ -117,7 +121,7 @@ def create_app(
                 asyncio.create_task(audit.run_forever(state), name="audit"),
             ]
         try:
-            async with gateway_endpoint.run():
+            async with gateway_endpoint.run(), z_mcp.run():
                 yield
         finally:
             for task in tasks:
@@ -140,6 +144,7 @@ def create_app(
     )
     errors.install(app)
     app.router.routes.append(Route(GATEWAY_PATH, endpoint=gateway_endpoint, methods=["GET", "POST", "DELETE"]))
+    app.router.routes.append(Route(MCP_PATH, endpoint=z_mcp, methods=["GET", "POST", "DELETE"]))
     app.add_middleware(SecurityHeaders)
     for router in ROUTERS:
         app.include_router(router)
