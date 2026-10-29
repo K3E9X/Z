@@ -7,6 +7,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
+
 from runner.tests.conftest import Harness
 from runner.tests.fake_internal import GOOD_SUMMARY, FakeJob, finish, tool_call, write_result
 
@@ -85,6 +87,25 @@ def test_loop_detected(harness: Harness) -> None:
     assert run.completion["needs_attention_reason"] == "loop_detected"
     assert run.completion["steps"] == 3
     assert any("Loop detected" in m["text"] for m in run.events("message"))
+
+
+@pytest.mark.parametrize(
+    "calls",
+    [
+        [tool_call("read", {"path": "notes.md"}), tool_call("read", {"path": "notes.md", "offset": 2})],
+        [tool_call("terminal", {"command": "ls"}), tool_call("terminal", {"command": "pwd"})],
+    ],
+)
+def test_alternating_calls_are_a_loop(harness: Harness, calls: list[dict[str, Any]]) -> None:
+    harness.llm.add_rules({"responses": calls * 10})
+    spec = harness.spec(
+        tools={"local": ["read", "terminal"], "builtins": [], "gateway": []},
+        limits={"max_steps": 30, "max_tokens": 10_000_000, "timeout_s": 300},
+    )
+    run = harness.run(spec, no_progress_limit=4)
+    assert run.completion["status"] == "needs_attention"
+    assert run.completion["needs_attention_reason"] == "loop_detected"
+    assert run.completion["steps"] == 6  # two new calls, then four steps that only repeat them
 
 
 def test_token_budget_exceeded(harness: Harness) -> None:

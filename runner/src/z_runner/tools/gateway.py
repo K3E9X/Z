@@ -108,7 +108,6 @@ class GatewayOperationTool(ZTool):
                 summary="gateway error",
             )
         text = ctx.redactor.text(result_text(result))
-        ctx.progress.append(f"gateway:{self.operation_id}")
         summary = text.strip().splitlines()[0][:300] if text.strip() else "(empty result)"
         judge, artifact = verdict(result)
         # docs/04 §6.1: flagged content is labelled as untrusted and the agent is told.

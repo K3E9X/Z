@@ -64,6 +64,7 @@ class ToolContext:
     control: ControlHub
     artifacts: ArtifactStore
     staged: StagedInputs
+    # what changed this step (edits, documents, proposals, answers, sub-agents); a call that only reads is not progress
     progress: list[str] = field(default_factory=list)
 
     def remaining_s(self) -> float:

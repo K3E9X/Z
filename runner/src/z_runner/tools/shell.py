@@ -186,7 +186,6 @@ class TerminalTool(ZTool):
             payload["output_ref"] = output_ref
         ctx.sink.emit("terminal", payload)
         status = "timed out" if outcome.timed_out else f"exit code {outcome.exit_code}"
-        ctx.progress.append(f"terminal:{status}")
         text = f"[{status}]\n{clip(output)}"
         return ToolResult(
             text=text,
@@ -239,5 +238,4 @@ class CodeTool(ZTool):
             Path(script).unlink(missing_ok=True)
         output = ctx.redactor.text(outcome.output)
         status = "timed out" if outcome.timed_out else f"exit code {outcome.exit_code}"
-        ctx.progress.append(f"code:{status}")
         return ToolResult(text=f"[{status}]\n{clip(output)}", ok=outcome.exit_code == 0, summary=f"python: {status}")

@@ -25,7 +25,7 @@ class StepResult:
     tool_failures: int = 0
     tool_successes: int = 0
     validation_errors: int = 0
-    progress: bool = False
+    progress: bool = False  # new output (an agent message); repeated successful calls are not progress
     error: str | None = None
     # "llm_unavailable" (transient: rate limit, timeout, unavailable), "llm_budget" (the virtual key budget is
     # spent), "llm_auth", "context_window" or "agent"

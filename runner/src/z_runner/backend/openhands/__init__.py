@@ -226,7 +226,8 @@ class OpenHandsBackend:
             tool_failures=stats.failures,
             tool_successes=stats.successes,
             validation_errors=stats.validation_errors,
-            progress=bool(stats.agent_messages or stats.successes),
+            # a successful call is not progress by itself: new calls count in the LoopDetector, edits in ctx.progress
+            progress=bool(stats.agent_messages),
         )
         if error or stats.error:
             result.status = "error"
