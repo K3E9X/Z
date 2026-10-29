@@ -1,0 +1,107 @@
+# Helm chart checks (docs/13 §1 "chart"): lint, render and schema-validate deploy/helm/z for k3s and
+# Kubernetes. Actions pinned by commit SHA; tools pinned by version and verified before use:
+# - kubeconform: release archive checked against its sha256 (from the release CHECKSUMS file);
+# - helm: built from the helm.sh/helm/v3 module, whose content Go verifies against the sum.golang.org
+#   transparency log, and whose module hash is pinned below. The Go toolchain itself is fetched the same
+#   way (GOTOOLCHAIN), so the runner's Go only bootstraps it.
+# kube-score and kubescape (docs/13) are added with ci/scripts/install-scanners.sh.
+name: helm
+on:
+  pull_request:
+    paths: ["deploy/helm/**", ".github/workflows/helm.yml"]
+  push:
+    branches: [main]
+    paths: ["deploy/helm/**", ".github/workflows/helm.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: helm-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HELM_VERSION: v3.22.1
+  HELM_MODULE_SUM: "h1:uo2SouzAxMkKZTNzZ1lLP/c/Bu7xfUJKYDaYMxMHvk8="
+  HELM_GIT_COMMIT: d6c1a0e4027caa6abc7892e7ea9f0cda7447baa3
+  HELM_K8S_MINOR: "37"     # client-go v0.37.x in helm v3.22.1 (same ldflags as helm's Makefile)
+  GO_TOOLCHAIN: go1.26.10
+  KUBECONFORM_VERSION: v0.8.0
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+  CRDS_CATALOG: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install helm (verified Go module) and kubeconform (verified archive)
+        env:
+          GOTOOLCHAIN: ${{ env.GO_TOOLCHAIN }}
+          GOSUMDB: sum.golang.org
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"; mkdir -p "$bin"
+          sum=$(go mod download -json "helm.sh/helm/v3@${HELM_VERSION}" | jq -r .Sum)
+          test "$sum" = "$HELM_MODULE_SUM" || { echo "helm module hash mismatch: $sum"; exit 1; }
+          ldf="-s -w -X helm.sh/helm/v3/internal/version.version=${HELM_VERSION}"
+          ldf="$ldf -X helm.sh/helm/v3/internal/version.gitCommit=${HELM_GIT_COMMIT} -X helm.sh/helm/v3/internal/version.gitTreeState=clean"
+          for p in pkg/lint/rules pkg/chartutil; do
+            ldf="$ldf -X helm.sh/helm/v3/$p.k8sVersionMajor=1 -X helm.sh/helm/v3/$p.k8sVersionMinor=${HELM_K8S_MINOR}"
+          done
+          GOBIN="$bin" go install -trimpath -ldflags "$ldf" "helm.sh/helm/v3/cmd/helm@${HELM_VERSION}"
+          curl -fsSL -o "$RUNNER_TEMP/kubeconform.tar.gz" \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$bin" kubeconform
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Versions
+        run: helm version --short && kubeconform -v
+      - name: Lint
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml"
+          done
+      - name: Render and validate (kubeconform -strict)
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            echo "::group::$v"
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "rendered-$v.yaml"
+            kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
+            echo "::endgroup::"
+          done
+      - name: Render with Prometheus Operator present (ServiceMonitor) and optional resources
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" \
+              --api-versions monitoring.coreos.com/v1 --set metrics.serviceMonitor.enabled=true \
+              > "rendered-$v-monitoring.yaml"
+            grep -q '^kind: ServiceMonitor' "rendered-$v-monitoring.yaml"
+            kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" \
+              "rendered-$v-monitoring.yaml"
+          done
+          helm template z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml \
+            --set httpRoute.enabled=true --set 'httpRoute.parentRefs[0].name=gateway' \
+            --set secrets.externalSecret.enabled=true --set secrets.externalSecret.secretStoreRef.name=store \
+            --set 'secrets.externalSecret.dataFrom[0].extract.key=z/platform' \
+            --set runners.runtimeClass.create=true --set runners.runtimeClassName=gvisor \
+            > rendered-optional.yaml
+          kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" rendered-optional.yaml
+      - name: Refused combinations fail the render
+        run: |
+          set -uo pipefail
+          refuse() { if helm template z deploy/helm/z -n z "$@" >/dev/null 2>&1; then echo "accepted: $*"; exit 1; fi; }
+          refuse -f deploy/helm/z/values-k3s.yaml --set containerSecurityContext.readOnlyRootFilesystem=false
+          refuse -f deploy/helm/z/values-k3s.yaml --set runners.podSecurity.level=baseline
+          refuse -f deploy/helm/z/values-k3s.yaml --set runners.image.tag=latest
+          refuse -f deploy/helm/z/values-k3s.yaml --set server.replicas=2
+          refuse -f deploy/helm/z/values-k8s.yaml --set database.existingSecret=
+          echo "all refused"
