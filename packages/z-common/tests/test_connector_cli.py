@@ -73,3 +73,12 @@ def test_an_optional_value_after_a_flag_must_be_attached() -> None:
     assert any("optional argument o follows the flag --output" in p for p in swallowing)
     assert problems(["tool", "--output={{args.o}}", "--dry-run"], []) == []
     assert problems(["tool", "--output", "{{args.o}}"], ["o"]) == []
+
+
+def test_credentials_are_never_literals_in_env() -> None:
+    def problems(env: dict[str, str]) -> list[str]:
+        return connector_problems({"kind": "cli", "cli": {"image": IMAGE, "env": env}, "declared": []})
+
+    assert problems({"KUBE_TOKEN": "{{auth.secret}}", "MODE": "read-only", "AUTH": "Bearer {{auth.secret}}"}) == []
+    assert any("looks like a credential" in p for p in problems({"VAULT_TOKEN": "hvs-literal-value"}))
+    assert any("looks like a credential" in p for p in problems({"GL": "glpat-" + "a" * 20}))

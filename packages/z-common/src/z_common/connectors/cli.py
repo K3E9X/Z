@@ -13,11 +13,14 @@ import math
 import re
 from typing import Any
 
+from z_common.redaction import Redactor
+
 ARG = re.compile(r"\{\{\s*args\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 AUTH = re.compile(r"\{\{\s*auth\.(secret|username|password)\s*\}\}")
 ANY_PLACEHOLDER = re.compile(r"\{\{[^}]*\}\}")
 ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
 DIGEST = re.compile(r"^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$")
+SECRET_NAME = re.compile(r"(?i)(token|secret|passw(or)?d|api_?key|credential|private_?key)")
 MAX_ARG_CHARS = 4096
 MAX_ARGV = 64
 
@@ -88,6 +91,12 @@ def connector_problems(manifest: dict[str, Any]) -> list[str]:
         leftovers = ANY_PLACEHOLDER.findall(AUTH.sub("", str(value)))
         if leftovers:
             problems.append(f"cli.env {name}: only {{{{auth.secret|username|password}}}} placeholders are allowed")
+        literal = AUTH.sub("", str(value))
+        if literal and (SECRET_NAME.search(str(name)) or Redactor().text(literal) != literal):
+            problems.append(
+                f"cli.env {name}: looks like a credential written in the manifest; use {{{{auth.secret}}}} and a "
+                "secret reference in auth"
+            )
     for op in manifest.get("declared") or []:
         op_id, command = op.get("id"), op.get("command")
         if not isinstance(command, list) or not command or not all(isinstance(c, str) for c in command):
