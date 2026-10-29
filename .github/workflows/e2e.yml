@@ -1,7 +1,7 @@
 # End-to-end (docs/13 §1 "e2e"): the compose stack with the fake LLM, fake tools and fake GitLab OIDC
 # (tests/e2e/compose.fakes.yml + compose.e2e.yml), images built locally, then `pytest -m e2e tests/e2e`.
 # Runs on PRs that touch the server, runner, deploy or e2e code, and on main. No secrets: the stack's
-# passwords are random per run. Job `kind` installs the Helm chart on a kind cluster. ZAP baseline comes later.
+# passwords are random per run. Job `kind` installs the Helm chart on a kind cluster; the compose job ends with a ZAP baseline scan.
 name: e2e
 on:
   pull_request:
@@ -16,6 +16,7 @@ on:
       - "tests/fakes/**"
       - "ui/**"
       - "ci/kind/**"
+      - "security/zap-baseline.conf"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/e2e.yml"
@@ -62,6 +63,22 @@ jobs:
             docker compose --env-file ../../.env $COMPOSE_FILES up -d --build --wait --wait-timeout 600
       - name: pytest -m e2e
         run: uv run pytest -m e2e tests/e2e -v
+      - name: ZAP baseline (passive scan of the web app; security headers and cookie flags fail the job)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zap" && chmod 777 "$RUNNER_TEMP/zap"
+          cp security/zap-baseline.conf "$RUNNER_TEMP/zap/"
+          # ZAP 2.17.0 (the `stable` tag), pinned by index digest
+          docker run --rm --network host -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238 \
+            zap-baseline.py -t http://127.0.0.1:8080/ -c zap-baseline.conf -I -m 2 -r zap-report.html -J zap-report.json
+      - name: ZAP report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-baseline
+          path: ${{ runner.temp }}/zap/zap-report.*
+          if-no-files-found: ignore
       - name: Compose logs
         if: failure()
         working-directory: deploy/compose
