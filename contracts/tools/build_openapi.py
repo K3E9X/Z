@@ -1177,6 +1177,38 @@ schemas = {
         ["alias", "provider", "kind", "status", "listed"],
     ),
     "InferenceNode": obj({"name": S, "gpu_util": nul(N), "gpu_mem_used_ratio": nul(N), "gpu_temp_c": nul(N)}, ["name"]),
+    "InferenceCredential": obj(
+        {
+            "source": {
+                "type": "string",
+                "enum": ["ui", "env", "none", "unknown"],
+                "description": "ui: set from Z; env: the deployment's INFERENCE_API_KEY; none: no key; unknown: LiteLLM unreachable.",
+            },
+            "fingerprint": nul({**S, "description": "First 12 hex of the key's SHA-256 (never the key)."}),
+            "updated_at": nul(TS),
+            "updated_by": nul(S),
+            "check": nul(
+                obj(
+                    {"ok": B, "model": S, "detail": S, "checked_at": TS},
+                    ["ok", "model", "detail", "checked_at"],
+                )
+            ),
+        },
+        ["source"],
+        desc="The inferX project key Z's LiteLLM gateway uses (ADR 0027). The key itself is never returned.",
+    ),
+    "InferenceCredentialWrite": obj(
+        {
+            "api_key": {
+                "type": "string",
+                "pattern": "^ixk_[0-9a-fA-F]{64}$",
+                "writeOnly": True,
+                "description": "An inferX key (ixk_ + 64 hex). Stored encrypted by LiteLLM; Z keeps its fingerprint.",
+            },
+            "test": {**B, "description": "Check the key with one model after saving (default true)."},
+        },
+        ["api_key"],
+    ),
     "InferenceHealth": obj(
         {
             "status": {"type": "string", "enum": ["healthy", "degraded", "down", "unknown"]},
@@ -3017,6 +3049,39 @@ for p in ("/channels/slack/events", "/channels/mattermost/hook"):
         "content": {"application/json": {"schema": ref("ChannelReply")}},
     }
 # ---- inference & usage
+op(
+    "get",
+    "/inference/credential",
+    "getInferenceCredential",
+    "providers:manage",
+    "B1",
+    "Status of the inferX key the gateway uses",
+    "inference",
+    resp=ref("InferenceCredential"),
+)
+op(
+    "put",
+    "/inference/credential",
+    "putInferenceCredential",
+    "providers:manage",
+    "B1",
+    "Set or replace the inferX key",
+    "inference",
+    req=ref("InferenceCredentialWrite"),
+    resp=ref("InferenceCredential"),
+    step_up=True,
+    desc="The key goes to the LiteLLM gateway only (encrypted there); it is never returned, logged or audited.",
+)
+op(
+    "post",
+    "/inference/credential:test",
+    "testInferenceCredential",
+    "providers:manage",
+    "B1",
+    "Check the inferX key with one model",
+    "inference",
+    resp=ref("InferenceCredential"),
+)
 op(
     "get",
     "/inference/health",

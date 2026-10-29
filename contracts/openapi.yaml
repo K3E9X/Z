@@ -3526,6 +3526,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
       security: []
+  /inference/credential:
+    get:
+      operationId: getInferenceCredential
+      tags:
+      - inference
+      summary: Status of the inferX key the gateway uses
+      x-permission: providers:manage
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceCredential'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      operationId: putInferenceCredential
+      tags:
+      - inference
+      summary: Set or replace the inferX key
+      x-permission: providers:manage
+      x-owner: B1
+      x-audit: true
+      x-step-up: true
+      description: The key goes to the LiteLLM gateway only (encrypted there); it is never returned, logged or audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceCredentialWrite'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceCredential'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /inference/credential:test:
+    post:
+      operationId: testInferenceCredential
+      tags:
+      - inference
+      summary: Check the inferX key with one model
+      x-permission: providers:manage
+      x-owner: B1
+      x-audit: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceCredential'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /inference/health:
     get:
       operationId: inferenceHealth
@@ -8569,6 +8641,63 @@ components:
           - type: 'null'
       required:
       - name
+      additionalProperties: false
+    InferenceCredential:
+      type: object
+      properties:
+        source:
+          type: string
+          enum:
+          - ui
+          - env
+          - none
+          - unknown
+          description: 'ui: set from Z; env: the deployment''s INFERENCE_API_KEY; none: no key; unknown: LiteLLM unreachable.'
+        fingerprint:
+          oneOf:
+          - type: string
+            description: First 12 hex of the key's SHA-256 (never the key).
+          - type: 'null'
+        updated_at:
+          oneOf:
+          - *id005
+          - type: 'null'
+        updated_by:
+          oneOf:
+          - *id001
+          - type: 'null'
+        check:
+          oneOf:
+          - type: object
+            properties:
+              ok: *id007
+              model: *id001
+              detail: *id001
+              checked_at: *id005
+            required:
+            - ok
+            - model
+            - detail
+            - checked_at
+            additionalProperties: false
+          - type: 'null'
+      required:
+      - source
+      additionalProperties: false
+      description: The inferX project key Z's LiteLLM gateway uses (ADR 0027). The key itself is never returned.
+    InferenceCredentialWrite:
+      type: object
+      properties:
+        api_key:
+          type: string
+          pattern: ^ixk_[0-9a-fA-F]{64}$
+          writeOnly: true
+          description: An inferX key (ixk_ + 64 hex). Stored encrypted by LiteLLM; Z keeps its fingerprint.
+        test:
+          type: boolean
+          description: Check the key with one model after saving (default true).
+      required:
+      - api_key
       additionalProperties: false
     InferenceHealth:
       type: object

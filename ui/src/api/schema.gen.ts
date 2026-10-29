@@ -1614,6 +1614,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inference/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status of the inferX key the gateway uses */
+        get: operations["getInferenceCredential"];
+        /**
+         * Set or replace the inferX key
+         * @description The key goes to the LiteLLM gateway only (encrypted there); it is never returned, logged or audited.
+         */
+        put: operations["putInferenceCredential"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inference/credential:test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the inferX key with one model */
+        post: operations["testInferenceCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inference/health": {
         parameters: {
             query?: never;
@@ -3648,6 +3686,29 @@ export interface components {
             gpu_util?: number | null;
             gpu_mem_used_ratio?: number | null;
             gpu_temp_c?: number | null;
+        };
+        /** @description The inferX project key Z's LiteLLM gateway uses (ADR 0027). The key itself is never returned. */
+        InferenceCredential: {
+            /**
+             * @description ui: set from Z; env: the deployment's INFERENCE_API_KEY; none: no key; unknown: LiteLLM unreachable.
+             * @enum {string}
+             */
+            source: "ui" | "env" | "none" | "unknown";
+            fingerprint?: string | null;
+            updated_at?: components["schemas"]["Timestamp"] | null;
+            updated_by?: string | null;
+            check?: {
+                ok: boolean;
+                model: string;
+                detail: string;
+                checked_at: components["schemas"]["Timestamp"];
+            } | null;
+        };
+        InferenceCredentialWrite: {
+            /** @description An inferX key (ixk_ + 64 hex). Stored encrypted by LiteLLM; Z keeps its fingerprint. */
+            api_key: string;
+            /** @description Check the key with one model after saving (default true). */
+            test?: boolean;
         };
         InferenceHealth: {
             /** @enum {string} */
@@ -8852,6 +8913,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookAccepted"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getInferenceCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InferenceCredential"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    putInferenceCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InferenceCredentialWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InferenceCredential"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    testInferenceCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InferenceCredential"];
                 };
             };
             /** @description Problem details */
