@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi.responses import Response
 from sqlalchemy import func, select
-from z_common.connectors import browser
+from z_common.connectors import browser, queries
 from z_common.contracts import validator as contract_validator
 from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
@@ -247,7 +247,7 @@ async def _validated_manifest(ctx: Ctx, manifest: dict[str, Any]) -> dict[str, A
         f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: does not match the connector schema ({e.validator})"
         for e in contract_validator("connector.schema.json").iter_errors(manifest)
     ]
-    problems += browser.connector_problems(manifest)
+    problems += browser.connector_problems(manifest) + queries.connector_problems(manifest)
     if problems:
         raise Problem("validation", "; ".join(sorted(set(problems))[:5]))
     if manifest.get("base_url") and "${" not in str(manifest["base_url"]):

@@ -31,6 +31,7 @@ from z_server.state import AppState
 
 MAX_SPEC_BYTES = 5 * 1024 * 1024
 BACKENDS = {"env", "file", "vault", "kubernetes"}
+REVIEWED_SOURCES = {"browser": "flow", "graphql": "query", "database": "query"}
 
 
 @dataclass
@@ -72,9 +73,11 @@ async def sync_operations(db: AsyncSession, connector: Connector, specs: list[Op
         if new_class.value != row.op_class and row.exposed:
             row.exposed = False
             report.warnings.append(f"{op_id}: class rose to {new_class.value}; exposure needs a new review")
-        if connector.kind == "browser" and row.source_ref != spec.source_ref and row.exposed:
-            row.exposed = False  # what the flow clicks changed: an admin reviews it again
-            report.warnings.append(f"{op_id}: flow steps changed; exposure needs a new review")
+        if connector.kind in REVIEWED_SOURCES and row.source_ref != spec.source_ref and row.exposed:
+            row.exposed = False  # what the operation does changed (flow steps, query): an admin reviews it again
+            report.warnings.append(
+                f"{op_id}: its {REVIEWED_SOURCES[connector.kind]} changed; exposure needs a new review"
+            )
         if (row.source_ref, row.input_schema, row.op_class) != (spec.source_ref, spec.input_schema, new_class.value):
             report.changed.append(op_id)
         row.source_ref, row.description, row.input_schema = spec.source_ref, spec.description, spec.input_schema

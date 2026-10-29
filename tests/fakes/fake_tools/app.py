@@ -13,7 +13,7 @@ from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .._mcp import McpEndpoint
-from . import botframework, cmdb, confluence, defectdojo, fwconsole, gitlab, jira, logos, m365
+from . import botframework, cmdb, confluence, defectdojo, fwconsole, gitlab, graphql, jira, logos, m365
 from .errors import FakeToolError
 from .seed import default_seed
 from .state import TOOLS, Store, extract_token
@@ -80,6 +80,7 @@ def create_app(seed: dict[str, Any] | None = None, tokens: dict[str, dict[str, s
     app.include_router(m365.router(store))
     app.include_router(botframework.router(store))
     app.include_router(fwconsole.router(store))
+    app.include_router(graphql.router(store))
     app.include_router(jira.router(store, jira_api))
     app.include_router(jira.router_v3(store, jira_api))
     app.include_router(confluence.router(store, conf_api))

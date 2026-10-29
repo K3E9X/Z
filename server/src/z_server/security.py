@@ -91,8 +91,8 @@ async def check_outbound_url(url: str, state: AppState | None = None) -> None:
     """Refuse URLs that resolve to loopback, link-local, metadata or cluster-internal ranges unless the host
     is in Z_OUTBOUND_ALLOW (comma-separated host names or CIDRs)."""
     parsed = urlparse(url)
-    if parsed.scheme not in {"https", "http", "tls"} or not parsed.hostname:
-        raise Problem("validation", "URL must be http(s) with a host")
+    if parsed.scheme not in {"https", "http", "tls", "postgresql", "postgres"} or not parsed.hostname:
+        raise Problem("validation", "URL must be http(s) (or postgresql:// for a database connector) with a host")
     allow = [a.strip() for a in os.environ.get("Z_OUTBOUND_ALLOW", "").split(",") if a.strip()]
     host = parsed.hostname
     if host in allow:
