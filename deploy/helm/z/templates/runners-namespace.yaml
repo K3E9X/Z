@@ -1,0 +1,68 @@
+{{- $r := .Values.runners }}
+{{- if $r.createNamespace }}
+# Agent jobs run here, one batch/v1 Job per job, started by z-server (docs/07 §3).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
+    pod-security.kubernetes.io/enforce: {{ $r.podSecurity.level }}
+    pod-security.kubernetes.io/enforce-version: {{ $r.podSecurity.version }}
+    pod-security.kubernetes.io/audit: {{ $r.podSecurity.level }}
+    pod-security.kubernetes.io/audit-version: {{ $r.podSecurity.version }}
+    pod-security.kubernetes.io/warn: {{ $r.podSecurity.level }}
+    pod-security.kubernetes.io/warn-version: {{ $r.podSecurity.version }}
+---
+{{- end }}
+# Runner pods get no Kubernetes API token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $r.serviceAccountName }}
+  namespace: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
+automountServiceAccountToken: false
+{{- if $r.resourceQuota.enabled }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: z-runners
+  namespace: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml $r.resourceQuota.hard | nindent 4 }}
+{{- end }}
+{{- if $r.limitRange.enabled }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: z-runners
+  namespace: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        {{- toYaml $r.limitRange.default | nindent 8 }}
+      defaultRequest:
+        {{- toYaml $r.limitRange.defaultRequest | nindent 8 }}
+      max:
+        {{- toYaml $r.limitRange.max | nindent 8 }}
+{{- end }}
+{{- if $r.runtimeClass.create }}
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: {{ $r.runtimeClass.name }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
+handler: {{ $r.runtimeClass.handler }}
+{{- end }}

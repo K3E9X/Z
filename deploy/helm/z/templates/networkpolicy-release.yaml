@@ -1,0 +1,135 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+{{- $runners := list (dict "namespaceSelector" (dict "matchLabels" (dict "kubernetes.io/metadata.name" .Values.runners.namespace))) }}
+{{- $peer := dict "namespaceSelector" $np.ingressController.namespaceSelector }}
+{{- if $np.ingressController.podSelector }}
+{{- $_ := set $peer "podSelector" $np.ingressController.podSelector }}
+{{- end }}
+{{- $controller := list $peer }}
+# Release namespace: ingress to each Z pod only from the pods that need it. Egress is left open for z-server
+# (GitLab, tools, Kubernetes API) and LiteLLM (inference cluster) unless networkPolicy.litellmEgress is set.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "z.server.fullname" . }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        # runners: internal API (job token) and the tool gateway
+        {{- toYaml $runners | nindent 8 }}
+        {{- if .Values.ui.enabled }}
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "ui") | nindent 14 }}
+        {{- else }}
+        {{- toYaml $controller | nindent 8 }}
+        {{- end }}
+        {{- with $np.metricsFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.server.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "z.litellm.fullname" . }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "litellm") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "litellm") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    {{- if $np.litellmEgress }}
+    - Egress
+    {{- end }}
+  ingress:
+    - from:
+        # runners call models with their mission's virtual key; z-server manages keys with the master key
+        {{- toYaml $runners | nindent 8 }}
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.litellm.port }}
+  {{- if $np.litellmEgress }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.dns.podLabels | nindent 14 }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if .Values.postgres.embedded }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- end }}
+    {{- toYaml $np.litellmEgress | nindent 4 }}
+  {{- end }}
+{{- if .Values.ui.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "z.ui.fullname" . }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "ui") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "ui") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $controller | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ui.port }}
+{{- end }}
+{{- if .Values.postgres.embedded }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "z.postgres.fullname" . }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "postgres") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        # z-server (and its migrate init container), the seed Job, LiteLLM
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              z.io/postgres-client: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress: []   # Postgres initiates no connection
+{{- end }}
+{{- end }}

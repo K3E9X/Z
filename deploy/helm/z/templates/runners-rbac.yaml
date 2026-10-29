@@ -1,0 +1,73 @@
+{{- $r := .Values.runners }}
+# What the Kubernetes executor needs, and nothing more (server/src/z_server/executors/kubernetes.py):
+# runner Jobs, the per-job Secret holding the job token (owned by the Job, patched after creation),
+# and pod status + logs. Scoped to the runner namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "z.server.fullname" . }}-executor
+  namespace: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "z.server.fullname" . }}-executor
+  namespace: {{ $r.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "z.server.fullname" . }}-executor
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "z.server.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- range $i, $ref := .Values.server.secretRefs }}
+---
+# `kubernetes:` secret references of the tool gateway: get on these Secret names only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "z.server.fullname" $ }}-secret-refs-{{ $i }}
+  namespace: {{ $ref.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" $ "component" "server") | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      {{- toYaml $ref.names | nindent 6 }}
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "z.server.fullname" $ }}-secret-refs-{{ $i }}
+  namespace: {{ $ref.namespace }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" $ "component" "server") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "z.server.fullname" $ }}-secret-refs-{{ $i }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "z.server.fullname" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}

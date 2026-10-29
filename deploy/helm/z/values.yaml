@@ -1,0 +1,431 @@
+# Z Helm chart: safe defaults, everything hardened (docs/11 §2, docs/07 §3).
+# Overlays: values-k3s.yaml (team server on k3s) and values-k8s.yaml (vanilla Kubernetes). Put site-specific
+# values (host, OIDC, image digests, model ids) in your own file:  -f values-k3s.yaml -f my-values.yaml
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Z_ENV. `production` refuses dev auth, the process executor, test accounts and runner images without a digest
+# (the server checks this at start and exits with the reason).
+env: production
+
+# Public URL of Z (Z_PUBLIC_URL). Empty: derived from ingress.host (https when ingress.tls.enabled).
+publicUrl: ""
+
+# Sign-in (docs/12). The client secret goes in the Secret (secrets.oidcClientSecret or your existing Secret).
+oidc:
+  issuerUrl: ""            # https://gitlab.example.internal
+  clientId: ""
+authMode: oidc             # Z_AUTH_MODE: oidc | dev (dev is refused when env=production)
+
+imagePullSecrets: []       # [{name: ghcr-pull}]
+
+# Applied to every pod of the chart (pods override with their own runAsUser where the image needs it).
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Applied to every container of the chart (invariant 13). Not configurable per component on purpose.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  runAsNonRoot: true
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+
+# --------------------------------------------------------------------------------------------------- z-server
+server:
+  # `all`: api + scheduler + gateway + executor + learner + monitor in one process. Several replicas are safe
+  # (the job queue, action executor and intake claim rows with FOR UPDATE SKIP LOCKED), but every replica
+  # writes artifacts: with more than one replica, persistence.artifacts needs ReadWriteMany storage.
+  replicas: 1
+  # Running each component in its own Deployment (docs/11 §2) is not implemented by this chart version.
+  # Leave false; true fails the render instead of producing broken Deployments.
+  splitComponents: false
+  image:
+    repository: ghcr.io/k3e9x/z-server
+    tag: ""                # default: v<appVersion>. Never `latest`.
+    digest: ""             # sha256:... wins over the tag. Always deploy by digest in production.
+    pullPolicy: IfNotPresent
+  port: 8000
+  logLevel: INFO           # Z_LOG_LEVEL
+  # Z_TRUSTED_PROXIES: addresses/CIDRs whose X-Forwarded-For is trusted (uvicorn forwarded_allow_ips).
+  # Empty keeps the server default (127.0.0.1). Set it to the z-ui / ingress controller pod CIDR to record
+  # client IPs in the audit log; runners share the pod CIDR, so only do it if that trade-off is acceptable.
+  trustedProxies: ""
+  # Z_CLUSTER_CIDRS: ranges the SSRF guard treats as cluster-internal. Empty keeps the server default
+  # (10.42.0.0/16,10.43.0.0/16,10.96.0.0/12). Set your pod and service CIDRs.
+  clusterCIDRs: ""
+  # Z_OUTBOUND_ALLOW: host names or CIDRs allowed although they resolve to internal ranges (internal tools).
+  outboundAllow: ""
+  secretsBackend: kubernetes   # Z_SECRETS_BACKEND: env | file | vault | kubernetes
+  inferencePrometheusUrl: ""   # INFERENCE_PROMETHEUS_URL (Inference screen)
+  shutdownGraceSeconds: 10     # Z_SHUTDOWN_GRACE_S; terminationGracePeriodSeconds is derived from it
+  # Secrets the gateway may read with `kubernetes:<namespace>/<name>#<key>` references (connector
+  # credentials). Each entry grants `get` on exactly these Secret names. Empty: no Secret read access.
+  secretRefs: []
+  #  - namespace: z
+  #    names: [gitlab-ro, gitlab-rw]
+  resources:
+    requests: { cpu: 250m, memory: 512Mi, ephemeral-storage: 256Mi }
+    limits: { cpu: "2", memory: 2Gi, ephemeral-storage: 1Gi }
+  tmpSizeLimit: 256Mi
+  extraEnv: []             # [{name: GITLAB_URL, value: https://gitlab.example.internal}]
+  extraEnvFrom: []         # [{secretRef: {name: z-connectors}}]  (env: secret references)
+  extraVolumes: []         # Secret volumes for file: secret references
+  extraVolumeMounts: []
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+
+# Database migrations (`z-server migrate`, owner role).
+#   hook:          a Job run as a pre-install,pre-upgrade hook. Needs the database reachable before install,
+#                  so it needs an external Postgres and database.existingSecret.
+#   initContainer: an init container of the z-server pod (single replica only). Used with the embedded
+#                  Postgres, which does not exist yet when pre-install hooks run.
+#   auto:          initContainer with postgres.embedded, hook otherwise.
+migrate:
+  mode: auto
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+# Load packs into the catalog (`z-server seed`, idempotent) as a post-install,post-upgrade hook.
+seed:
+  enabled: true
+  packs: /app/packs        # baked into the z-server image
+  only: []                 # pack names; empty: all
+  # On a first install with the embedded Postgres the seed may start before the migrations ran: retries
+  # with exponential back-off cover that (~10 minutes).
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+
+# --------------------------------------------------------------------------------------------------- runners
+runners:
+  # z-server starts one batch/v1 Job per agent job here (Z_EXECUTOR=kubernetes).
+  namespace: z-runners
+  createNamespace: true
+  serviceAccountName: z-runner   # no token mounted (automountServiceAccountToken: false)
+  image:
+    repository: ghcr.io/k3e9x/z-runner
+    tag: ""
+    digest: ""             # REQUIRED when env=production (the server refuses a runner image without a digest)
+  runtimeClassName: ""     # e.g. gvisor (Z_RUNNER_RUNTIME_CLASS); see README "gVisor"
+  runtimeClass:
+    create: false          # create a cluster-scoped RuntimeClass (needs runsc on every node)
+    name: gvisor
+    handler: runsc
+  jobTTLSeconds: 3600      # Z_RUNNER_JOB_TTL_S: ttlSecondsAfterFinished of runner Jobs
+  podSecurity:
+    level: restricted      # Pod Security Admission enforce/audit/warn on the runner namespace
+    version: latest
+  resourceQuota:
+    enabled: true
+    hard:
+      pods: "40"
+      count/jobs.batch: "80"
+      count/secrets: "100"
+      requests.cpu: "16"
+      requests.memory: 32Gi
+      limits.cpu: "64"
+      limits.memory: 96Gi
+      limits.ephemeral-storage: 160Gi
+  # The executor sets cpu 250m-2, memory 512Mi-2Gi, ephemeral-storage limit 3Gi per runner pod.
+  limitRange:
+    enabled: true
+    default: { cpu: "2", memory: 2Gi, ephemeral-storage: 3Gi }
+    defaultRequest: { cpu: 250m, memory: 512Mi, ephemeral-storage: 512Mi }
+    max: { cpu: "4", memory: 8Gi, ephemeral-storage: 10Gi }
+  networkPolicy:
+    enabled: true
+    # Ports runners may open on pods labelled z.io/runner-reachable=true in the release namespace
+    # (z-server internal API + gateway, LiteLLM, egress proxy once it ships).
+    reachablePorts: [8000, 4000]
+    extraEgress: []        # extra NetworkPolicy egress rules (e.g. the egress proxy in another namespace)
+
+# DNS for the runner egress policy (kube-dns/CoreDNS pods). k3s and most distributions label CoreDNS
+# k8s-app=kube-dns in kube-system.
+dns:
+  namespace: kube-system
+  podLabels:
+    k8s-app: kube-dns
+
+# --------------------------------------------------------------------------------------------------- z-ui
+ui:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/k3e9x/z-ui
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --------------------------------------------------------------------------------------------------- LiteLLM
+litellm:
+  replicas: 1
+  # Official proxy image pinned by digest (same reference as compose). Never 1.82.7 / 1.82.8
+  # (security/blocked-versions.yaml).
+  image:
+    repository: docker.io/litellm/litellm
+    tag: v1.105.0
+    digest: sha256:60947db020b57e204823d3fbc8bb295c85be890d7c9adcc77fb4f5fc2fe410b2
+    pullPolicy: IfNotPresent
+  port: 4000
+  runAsUser: 65534         # the image defaults to root; its Prisma engines are readable by any uid
+  inferenceApiBase: ""     # INFERENCE_API_BASE: https://<inferx-endpoint>/v1 (key: secrets.inferenceApiKey)
+  extraEnv: []
+  extraEnvFrom: []
+  resources:
+    requests: { cpu: 250m, memory: 768Mi, ephemeral-storage: 256Mi }
+    limits: { cpu: "2", memory: 2Gi, ephemeral-storage: 1Gi }
+  tmpSizeLimit: 512Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --------------------------------------------------------------------------------------------------- Postgres
+postgres:
+  # Embedded single-instance Postgres 16 + pgvector (team server / dev). Production on shared clusters:
+  # external Postgres or CloudNativePG (embedded: false + database.existingSecret).
+  embedded: false
+  image:
+    repository: docker.io/pgvector/pgvector
+    tag: pg16
+    digest: sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    pullPolicy: IfNotPresent
+  runAsUser: 999           # the image's postgres user
+  storage:
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+
+database:
+  # External Postgres (postgres.embedded=false): REQUIRED. A Secret with three DSNs:
+  #   DATABASE_URL          postgresql://z_app:...@host:5432/z      (application role, append-only audit)
+  #   MIGRATE_DATABASE_URL  postgresql://z:...@host:5432/z          (owner role, migrations only)
+  #   LITELLM_DATABASE_URL  postgresql://litellm:...@host:5432/litellm
+  # Embedded Postgres: optional. Empty: the chart generates the passwords once and keeps them. Otherwise a
+  # Secret with POSTGRES_PASSWORD (owner `z`), Z_APP_DB_PASSWORD and LITELLM_DB_PASSWORD (alphanumeric).
+  existingSecret: ""
+  keys:
+    appUrl: DATABASE_URL
+    migrateUrl: MIGRATE_DATABASE_URL
+    litellmUrl: LITELLM_DATABASE_URL
+  appRole: z_app           # Z_DB_APP_ROLE: the role migrations grant (no UPDATE/DELETE on the audit tables)
+  embeddingDim: 1024       # Z_EMBEDDING_DIM: must match the z-embed model
+
+# --------------------------------------------------------------------------------------------------- Secrets
+secrets:
+  # Name of an existing Secret with the keys Z_SECRET_KEY, LITELLM_MASTER_KEY and optionally
+  # OIDC_CLIENT_SECRET, INFERENCE_API_KEY. Empty: the chart creates `<fullname>-secrets` from the values below
+  # (empty Z_SECRET_KEY / LITELLM_MASTER_KEY are generated once and kept across upgrades and uninstall).
+  existingSecret: ""
+  zSecretKey: ""
+  litellmMasterKey: ""
+  oidcClientSecret: ""
+  inferenceApiKey: ""
+  # External Secrets Operator: render an ExternalSecret that writes the Secret `<fullname>-secrets` instead.
+  externalSecret:
+    enabled: false
+    apiVersion: external-secrets.io/v1
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: ""
+    data: []               # [{secretKey: Z_SECRET_KEY, remoteRef: {key: z/platform, property: secret_key}}]
+    dataFrom: []
+
+# --------------------------------------------------------------------------------------------------- storage
+persistence:
+  artifacts:
+    enabled: true          # false: emptyDir (artifacts are lost when the pod goes)
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+    mountPath: /data/artifacts   # Z_ARTIFACTS_DIR
+
+# --------------------------------------------------------------------------------------------------- traffic
+ingress:
+  enabled: true
+  className: ""
+  host: z.example.internal
+  annotations: {}
+  tls:
+    enabled: true
+    secretName: z-tls      # provided by cert-manager or created beforehand
+
+# Gateway API instead of (or next to) the Ingress.
+httpRoute:
+  enabled: false
+  apiVersion: gateway.networking.k8s.io/v1
+  parentRefs: []           # [{name: shared-gateway, namespace: gateway-system, sectionName: https}]
+  hostnames: []            # default: [ingress.host]
+  annotations: {}
+
+networkPolicy:
+  # Ingress policies for the chart's pods in the release namespace. Egress from z-server (GitLab, tools,
+  # Kubernetes API) and LiteLLM (inference cluster) is not restricted by default: see litellmEgress.
+  enabled: true
+  # Where the ingress controller / gateway pods run (traffic to z-ui, or z-server when ui.enabled=false).
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+    podSelector: {}
+  # Extra peers allowed to scrape z-server /metrics (Prometheus).
+  metricsFrom: []          # [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]
+  # Restrict LiteLLM egress to DNS + these rules (invariant 1/2: models only through LiteLLM, external
+  # providers off). Empty: not restricted.
+  litellmEgress: []        # [{to: [{ipBlock: {cidr: 10.20.0.0/16}}], ports: [{port: 443, protocol: TCP}]}]
+
+podDisruptionBudget:
+  enabled: false
+
+metrics:
+  serviceMonitor:
+    enabled: false         # rendered only when the cluster serves monitoring.coreos.com/v1
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+
+# --------------------------------------------------------------------------------------------------- config
+config:
+  # config/z.yaml (validated by the server against contracts/config.schema.json). ${VAR} placeholders are
+  # filled from the z-server environment. executor.kubernetes is overridden by the Z_RUNNER_* env vars.
+  z:
+    workspace:
+      name: Cyber Ops
+      environment: kubernetes
+    auth:
+      provider: gitlab
+      mode: ${Z_AUTH_MODE:-oidc}
+      issuer_url: ${OIDC_ISSUER_URL}
+      client_id: ${OIDC_CLIENT_ID}
+      client_secret: ${OIDC_CLIENT_SECRET}
+      scopes: [openid, profile, email]
+      groups_claim: groups
+      allowed_groups: [cyber]
+      no_match: viewer
+      group_mapping:
+        - { group: cyber/z/z-admins, role: admin, scope: org }
+        - { group: cyber/z/z-auditors, role: auditor, scope: org }
+        - { group: cyber/z/z-builders, role: builder, scope: org }
+        - { group: cyber/z/z-approvers, role: approver, scope: team }
+        - { group: cyber/z/z-operators, role: operator, scope: team }
+      team_mapping:
+        - { group: cyber/soc-csirt, team: Cyber Ops }
+        - { group: cyber/archi, team: Architecture }
+      reevaluate_groups_minutes: 60
+      session: { idle_minutes: 120, absolute_hours: 12, cli_token_days: 30 }
+      step_up_max_age_s: 300
+      api_tokens: { max_days: 90 }
+      cli: { device_flow: true, loopback_redirect: "http://127.0.0.1:8765/callback" }
+      local_accounts:
+        bootstrap: { enabled: true, ttl_hours: 24 }
+        password_policy: { min_length: 14, lockout_after: 5, lockout_minutes: 15 }
+      breakglass: { enabled: false }
+    audit:
+      retention_days: 365
+      checkpoint_minutes: 60
+      forward:
+        syslog: { enabled: false, url: "tls://syslog.example.internal:6514", format: rfc5424 }
+        https: { enabled: false, url: "" }
+    executor:
+      kind: kubernetes
+      kubernetes: { namespace: z-runners, service_account: z-runner, job_ttl_s: 3600 }
+      default_concurrency: 8
+      max_concurrency: 32
+    inference:
+      gateway_url: ${LITELLM_URL}
+      aliases: [z-heavy, z-fast, z-judge, z-embed]
+      prometheus:
+        url: ${INFERENCE_PROMETHEUS_URL}
+      probes: { models_poll_s: 60, tool_call_probe_s: 600 }
+    providers:
+      - { name: inferX, kind: internal, enabled: true, aliases: [z-heavy, z-fast, z-judge, z-embed], data_classes: [C0, C1, C2, C3] }
+      - { name: Anthropic API, kind: external, enabled: false, aliases: [ext-claude], data_classes: [C0, C1] }
+      - { name: Azure OpenAI, kind: external, enabled: false, aliases: [ext-azure], data_classes: [C0, C1] }
+      - { name: Mistral API, kind: external, enabled: false, aliases: [ext-mistral], data_classes: [C0, C1] }
+    routing_policy:
+      data_classes: { C0: Public, C1: Internal, C2: Confidential, C3: Restricted }
+      default_mission_class: C2
+      external_fallback_when_degraded: false
+      never_external: [C2, C3]
+      never_in_memory: [C3]
+    budgets:
+      org_monthly_tokens: 600000000
+      default_mission_tokens: 10000000
+      alert_at: 0.8
+    guardrails:
+      human_approval_for_writes: { value: true, locked: true }
+      two_approvers_for_destructive: { value: true, locked: true }
+      sandbox_network: { value: deny, locked: true }
+      judge_injection_scan: { value: true, locked: false }
+      learning_requires_approval: { value: true, locked: true }
+      max_steps_per_job: 120
+      max_job_minutes: 60
+    egress:
+      proxy_url: ${EGRESS_PROXY_URL}
+      mirrors: []
+      browser_targets: []
+    secrets:
+      backend: ${Z_SECRETS_BACKEND:-kubernetes}
+      vault: { address: "", mount: kv, path_prefix: z/ }
+    memory:
+      embedding_dim: ${Z_EMBEDDING_DIM:-1024}
+    retention:
+      events_days: 180
+      artifacts_days: 90
+      c3_artifacts_days: 7
+    learning:
+      schedule: "0 2 * * *"
+      shadow_replay_missions: 10
+      max_token_cost_increase: 0.15
+    ui:
+      default_theme: night
+      default_font: plex
+
+  # config/litellm.yaml. Replace <...> with the model ids served by inferX. The keys come from the Secret.
+  litellm:
+    model_list:
+      - model_name: z-heavy
+        litellm_params: { model: "openai/<GLM_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+      - model_name: z-fast
+        litellm_params: { model: "openai/<QWEN_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+      - model_name: z-judge
+        litellm_params: { model: "openai/<SMALL_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+      - model_name: z-embed
+        litellm_params: { model: "openai/<EMBEDDING_MODEL_ID>", api_base: os.environ/INFERENCE_API_BASE, api_key: os.environ/INFERENCE_API_KEY }
+        model_info: { mode: embedding, provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+    litellm_settings:
+      drop_params: true
+      request_timeout: 600
+    router_settings:
+      num_retries: 2
+    general_settings:
+      master_key: os.environ/LITELLM_MASTER_KEY
+      database_url: os.environ/LITELLM_DATABASE_URL

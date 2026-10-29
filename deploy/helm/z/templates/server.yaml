@@ -1,0 +1,186 @@
+{{- include "z.validate" . }}
+{{- $mode := include "z.migrateMode" . }}
+{{- $fullname := include "z.server.fullname" . }}
+# z-server ServiceAccount: the only chart pod with an API token. It starts runner Jobs in the runner namespace
+# (Role in runners-rbac.yaml) and, if server.secretRefs is set, reads exactly those Secrets.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.server.port }}
+      targetPort: http
+      protocol: TCP
+---
+{{- if and .Values.persistence.artifacts.enabled (not .Values.persistence.artifacts.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-artifacts
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.artifacts.accessModes | nindent 4 }}
+  {{- with .Values.persistence.artifacts.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.artifacts.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+spec:
+  replicas: {{ .Values.server.replicas }}
+  revisionHistoryLimit: 5
+  {{- if and .Values.persistence.artifacts.enabled (not (has "ReadWriteMany" .Values.persistence.artifacts.accessModes)) }}
+  # A ReadWriteOnce artifacts volume cannot be attached to the old and the new pod on two nodes.
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 8 }}
+        # Runners may reach this pod (internal API + tool gateway), see networkpolicy-runners.yaml.
+        z.io/runner-reachable: "true"
+        z.io/postgres-client: "true"
+        {{- with .Values.server.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.server.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ add (int .Values.server.shutdownGraceSeconds) 20 }}
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" 10001) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      {{- if eq $mode "initContainer" }}
+      initContainers:
+        - name: migrate
+          image: {{ include "z.image" (dict "image" .Values.server.image "root" .) }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          args: ["migrate"]
+          env:
+            {{- include "z.dbEnv" (dict "root" . "role" "migrate" "name" "DATABASE_URL") | nindent 12 }}
+            - name: Z_DB_APP_ROLE
+              value: {{ .Values.database.appRole | quote }}
+            - name: Z_EMBEDDING_DIM
+              value: {{ .Values.database.embeddingDim | quote }}
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      {{- end }}
+      containers:
+        - name: server
+          image: {{ include "z.image" (dict "image" .Values.server.image "root" .) }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          args: ["all", "--port", "{{ .Values.server.port }}"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
+              protocol: TCP
+          env:
+            {{- include "z.serverEnv" . | nindent 12 }}
+          {{- with .Values.server.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 4
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/z
+              readOnly: true
+            - name: artifacts
+              mountPath: {{ .Values.persistence.artifacts.mountPath }}
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.server.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "z.fullname" . }}-config
+        - name: artifacts
+          {{- if .Values.persistence.artifacts.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-artifacts" $fullname) .Values.persistence.artifacts.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.server.tmpSizeLimit }}
+        {{- with .Values.server.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

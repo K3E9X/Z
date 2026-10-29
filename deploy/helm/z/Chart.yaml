@@ -1,0 +1,14 @@
+apiVersion: v2
+name: z
+description: >-
+  Z: run many AI agents in parallel against any tool, with live visibility, human approval of every write
+  and a learning loop. One chart for k3s (values-k3s.yaml) and vanilla Kubernetes (values-k8s.yaml).
+type: application
+# Chart version = app version (docs/11 §4).
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/K3E9X/Z
+sources:
+  - https://github.com/K3E9X/Z
+keywords: [ai-agents, litellm, openhands, k3s]
