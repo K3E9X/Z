@@ -1828,6 +1828,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Approved memory facts, newest first */
+        get: operations["listMemoryFacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop retrieving a memory fact (kept for history; restore undoes it) */
+        post: operations["deactivateMemoryFact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retrieve a deactivated memory fact again */
+        post: operations["restoreMemoryFact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/proposals": {
         parameters: {
             query?: never;
@@ -3869,6 +3920,27 @@ export interface components {
             skill?: string | null;
             payload: Record<string, unknown>;
             ts: components["schemas"]["Timestamp"];
+        };
+        /** @description An approved memory fact (invariant 14: deactivating one is versioned and reversible). */
+        MemoryFact: {
+            id: components["schemas"]["Id"];
+            /** @enum {string} */
+            scope: "org" | "team" | "agent";
+            /** @description The team id (team scope) or the agent name (agent scope). */
+            scope_ref?: string | null;
+            text: string;
+            /** @description Where the fact came from, e.g. proposal:<id>. */
+            source: string;
+            approved_by: string;
+            version: number;
+            data_class: components["schemas"]["DataClass"];
+            expires_at?: components["schemas"]["Timestamp"] | null;
+            /** @description Inactive facts are kept for history and never retrieved. */
+            active: boolean;
+            created_at: components["schemas"]["Timestamp"];
+        };
+        MemoryFactChange: {
+            reason: string;
         };
         EvalScores: {
             checks_passed: number;
@@ -9485,6 +9557,115 @@ export interface operations {
                         items: components["schemas"]["Signal"][];
                         next_cursor: string | null;
                     };
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listMemoryFacts: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                scope?: "org" | "team" | "agent";
+                agent?: string;
+                active?: boolean;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MemoryFact"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deactivateMemoryFact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryFactChange"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryFact"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    restoreMemoryFact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryFactChange"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryFact"];
                 };
             };
             /** @description Problem details */

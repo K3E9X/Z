@@ -1349,6 +1349,24 @@ schemas = {
         },
         ["id", "kind", "payload", "ts"],
     ),
+    "MemoryFact": obj(
+        {
+            "id": ID,
+            "scope": {"type": "string", "enum": ["org", "team", "agent"]},
+            "scope_ref": {**nul(S), "description": "The team id (team scope) or the agent name (agent scope)."},
+            "text": S,
+            "source": {**S, "description": "Where the fact came from, e.g. proposal:<id>."},
+            "approved_by": S,
+            "version": I,
+            "data_class": ext(C + "DataClass"),
+            "expires_at": nul(TS),
+            "active": {"type": "boolean", "description": "Inactive facts are kept for history and never retrieved."},
+            "created_at": TS,
+        },
+        ["id", "scope", "text", "source", "approved_by", "version", "data_class", "active", "created_at"],
+        desc="An approved memory fact (invariant 14: deactivating one is versioned and reversible).",
+    ),
+    "MemoryFactChange": obj({"reason": {**S, "minLength": 1, "maxLength": 2000}}, ["reason"]),
     "EvalScores": obj(
         {"checks_passed": I, "checks_total": I, "cases_passed": I, "cases_total": I, "rubric_avg": nul(N), "tokens": I},
         ["checks_passed", "checks_total", "cases_passed", "cases_total", "tokens"],
@@ -3237,6 +3255,47 @@ op(
     "learning",
     resp=page(ref("Signal")),
     query=PG + [("agent", {"type": "string"}), ("kind", {"type": "string"})],
+)
+op(
+    "get",
+    "/memory",
+    "listMemoryFacts",
+    "learning:read",
+    "B6",
+    "Approved memory facts, newest first",
+    "learning",
+    resp=page(ref("MemoryFact")),
+    query=PG
+    + [
+        ("scope", {"type": "string", "enum": ["org", "team", "agent"]}),
+        ("agent", {"type": "string"}),
+        ("active", {"type": "boolean"}),
+        ("q", {"type": "string"}),
+    ],
+)
+op(
+    "post",
+    "/memory/{id}/deactivate",
+    "deactivateMemoryFact",
+    "learning:apply",
+    "B6",
+    "Stop retrieving a memory fact (kept for history; restore undoes it)",
+    "learning",
+    req=ref("MemoryFactChange"),
+    resp=ref("MemoryFact"),
+    params=["id"],
+)
+op(
+    "post",
+    "/memory/{id}/restore",
+    "restoreMemoryFact",
+    "learning:apply",
+    "B6",
+    "Retrieve a deactivated memory fact again",
+    "learning",
+    req=ref("MemoryFactChange"),
+    resp=ref("MemoryFact"),
+    params=["id"],
 )
 op(
     "get",

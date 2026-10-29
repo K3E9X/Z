@@ -3992,6 +3992,141 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /memory:
+    get:
+      operationId: listMemoryFacts
+      tags:
+      - learning
+      summary: Approved memory facts, newest first
+      x-permission: learning:read
+      x-owner: B6
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema: *id002
+      - name: limit
+        in: query
+        required: false
+        schema: *id003
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - org
+          - team
+          - agent
+      - name: agent
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: active
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MemoryFact'
+                  next_cursor:
+                    oneOf:
+                    - *id001
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /memory/{id}/deactivate:
+    post:
+      operationId: deactivateMemoryFact
+      tags:
+      - learning
+      summary: Stop retrieving a memory fact (kept for history; restore undoes it)
+      x-permission: learning:apply
+      x-owner: B6
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryFactChange'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryFact'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /memory/{id}/restore:
+    post:
+      operationId: restoreMemoryFact
+      tags:
+      - learning
+      summary: Retrieve a deactivated memory fact again
+      x-permission: learning:apply
+      x-owner: B6
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryFactChange'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryFact'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /proposals:
     get:
       operationId: listProposals
@@ -9115,6 +9250,59 @@ components:
       - kind
       - payload
       - ts
+      additionalProperties: false
+    MemoryFact:
+      type: object
+      properties:
+        id: *id004
+        scope:
+          type: string
+          enum:
+          - org
+          - team
+          - agent
+        scope_ref:
+          oneOf:
+          - *id001
+          - type: 'null'
+          description: The team id (team scope) or the agent name (agent scope).
+        text: *id001
+        source:
+          type: string
+          description: Where the fact came from, e.g. proposal:<id>.
+        approved_by: *id001
+        version: *id006
+        data_class:
+          $ref: common.schema.json#/$defs/DataClass
+        expires_at:
+          oneOf:
+          - *id005
+          - type: 'null'
+        active:
+          type: boolean
+          description: Inactive facts are kept for history and never retrieved.
+        created_at: *id005
+      required:
+      - id
+      - scope
+      - text
+      - source
+      - approved_by
+      - version
+      - data_class
+      - active
+      - created_at
+      additionalProperties: false
+      description: 'An approved memory fact (invariant 14: deactivating one is versioned and reversible).'
+    MemoryFactChange:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+      - reason
       additionalProperties: false
     EvalScores:
       type: object
