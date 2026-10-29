@@ -1,7 +1,7 @@
 ---
 name: dependency-upgrade
 description: Upgrade one dependency in a repository and prove it still builds.
-version: 1.0.0
+version: 1.0.1
 evals: evals/dependency-upgrade.jsonl
 ---
 
@@ -9,4 +9,4 @@ evals: evals/dependency-upgrade.jsonl
 2. Change the version to the target. Do not touch unrelated dependencies.
 3. Run the build and the tests with the project's own command (look at CI config first).
 4. If tests fail, read the error. Fix only what the upgrade broke. If the failure is unrelated (external service, flaky test), stop and ask_human.
-5. Produce `diff.patch` and `report.md` (what changed, test results, risks).
+5. Write `report.md` (what changed, test results, risks). Z builds the patch of your changes itself (`changes.patch`): do not write one.
