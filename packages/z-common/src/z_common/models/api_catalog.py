@@ -23,6 +23,7 @@ from z_common.models.manifests import (
     AgentProfile,
     BrowserFlow,
     BrowserStep,
+    CliSettings,
     ConnectorManifest,
     DeclaredOperation,
     McpServer,
@@ -257,7 +258,7 @@ class ConnectorTestResult(ZModel):
 
 
 class ConnectorImport(ZModel):
-    source: Literal["openapi", "graphql", "mcp", "docs", "browser"]
+    source: Literal["openapi", "graphql", "mcp", "docs", "browser", "cli"]
     name: Slug
     display_name: str | None = None
     base_url: str | None = None
@@ -267,6 +268,7 @@ class ConnectorImport(ZModel):
     docs: str | None = None
     flows: dict[str, BrowserFlow] | None = None
     declared: list[DeclaredOperation] | None = None
+    cli: CliSettings | None = None
     data_class: DataClass | None = None
 
 

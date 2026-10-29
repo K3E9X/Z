@@ -139,3 +139,33 @@ def test_tool_images_must_be_allowlisted(app: TestClient, oidc: FakeGitLabOIDC) 
     other = {**KUBE, "name": "kube2", "cli": {**KUBE["cli"], "image": "evil/tool@sha256:" + "e" * 64}}
     refused = app.post("/api/v1/connectors", json=other, headers=csrf(app))
     assert refused.status_code == 422 and "executor.tool_images" in refused.text
+
+
+def test_builder_drafts_a_cli_connector(app: TestClient, oidc: FakeGitLabOIDC) -> None:
+    use_jar(app, sign_in_as(app, oidc, "alice"))
+    body = {"source": "cli", "name": "kube3", "cli": KUBE["cli"], "declared": KUBE["declared"], "data_class": "C1"}
+    draft = app.post("/api/v1/connectors/import", json=body, headers=csrf(app))
+    assert draft.status_code == 200, draft.text
+    out = draft.json()
+    assert [(o["id"], o["class"]) for o in out["operations"]] == [("kube3.pods.list", "read")]
+    assert out["manifest"]["kind"] == "cli" and out["manifest"]["cli"]["image"] == IMAGE
+    assert out["manifest"]["auth"]["read"] == {"type": "bearer", "secret": "env:KUBE3_TOKEN_RO"}
+    assert out["manifest"]["auth"]["write"]["secret"] == "env:KUBE3_TOKEN_RW"  # read and write stay apart
+    created = app.post("/api/v1/connectors", json=out["manifest"], headers=csrf(app))
+    assert created.status_code == 201, created.text
+    assert created.json()["review_status"] == "pending_review"
+
+
+def test_builder_refuses_unsafe_cli_drafts(app: TestClient, oidc: FakeGitLabOIDC) -> None:
+    use_jar(app, sign_in_as(app, oidc, "alice"))
+    leaky = [{**KUBE["declared"][0], "command": ["kubectl", "--token={{auth.secret}}", "get", "pods"]}]
+    body = {"source": "cli", "name": "kube4", "cli": KUBE["cli"], "declared": leaky}
+    refused = app.post("/api/v1/connectors/import", json=body, headers=csrf(app))
+    assert refused.status_code == 422 and "never in the command" in refused.text
+    floating = {**body, "cli": {**KUBE["cli"], "image": "evil/tool:latest"}, "declared": KUBE["declared"]}
+    assert app.post("/api/v1/connectors/import", json=floating, headers=csrf(app)).status_code == 422
+    other = {**floating, "cli": {**KUBE["cli"], "image": "evil/tool@sha256:" + "e" * 64}}
+    draft = app.post("/api/v1/connectors/import", json=other, headers=csrf(app))
+    assert draft.status_code == 200 and any("executor.tool_images" in w for w in draft.json()["warnings"])
+    no_cli = app.post("/api/v1/connectors/import", json={"source": "cli", "name": "kube5"}, headers=csrf(app))
+    assert no_cli.status_code == 422

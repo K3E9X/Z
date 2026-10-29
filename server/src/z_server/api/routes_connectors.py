@@ -450,6 +450,35 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
         warnings.append("every flow runs exactly as reviewed: check what each step clicks before exposing it")
         if not ctx.state.settings.browser_url:
             warnings.append("the z-browser worker is not configured (Z_BROWSER_URL): flows cannot run yet")
+    elif body.source == "cli":
+        if body.cli is None or not body.declared:
+            raise Problem("validation", "cli import needs cli (the digest-pinned tool image) and the declared commands")
+        prefix = body.name.upper().replace("-", "_")
+        manifest.pop("base_url", None)  # a cli connector reaches its target from the tool container, not over Z's HTTP
+        manifest.update(
+            {
+                "kind": "cli",
+                "cli": body.cli.dump(),
+                "declared": [d.dump() for d in body.declared],
+                # the tool reads its credential from cli.env ({{auth.secret}}): separate read and write tokens
+                "auth": {
+                    "read": {"type": "bearer", "secret": f"env:{prefix}_TOKEN_RO"},
+                    "write": {"type": "bearer", "secret": f"env:{prefix}_TOKEN_RW"},
+                },
+            }
+        )
+        problems = cli.connector_problems(manifest)
+        if problems:
+            raise Problem("validation", "; ".join(problems[:5]))
+        specs = admin.operation_specs(manifest, None)
+        allowed = (ctx.state.config.get("executor") or {}).get("tool_images") or []
+        if body.cli.image not in allowed:
+            warnings.append(
+                "the image is not in executor.tool_images: saving is refused until a platform admin allows it"
+            )
+        if not any("{{auth." in str(v) for v in (body.cli.env or {}).values()):
+            warnings.append("cli.env passes no credential ({{auth.secret}}): the tool runs without one")
+        warnings.append("every command runs exactly as reviewed: check each argv and the arguments it takes")
     else:
         raise Problem("unavailable", f"import from {body.source} is not available on this server yet")
     manifest["operations"] = {
