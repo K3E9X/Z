@@ -130,7 +130,17 @@ def create_app(
         if workers:
             from z_server.executors.factory import from_settings
             from z_server.gateway import executor
-            from z_server.workers import audit, channels, health, identity, intake, learning, notifications, scheduler
+            from z_server.workers import (
+                audit,
+                channels,
+                health,
+                identity,
+                intake,
+                learning,
+                notifications,
+                retention,
+                scheduler,
+            )
 
             tasks = [
                 asyncio.create_task(scheduler.run_forever(state, from_settings(settings)), name="scheduler"),
@@ -142,6 +152,7 @@ def create_app(
                 asyncio.create_task(channels.run_forever(state), name="channels"),
                 asyncio.create_task(audit.run_forever(state), name="audit"),
                 asyncio.create_task(notifications.run_forever(state), name="notifications"),
+                asyncio.create_task(retention.run_forever(state), name="retention"),
             ]
         try:
             async with gateway_endpoint.run(), z_mcp.run():
