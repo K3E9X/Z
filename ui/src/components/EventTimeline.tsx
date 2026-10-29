@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { artifactUrl, downloadArtifact, useArtifactText } from '@/api/artifacts'
+import { artifactUrl, useArtifactDownload, useArtifactText } from '@/api/artifacts'
 import type { TimelineItem, TimelineState } from '@/lib/timeline'
 import { clock } from '@/lib/format'
 import { actionStatus } from '@/lib/status'
@@ -76,6 +76,7 @@ export function TimelineRow({
   agents: AgentIndex
   showAgent: boolean
 }) {
+  const download = useArtifactDownload()
   let body: ReactNode = null
   switch (item.kind) {
     case 'tool':
@@ -204,7 +205,7 @@ export function TimelineRow({
           <button
             type="button"
             className="text-meta text-text-2 underline underline-offset-2"
-            onClick={() => void downloadArtifact(item.artifact.artifact_id, item.artifact.name)}
+            onClick={() => download(item.artifact.artifact_id, item.artifact.name)}
           >
             Download
           </button>

@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { useToast } from '@/components/toast'
 import { API_BASE, rawFetch } from './client'
 
 export function artifactUrl(id: string): string {
@@ -28,6 +30,19 @@ export async function downloadArtifact(id: string, name: string): Promise<void> 
   const res = await rawFetch(`/artifacts/${encodeURIComponent(id)}`)
   const blob = await res.blob()
   saveBlob(blob, name)
+}
+
+/** downloadArtifact for a button: a refused or missing artifact shows a toast instead of failing silently. */
+export function useArtifactDownload(): (id: string, name: string) => void {
+  const toast = useToast()
+  return useCallback(
+    (id: string, name: string) => {
+      downloadArtifact(id, name).catch((e: unknown) => {
+        toast.error(e, `${name} was not downloaded`)
+      })
+    },
+    [toast],
+  )
 }
 
 export function saveBlob(blob: Blob, name: string): void {

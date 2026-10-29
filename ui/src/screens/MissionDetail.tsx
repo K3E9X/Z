@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
-import { artifactUrl, downloadArtifact } from '@/api/artifacts'
+import { artifactUrl, useArtifactDownload } from '@/api/artifacts'
 import { api, unwrap } from '@/api/client'
 import { isNotServed, problemMessage } from '@/api/problem'
 import { qk, useAgents, useMission, useMissionJobs } from '@/api/queries'
@@ -231,13 +231,14 @@ function FullOutput({ id }: { id: string }) {
   )
 }
 
-function FilesTab({ timeline }: { timeline: TimelineState }) {
+export function FilesTab({ timeline }: { timeline: TimelineState }) {
   const edits = timeline.items.filter((i) => i.kind === 'file_edit')
   const byPath = new Map<string, typeof edits>()
   for (const e of edits)
     if (e.kind === 'file_edit') byPath.set(e.edit.path, [...(byPath.get(e.edit.path) ?? []), e])
   const artifacts = timeline.items.filter((i) => i.kind === 'artifact')
   const [open, setOpen] = useState<string | null>(null)
+  const download = useArtifactDownload()
   const openEdit = edits.find((e) => e.kind === 'file_edit' && e.key === open)
   const diffQ = useArtifactText(openEdit?.kind === 'file_edit' ? openEdit.edit.diff_ref : null)
   if (edits.length === 0 && artifacts.length === 0)
@@ -303,7 +304,7 @@ function FilesTab({ timeline }: { timeline: TimelineState }) {
                     size="xs"
                     variant="ghost"
                     icon="download"
-                    onClick={() => void downloadArtifact(a.artifact.artifact_id, a.artifact.name)}
+                    onClick={() => download(a.artifact.artifact_id, a.artifact.name)}
                   >
                     Download
                   </Button>
