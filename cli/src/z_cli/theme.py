@@ -40,6 +40,7 @@ PALETTES: dict[str, Palette] = {
     ),
 }
 DEFAULT = "night"
+THEME_NAMES: tuple[str, ...] = tuple(PALETTES)
 
 
 def palette(name: str | None) -> Palette:
