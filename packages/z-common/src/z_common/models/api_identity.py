@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field
 
 from z_common.models.base import Handle, Id, Permission, RoleName, Scope, Subject, ZModel
-from z_common.models.enums import BindingSource, MappingSource, SessionKind, UserStatus
+from z_common.models.enums import BindingSource, DataClass, MappingSource, SessionKind, UserStatus
 
 
 class EffectiveRole(ZModel):
@@ -355,6 +355,54 @@ class AuditSettings(ZModel):
     retention_days: Annotated[int, Field(ge=90)]
     checkpoint_minutes: int
     forward: dict[str, Any]
+
+
+NotificationKind = Literal[
+    "approval_requested",
+    "question_asked",
+    "needs_attention",
+    "mission_succeeded",
+    "mission_failed",
+    "budget_alert",
+    "connector_unhealthy",
+    "breakglass_used",
+]
+
+
+class NotificationDelivery(ZModel):
+    last_sent_at: datetime | None = None
+    last_error: str | None = None
+    last_error_at: datetime | None = None
+
+
+class NotificationTarget(ZModel):
+    """openapi NotificationTarget (ADR 0023). Webhook URLs and signing keys are secret references."""
+
+    id: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,39}$")]
+    name: str | None = None
+    kind: Literal["slack", "mattermost", "teams", "webhook", "email"]
+    enabled: bool = True
+    events: list[NotificationKind]
+    teams: list[str] = Field(default_factory=list)
+    content_up_to: DataClass = DataClass.C1
+    url_ref: str | None = None
+    secret_ref: str | None = None
+    to: list[str] = Field(default_factory=list)
+    status: NotificationDelivery | None = None
+
+
+class SmtpSettings(ZModel):
+    host: str
+    port: int | None = None
+    starttls: bool = True
+    username: str | None = None
+    password_ref: str | None = None
+    from_: Annotated[str, Field(alias="from")]
+
+
+class NotificationSettings(ZModel):
+    targets: list[NotificationTarget]
+    smtp: SmtpSettings | None = None
 
 
 class PersonalConnectionInfo(ZModel):

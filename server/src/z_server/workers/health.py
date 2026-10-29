@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import select
 
+from z_server import notifications
 from z_server.auth.identity import now
 from z_server.db.models import Connector, Credential
 from z_server.gateway import admin
@@ -88,7 +89,14 @@ async def check_all(state: AppState) -> dict[str, str]:
         async with state.sessions() as db, db.begin():
             row = await db.get(Connector, connector.id)
             if row is not None:
+                was = (row.health or {}).get("status")
                 row.health = health
+                if status == "unreachable" and was not in {None, "unreachable"}:
+                    notifications.enqueue(
+                        db,
+                        "connector_unhealthy",
+                        payload={"connector": connector.name, "status": status, "detail": health["detail"]},
+                    )
         results[connector.name] = status
     return results
 

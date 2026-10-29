@@ -341,6 +341,27 @@ class ChannelThread(Base, Timestamps):
     failures: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class NotificationOutbox(Base):
+    """Transactional outbox of notifications (ADR 0023): written with the change, delivered by a worker.
+    `delivered` lists the target ids that accepted it; a row is done when every matching target did, or after
+    the last attempt."""
+
+    __tablename__ = "notification_outbox"
+    __table_args__ = (Index("ix_notification_outbox_pending", "done", "next_at"),)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    mission_id: Mapped[str | None] = mapped_column(ForeignKey("missions.id", ondelete="CASCADE"))
+    event_seq: Mapped[int | None] = mapped_column(BigInteger)
+    team_id: Mapped[str | None] = mapped_column(String(40))
+    data_class: Mapped[str] = mapped_column(String(2))
+    payload: Mapped[dict[str, Any]]
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_at: Mapped[datetime]
+    done: Mapped[bool] = mapped_column(default=False)
+    delivered: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 # ---------------------------------------------------------------- missions and jobs
 
 

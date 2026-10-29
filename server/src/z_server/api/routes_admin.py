@@ -707,3 +707,46 @@ async def admin_put_audit_settings(ctx: CtxDep, body: m.AuditSettings) -> m.Audi
     await ctx.db.flush()
     await ctx.audit("admin.audit_settings_changed", "audit_settings", None, before=before, after=value)
     return await audit_settings(ctx)
+
+
+# ---------------------------------------------------------------- notifications (ADR 0023)
+
+
+async def _notification_settings(ctx: Ctx) -> m.NotificationSettings:
+    from z_server import notifications
+
+    value = await notifications.settings(ctx.db)
+    state = await notifications.delivery_state(ctx.db)
+    targets = [{**t, "status": state[t["id"]]} if t.get("id") in state else t for t in value["targets"]]
+    return m.NotificationSettings.model_validate({"targets": targets, "smtp": value["smtp"]})
+
+
+@router.operation("adminGetNotifications")
+async def admin_get_notifications(ctx: CtxDep) -> m.NotificationSettings:
+    return await _notification_settings(ctx)
+
+
+@router.operation("adminPutNotifications")
+async def admin_put_notifications(ctx: CtxDep, body: m.NotificationSettings) -> m.NotificationSettings:
+    from z_server import notifications
+
+    value = notifications.validate(body.model_dump(mode="json", by_alias=True, exclude_none=True))
+    before = await notifications.settings(ctx.db)
+    row = await ctx.db.get(Setting, notifications.SETTINGS_KEY)
+    if row is None:
+        ctx.db.add(Setting(key=notifications.SETTINGS_KEY, value=value, updated_by=ctx.user.username))
+    else:
+        row.value, row.updated_by = value, ctx.user.username
+    await ctx.db.flush()
+    await ctx.audit("admin.notifications_changed", "notifications", None, before=before, after=value)
+    return await _notification_settings(ctx)
+
+
+@router.operation("adminTestNotification", status_code=204)
+async def admin_test_notification(ctx: CtxDep, body: dict[str, Any]) -> Response:
+    from z_server import notifications
+
+    target_id = str(body.get("target_id") or "")
+    await ctx.audit("admin.notification_tested", "notification_target", target_id)
+    await notifications.send_test(ctx.state, ctx.db, target_id)
+    return Response(status_code=204)

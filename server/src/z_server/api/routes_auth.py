@@ -313,6 +313,10 @@ async def auth_local_login(ctx: CtxDep, body: m.LocalLoginRequest) -> Response:
         after={"kind": user.local_kind},
     )
     ctx.audited = True
+    if user.local_kind == "breakglass":
+        from z_server import notifications
+
+        notifications.enqueue(ctx.db, "breakglass_used", payload={"ip": ctx.ip})
     principal = await identity.build_principal(
         ctx.db, user, ctx.state.config_auth, kind=user.local_kind or "local", session=session
     )

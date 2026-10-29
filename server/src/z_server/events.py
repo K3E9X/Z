@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.events import PAYLOADS
 from z_common.redaction import Redactor
 
-from z_server import signals
+from z_server import notifications, signals
 from z_server.db.models import Event, Mission
 
 log = logging.getLogger("z.events")
@@ -70,6 +70,10 @@ async def append(
     )
     db.add(row)
     await signals.from_event(db, mission_id, event_type, row.payload, job_id, agent)
+    notify = notifications.kind_for_event(event_type, row.payload)
+    if notify is not None:
+        mission = await db.get(Mission, mission_id)
+        notifications.enqueue(db, notify, mission=mission, event_seq=seq)
     await db.flush()
     await db.execute(text("SELECT pg_notify(:c, :p)"), {"c": CHANNEL, "p": f"{mission_id}:{seq}"})
     return row
