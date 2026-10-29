@@ -88,6 +88,8 @@ jobs:
           MYPYPATH=ci/scripts uv run mypy ci/scripts
       - run: uv run python -m z_common.contracts.validate_examples
       - run: uv run python -m z_common.packs.lint packs/
+      - name: Licenses of every installed Python package (security/licenses.yaml)
+        run: python3 ci/scripts/check_licenses.py --python "$(uv run python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
       - name: Chromium for the browser tests (version pinned by the playwright lock entry)
         run: |
           if uv run python -c "import playwright" 2>/dev/null; then
@@ -115,6 +117,8 @@ jobs:
       # pnpm comes from the packageManager field (pnpm@10.28.0), fetched and verified by corepack.
       - run: corepack enable && pnpm --version
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Licenses of every installed npm package (security/licenses.yaml)
+        run: python3 ../ci/scripts/check_licenses.py --node node_modules --policy ../security/licenses.yaml
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm format:check

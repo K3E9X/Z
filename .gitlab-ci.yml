@@ -121,11 +121,15 @@ lint:python:
       if [ -d browser/src ]; then paths="$paths browser/src"; fi
       uv run mypy $paths
     - MYPYPATH=ci/scripts uv run mypy ci/scripts
+    - python3 ci/scripts/check_licenses.py --python "$(uv run python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 
 lint:ui:
   extends: .node
   stage: lint
   script:
+    # the slim Node image has no python3 (the check is stdlib only)
+    - command -v python3 >/dev/null || { apt-get update -qq && apt-get install -y -qq --no-install-recommends python3 >/dev/null; }
+    - python3 ../ci/scripts/check_licenses.py --node node_modules --policy ../security/licenses.yaml
     - pnpm lint
     - pnpm typecheck
     - pnpm format:check
