@@ -27,9 +27,12 @@ inferX is the internal, OpenAI-compatible inference platform. What matters for Z
    baselines and learning proposals (invariant 14); changing a model is a reviewed config change.
 3. **No external fallback on anything Z calls** (invariant 2): every model the Z key can call must be shared
    without overflow, or a dedicated deployment with no fallback or the shared-model fallback. This is a
-   requirement on the inferX project, checked at go-live; LiteLLM returns provider headers as
-   `llm_provider-*` (`return_response_headers: true`), so a later Z check can flag
-   `llm_provider-x-inferx-fallback` per call. Until that check exists, the requirement is procedural.
+   requirement on the inferX project, checked at go-live. LiteLLM returns provider headers as
+   `llm_provider-*` (`return_response_headers: true`), and the LiteLLM callback `z_inference_guard`
+   (`deploy/helm/z/files/`, in the LiteLLM ConfigMap and the compose mount) checks every answer: one served
+   through an external fallback is logged, and refused with a 403 when the key's data class (key metadata, kept in
+   step when a mission's class is raised) is C2 or C3. 403 and not 5xx, so no client or Z retry sends the data out
+   again. The data has left by then: the guard detects and stops the answer; the inferX setting prevents.
 4. **Transient errors are retried twice by the LiteLLM router (which honours `Retry-After`); then the runner
    reports `llm_unavailable` and Z requeues the job from its last checkpoint with backoff** until its attempts
    run out. `key_inert`, `model_not_found`, `invalid_api_key` and `project_required` are configuration errors:
