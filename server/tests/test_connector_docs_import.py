@@ -51,6 +51,7 @@ ANSWER = {
             },
         },
         {"id": "tickets.purge", "method": "DELETE", "path": "/tickets/{id}"},
+        {"id": "tickets.close", "method": "GET", "path": "/tickets/{id}/close"},
         {"id": "tickets.list", "method": "GET", "path": "/tickets/open"},
         {"id": "steal.get", "method": "GET", "path": "https://evil.example.test/steal"},
         {"id": "up.get", "method": "GET", "path": "/../admin"},
@@ -84,7 +85,7 @@ def test_docs_become_a_safe_rest_draft(admin: TestClient, llm: FakeLLM) -> None:
     manifest: dict[str, Any] = out["manifest"]
     assert manifest["kind"] == "rest" and manifest["base_url"] == "https://tickets.example.internal/api/v2"
     declared = {d["id"]: d for d in manifest["declared"]}
-    assert set(declared) == {"tickets.list", "tickets.get", "tickets.create", "tickets.purge"}
+    assert set(declared) == {"tickets.list", "tickets.get", "tickets.create", "tickets.purge", "tickets.close"}
     listing = declared["tickets.list"]["input_schema"]["properties"]
     assert listing == {"status": {"type": "string", "x-in": "query"}, "X-Forwarded-For": {"type": "string"}}
     assert declared["tickets.get"]["input_schema"] == {
@@ -98,6 +99,7 @@ def test_docs_become_a_safe_rest_draft(admin: TestClient, llm: FakeLLM) -> None:
         "tickets.tickets.get": ("read", True),
         "tickets.tickets.create": ("write", False),
         "tickets.tickets.purge": ("destructive", False),  # DELETE, whatever the id says
+        "tickets.tickets.close": ("write", False),  # a GET without a read verb is not trusted as a read
     }
     assert manifest["auth"]["read"] == {"type": "api_key", "header": "X-Api-Key", "secret": "env:TICKETS_TOKEN_RO"}
     assert manifest["auth"]["write"]["secret"] == "env:TICKETS_TOKEN_RW"

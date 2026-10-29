@@ -15,6 +15,8 @@ import re
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from z_common.models.enums import OperationClass
+from z_common.packs.classify import classify
 
 from z_server.errors import Problem
 from z_server.llm import chat
@@ -173,3 +175,16 @@ async def draft(
         "against the tool before exposing anything"
     )
     return fields, warnings[:20]
+
+
+def raise_unclear_reads(specs: list[Any]) -> list[str]:
+    """A drafted GET whose id has no read verb (GET /tickets/{id}/close as tickets.close) is raised to a write:
+    the documentation, not the tool, said it is safe. Raising is always allowed (rules only raise)."""
+    warnings = []
+    for spec in specs:
+        if spec.op_class == OperationClass.read and classify(spec.local_id, None) != OperationClass.read:
+            spec.op_class, spec.proposed_exposed = OperationClass.write, False
+            warnings.append(
+                f"{spec.local_id} is a GET without a read verb: drafted as a write; lower it only after checking"
+            )
+    return warnings

@@ -495,6 +495,7 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
         manifest.update({"kind": "rest", **fields})
         warnings += more
         specs = admin.operation_specs(manifest, None)
+        warnings += connector_builder.raise_unclear_reads(specs)
     elif body.source == "cli":
         if body.cli is None or not body.declared:
             raise Problem("validation", "cli import needs cli (the digest-pinned tool image) and the declared commands")
