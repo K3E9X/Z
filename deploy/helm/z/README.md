@@ -38,6 +38,14 @@ litellm:
   inferenceApiBase: https://<inferx-endpoint>/v1
 secrets:
   existingSecret: z-secrets   # Z_SECRET_KEY, LITELLM_MASTER_KEY, OIDC_CLIENT_SECRET, INFERENCE_API_KEY
+networkPolicy:
+  litellmEgress:              # required with env=production: the inferX gateway only
+    - to: [{ ipBlock: { cidr: 10.20.0.15/32 } }]
+      ports: [{ port: 443, protocol: TCP }]
+  serverEgress:
+    allow:                    # GitLab (sign-in, connector) and the tools of your connectors
+      - to: [{ ipBlock: { cidr: 10.10.0.0/24 } }]
+        ports: [{ port: 443, protocol: TCP }]
 config:
   litellm:
     model_list: [...]         # the real inferX model ids (see values.yaml for the shape)
@@ -134,8 +142,17 @@ the migrations ran).
   the ingress controller (`networkPolicy.ingressController`, Traefik in `kube-system` on k3s, ingress-nginx
   in `ingress-nginx` on Kubernetes); Postgres from pods labelled `z.io/postgres-client: "true"` of the release,
   and no egress.
-- Egress of z-server (GitLab, tools, Kubernetes API) and LiteLLM (inference cluster) is not restricted by
-  default. Set `networkPolicy.litellmEgress` to the inference cluster's CIDRs to pin LiteLLM to it.
+- LiteLLM egress: DNS, the embedded Postgres (or `networkPolicy.databaseEgress`) and
+  `networkPolicy.litellmEgress`, the inference cluster. With `env: production` the render **fails** unless
+  `litellmEgress` has a rule with an `ipBlock` CIDR and ports (the inferX gateway), and `0.0.0.0/0` / `::/0`
+  are refused there (invariant 1: LiteLLM is the only path to models and reaches nothing else).
+- z-server egress (`networkPolicy.serverEgress`, on; cannot be disabled in production): DNS, LiteLLM, the
+  embedded Postgres, z-browser and the egress proxy (pod selectors, rendered by the chart), the Kubernetes API
+  (`serverEgress.kubernetesApi`, default any address on TCP 6443: narrow it to your control-plane IPs, use
+  443 on most managed clusters; on Cilium `ipBlock` does not match node IPs unless
+  `policy-cidr-match-mode=nodes`), the external Postgres (`networkPolicy.databaseEgress`, required when
+  `postgres.embedded: false`), and `serverEgress.allow`: GitLab (OIDC issuer and connector), the tool APIs of
+  your connectors, notification webhooks, audit forwarding, `INFERENCE_PROMETHEUS_URL`. Nothing else.
 - Label the release namespace for Pod Security Admission yourself (docs/07 §3), e.g.
   `kubectl label ns z pod-security.kubernetes.io/enforce=restricted`: every chart pod satisfies `restricted`.
 
@@ -225,7 +242,11 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `networkPolicy.enabled` | `true` | release namespace policies |
 | `networkPolicy.ingressController` | `kube-system` | namespace/pod selector of the ingress controller |
 | `networkPolicy.metricsFrom` | `[]` | peers allowed to scrape `/metrics` |
-| `networkPolicy.litellmEgress` | `[]` | restrict LiteLLM egress to these rules (+ DNS) |
+| `networkPolicy.litellmEgress` | `[]` | restrict LiteLLM egress to these rules (+ DNS); required in production |
+| `networkPolicy.databaseEgress` | `[]` | egress to the external Postgres (z-server, LiteLLM); required with `postgres.embedded: false` |
+| `networkPolicy.serverEgress.enabled` | `true` | z-server egress policy; refused `false` in production |
+| `networkPolicy.serverEgress.kubernetesApi` | any address, TCP 6443 | egress rules to the API server endpoints |
+| `networkPolicy.serverEgress.allow` | `[]` | GitLab, tool APIs, webhooks, audit forwarding |
 | `podDisruptionBudget.enabled` | `false` | PDBs (`true` in k8s values) |
 | `metrics.serviceMonitor.enabled` | `false` | rendered only if `monitoring.coreos.com/v1` is served |
 | `config.z` | see values.yaml | `config/z.yaml` (validated by the server against `contracts/config.schema.json`) |

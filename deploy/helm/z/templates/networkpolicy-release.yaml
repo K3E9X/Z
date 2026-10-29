@@ -6,8 +6,10 @@
 {{- $_ := set $peer "podSelector" $np.ingressController.podSelector }}
 {{- end }}
 {{- $controller := list $peer }}
-# Release namespace: ingress to each Z pod only from the pods that need it. Egress is left open for z-server
-# (GitLab, tools, Kubernetes API) and LiteLLM (inference cluster) unless networkPolicy.litellmEgress is set.
+{{- $se := $np.serverEgress }}
+# Release namespace: ingress to each Z pod only from the pods that need it. z-server egress: DNS, the chart's
+# own pods it calls, the Kubernetes API and networkPolicy.serverEgress.allow (GitLab, tools). LiteLLM egress:
+# DNS and networkPolicy.litellmEgress (the inference cluster; required in production).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -18,7 +20,58 @@ spec:
   podSelector:
     matchLabels:
       {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 6 }}
-  policyTypes: [Ingress]
+  policyTypes:
+    - Ingress
+    {{- if $se.enabled }}
+    - Egress
+    {{- end }}
+  {{- if $se.enabled }}
+  egress:
+    {{- include "z.dnsEgressRule" . | nindent 4 }}
+    # LiteLLM: virtual keys (master key) and the server's own model calls
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "litellm") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: {{ .Values.litellm.port }} }
+    {{- if .Values.postgres.embedded }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 5432 }
+    {{- end }}
+    {{- if .Values.browser.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "browser") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: {{ .Values.browser.port }} }
+    {{- end }}
+    {{- if .Values.egressProxy.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: {{ .Values.egressProxy.port }} }
+    {{- end }}
+    {{- with $se.kubernetesApi }}
+    # Kubernetes API (the executor starts runner Jobs): the API server endpoints, as the CNI sees them
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $np.databaseEgress }}
+    # external Postgres
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $se.allow }}
+    # GitLab (OIDC issuer), tool APIs, notification and audit forwarding targets
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
   ingress:
     - from:
         # runners: internal API (job token) and the tool gateway
@@ -64,18 +117,7 @@ spec:
           port: {{ .Values.litellm.port }}
   {{- if $np.litellmEgress }}
   egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
-          podSelector:
-            matchLabels:
-              {{- toYaml .Values.dns.podLabels | nindent 14 }}
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
+    {{- include "z.dnsEgressRule" . | nindent 4 }}
     {{- if .Values.postgres.embedded }}
     - to:
         - podSelector:
@@ -85,6 +127,11 @@ spec:
         - protocol: TCP
           port: 5432
     {{- end }}
+    {{- with $np.databaseEgress }}
+    # external Postgres (LiteLLM's own database)
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    # the inference cluster (inferX gateway) only
     {{- toYaml $np.litellmEgress | nindent 4 }}
   {{- end }}
 {{- if .Values.ui.enabled }}

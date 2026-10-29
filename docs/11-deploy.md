@@ -76,6 +76,18 @@ spec:
       ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
 ```
 
+### Release namespace egress (rendered by the chart)
+- **LiteLLM** (invariant 1): DNS, its database, and `networkPolicy.litellmEgress`, the inference cluster. With `env: production` the render fails unless `litellmEgress` lists at least one rule with an `ipBlock` CIDR and ports (the inferX gateway); `0.0.0.0/0` and `::/0` are refused.
+- **z-server** (`networkPolicy.serverEgress`, on, cannot be disabled in production): DNS; LiteLLM, the embedded Postgres, z-browser and the egress proxy by pod selector; the Kubernetes API (`serverEgress.kubernetesApi`, default any address on TCP 6443, which is how k3s and kubeadm expose the API server endpoints after Service translation; managed clusters often use 443; on Cilium, `ipBlock` does not match node IPs unless `policy-cidr-match-mode=nodes`); the external Postgres (`networkPolicy.databaseEgress`, required when `postgres.embedded: false`); and `serverEgress.allow`, the only knob for everything else: the GitLab instance (OIDC issuer, GitLab connector), tool APIs, notification webhooks, audit forwarding, inference Prometheus.
+
+```yaml
+# my-values.yaml
+networkPolicy:
+  litellmEgress:  [{ to: [{ ipBlock: { cidr: 10.20.0.15/32 } }], ports: [{ port: 443, protocol: TCP }] }]   # inferX gateway
+  serverEgress:
+    allow:        [{ to: [{ ipBlock: { cidr: 10.10.0.0/24 } }], ports: [{ port: 443, protocol: TCP }] }]  # GitLab, tools
+```
+
 ## 3. Images and CI
 See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish to GHCR), GitLab CI on the internal mirror (same checks, plus signed-image deploy to the team's k3s through a protected environment). Images: `z-server`, `z-runner`, `z-browser`, `z-ui`, multi-arch, tags `vX.Y.Z` and `sha-<short>`, always deployed by digest. The LiteLLM image is pinned by digest too.
 

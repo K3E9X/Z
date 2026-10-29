@@ -261,8 +261,51 @@ in the Secret. External: the DSN comes from database.existingSecret.
 {{- end }}
 {{- end -}}
 
+{{/* NetworkPolicy egress rule: DNS (dns.namespace / dns.podLabels), UDP and TCP 53 */}}
+{{- define "z.dnsEgressRule" -}}
+- to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
+      podSelector:
+        matchLabels:
+          {{- toYaml .Values.dns.podLabels | nindent 10 }}
+  ports:
+    - { protocol: UDP, port: 53 }
+    - { protocol: TCP, port: 53 }
+{{- end -}}
+
+{{/* Production: LiteLLM egress must be pinned to the inference cluster (invariant 1/2) */}}
+{{- define "z.validateLitellmEgress" -}}
+{{- $pinned := false -}}
+{{- range .Values.networkPolicy.litellmEgress -}}
+{{- $rule := . -}}
+{{- range (default (list) $rule.to) -}}
+{{- $cidr := dig "ipBlock" "cidr" "" . -}}
+{{- if has $cidr (list "0.0.0.0/0" "::/0") -}}
+{{- fail (printf "env=production: networkPolicy.litellmEgress must not allow %s; list the inference cluster's CIDRs (invariant 1)" $cidr) -}}
+{{- end -}}
+{{- if and $cidr $rule.ports -}}
+{{- $pinned = true -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if not $pinned -}}
+{{- fail "env=production needs networkPolicy.litellmEgress: at least one rule with an ipBlock CIDR and ports (the inferX gateway), e.g. [{to: [{ipBlock: {cidr: 10.20.0.0/16}}], ports: [{port: 443, protocol: TCP}]}]. LiteLLM is the only path to models and must reach nothing else (invariant 1)" -}}
+{{- end -}}
+{{- end -}}
+
 {{/* Validation that must stop the render (called from server-deployment.yaml) */}}
 {{- define "z.validate" -}}
+{{- if eq .Values.env "production" -}}
+{{- include "z.validateLitellmEgress" . -}}
+{{- if not .Values.networkPolicy.serverEgress.enabled -}}
+{{- fail "env=production: networkPolicy.serverEgress.enabled=false is refused; list what z-server must reach in networkPolicy.serverEgress.allow" -}}
+{{- end -}}
+{{- end -}}
+{{- if and .Values.networkPolicy.enabled .Values.networkPolicy.serverEgress.enabled (not .Values.postgres.embedded) (not .Values.networkPolicy.databaseEgress) -}}
+{{- fail "postgres.embedded=false with networkPolicy.serverEgress.enabled needs networkPolicy.databaseEgress (the external Postgres address and port), or z-server cannot reach its database" -}}
+{{- end -}}
 {{- if .Values.server.splitComponents -}}
 {{- fail "server.splitComponents=true is not implemented by this chart version; run the `all` entrypoint (false)" -}}
 {{- end -}}

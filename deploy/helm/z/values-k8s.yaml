@@ -50,6 +50,12 @@ networkPolicy:
     podSelector:
       matchLabels:
         app.kubernetes.io/name: ingress-nginx
+  # Site values (my-values.yaml), required with env=production and the external Postgres:
+  #   litellmEgress:  [{to: [{ipBlock: {cidr: <inferX gateway>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #   databaseEgress: [{to: [{ipBlock: {cidr: <postgres>/32}}], ports: [{port: 5432, protocol: TCP}]}]
+  #   serverEgress:
+  #     kubernetesApi: [{to: [{ipBlock: {cidr: <control plane>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #     allow: [{to: [{ipBlock: {cidr: <GitLab and tools>}}], ports: [{port: 443, protocol: TCP}]}]
 
 podDisruptionBudget:
   enabled: true

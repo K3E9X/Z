@@ -331,8 +331,8 @@ httpRoute:
   annotations: {}
 
 networkPolicy:
-  # Ingress policies for the chart's pods in the release namespace. Egress from z-server (GitLab, tools,
-  # Kubernetes API) and LiteLLM (inference cluster) is not restricted by default: see litellmEgress.
+  # Ingress policies for the chart's pods in the release namespace, egress policies for z-server
+  # (serverEgress) and LiteLLM (litellmEgress).
   enabled: true
   # Where the ingress controller / gateway pods run (traffic to z-ui, or z-server when ui.enabled=false).
   ingressController:
@@ -342,9 +342,30 @@ networkPolicy:
     podSelector: {}
   # Extra peers allowed to scrape z-server /metrics (Prometheus).
   metricsFrom: []          # [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]
-  # Restrict LiteLLM egress to DNS + these rules (invariant 1/2: models only through LiteLLM, external
-  # providers off). Empty: not restricted.
+  # Restrict LiteLLM egress to DNS (+ the embedded Postgres, + databaseEgress) and these rules (invariant 1/2:
+  # models only through LiteLLM, external providers off). REQUIRED when env=production: the render fails
+  # unless one rule has an ipBlock CIDR and ports (the inferX gateway); 0.0.0.0/0 and ::/0 are refused there.
+  # Empty (other environments only): LiteLLM egress is not restricted.
   litellmEgress: []        # [{to: [{ipBlock: {cidr: 10.20.0.0/16}}], ports: [{port: 443, protocol: TCP}]}]
+  # External Postgres (postgres.embedded=false): egress rules to the database, added to z-server and LiteLLM.
+  databaseEgress: []       # [{to: [{ipBlock: {cidr: 10.30.0.10/32}}], ports: [{port: 5432, protocol: TCP}]}]
+  # z-server egress. The chart always allows DNS and the chart pods z-server calls (LiteLLM, the embedded
+  # Postgres, z-browser, the egress proxy); everything outside the release is listed here. Cannot be
+  # disabled when env=production.
+  serverEgress:
+    enabled: true
+    # The Kubernetes API (the executor creates runner Jobs and Secrets). NetworkPolicy matches the API server
+    # endpoints after the kubernetes Service is translated: control-plane / node IPs, port 6443 on k3s and
+    # kubeadm (443 on most managed clusters). Narrow the CIDR to your control-plane addresses. On Cilium,
+    # ipBlock does not select node IPs unless policy-cidr-match-mode=nodes is set (or add a
+    # CiliumNetworkPolicy with toEntities: [kube-apiserver]).
+    kubernetesApi:
+      - to: [{ ipBlock: { cidr: 0.0.0.0/0 } }]
+        ports: [{ port: 6443, protocol: TCP }]
+    # Everything else z-server calls: the GitLab instance (OIDC issuer, and usually the GitLab connector),
+    # the tool APIs of your connectors, chat/notification webhooks, audit forwarding (syslog, https),
+    # INFERENCE_PROMETHEUS_URL. Empty: none of them is reachable (GitLab sign-in fails).
+    allow: []              # [{to: [{ipBlock: {cidr: 10.10.0.0/16}}], ports: [{port: 443, protocol: TCP}]}]
 
 podDisruptionBudget:
   enabled: false

@@ -39,6 +39,11 @@ networkPolicy:
     podSelector:
       matchLabels:
         app.kubernetes.io/name: traefik
+  # Site values (my-values.yaml), required with env=production:
+  #   litellmEgress: [{to: [{ipBlock: {cidr: <inferX gateway>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #   serverEgress:
+  #     allow: [{to: [{ipBlock: {cidr: <GitLab and tools>}}], ports: [{port: 443, protocol: TCP}]}]
+  # The Kubernetes API default (any address, TCP 6443) fits k3s; narrow it to the server nodes' IPs.
 
 podDisruptionBudget:
   enabled: false

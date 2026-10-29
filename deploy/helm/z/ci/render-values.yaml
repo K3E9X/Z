@@ -1,0 +1,15 @@
+# CI render only (helm lint / helm template / kubeconform / kubescape / trivy), on top of values-k3s.yaml or
+# values-k8s.yaml. The defaults are env=production, whose checks fail the render until site values exist;
+# this file stands in for my-values.yaml with documentation addresses (RFC 5737). NEVER deploy with it.
+#   helm template z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml
+networkPolicy:
+  litellmEgress:
+    - to: [{ ipBlock: { cidr: 192.0.2.0/24 } }]
+      ports: [{ port: 443, protocol: TCP }]
+  databaseEgress:            # used by values-k8s.yaml (external Postgres)
+    - to: [{ ipBlock: { cidr: 203.0.113.10/32 } }]
+      ports: [{ port: 5432, protocol: TCP }]
+  serverEgress:
+    allow:
+      - to: [{ ipBlock: { cidr: 198.51.100.0/24 } }]
+        ports: [{ port: 443, protocol: TCP }]
