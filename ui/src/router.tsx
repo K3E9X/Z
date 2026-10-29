@@ -34,6 +34,12 @@ const missionDetail = createRoute({
   component: lazyRouteComponent(() => import('./screens/MissionDetail'), 'MissionDetail'),
 })
 
+const takeOver = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/missions/$id/take-over/$jobId',
+  component: lazyRouteComponent(() => import('./screens/TakeOver'), 'TakeOver'),
+})
+
 const replay = createRoute({
   getParentRoute: () => rootRoute,
   path: '/missions/$id/replay',
@@ -177,6 +183,7 @@ const routeTree = rootRoute.addChildren([
   newMission,
   missionDetail,
   replay,
+  takeOver,
   review,
   tasks,
   playbooks,

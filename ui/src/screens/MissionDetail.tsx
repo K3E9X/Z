@@ -658,9 +658,12 @@ function Header({ mission, onStop }: { mission: Mission; onStop: () => void }) {
                     body: { job_id: job.id, mode: 'read_only' },
                   }),
                 )
-                window.open(s.terminal_url, '_blank', 'noopener,noreferrer')
+                await navigate({
+                  to: '/missions/$id/take-over/$jobId',
+                  params: { id: mission.id, jobId: s.job_id },
+                })
               },
-              'Workspace opened read-only in a new tab',
+              'The job is paused; its workspace is open read-only',
             )
           }
         >

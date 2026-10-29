@@ -392,6 +392,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/missions/{id}/take-over/{job_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files of a workspace being taken over
+         * @description The paused workspace rebuilt from its staged inputs and the job checkpoint, with the edits of this take-over. Only the person who took it over, while the session lasts.
+         */
+        get: operations["getTakeOverWorkspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/missions/{id}/take-over/{job_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one file of a workspace being taken over */
+        get: operations["getTakeOverFile"];
+        /** Write one file (read_write take-over) */
+        put: operations["putTakeOverFile"];
+        post?: never;
+        /** Delete one file (read_write take-over) */
+        delete: operations["deleteTakeOverFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/missions/{id}/take-over/{job_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a take-over
+         * @description Edits are folded into the job checkpoint and the job restarts from it (the agent is told which files a person changed); without edits the job simply resumes. resume=false keeps it paused.
+         */
+        post: operations["finishTakeOver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/missions/{id}/events": {
         parameters: {
             query?: never;
@@ -2903,11 +2962,56 @@ export interface components {
              */
             mode?: "read_only" | "read_write";
         };
+        /** @description terminal_url opens the take-over page of the web app: the paused workspace as files (read, and edit in read_write). */
         TakeOverSession: {
             job_id: string;
             terminal_url: string;
             expires_at: components["schemas"]["Timestamp"];
             mode: string;
+        };
+        TakeOverFile: {
+            path: string;
+            size: number;
+            /** @enum {string} */
+            origin: "staged" | "agent" | "human";
+            deleted: boolean;
+        };
+        TakeOverWorkspace: {
+            job_id: string;
+            /** @enum {string} */
+            mode: "read_only" | "read_write";
+            by: string;
+            expires_at: components["schemas"]["Timestamp"];
+            files: components["schemas"]["TakeOverFile"][];
+            truncated: boolean;
+        };
+        TakeOverFileContent: {
+            path: string;
+            /** @enum {string} */
+            encoding: "utf-8" | "base64";
+            content: string;
+            size: number;
+            /** @enum {string} */
+            origin: "staged" | "agent" | "human";
+        };
+        TakeOverEdit: {
+            path: string;
+            content: string;
+            /**
+             * @default utf-8
+             * @enum {string}
+             */
+            encoding?: "utf-8" | "base64";
+        };
+        TakeOverFinish: {
+            /** @default true */
+            resume?: boolean;
+        };
+        TakeOverResult: {
+            job_id: string;
+            edited: string[];
+            restarted: boolean;
+            resumed: boolean;
         };
         SaveAsPlaybook: {
             name: components["schemas"]["Slug"];
@@ -5652,6 +5756,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TakeOverSession"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getTakeOverWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeOverWorkspace"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getTakeOverFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeOverFileContent"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    putTakeOverFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakeOverEdit"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeOverFile"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteTakeOverFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    finishTakeOver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakeOverFinish"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeOverResult"];
                 };
             };
             /** @description Problem details */
