@@ -279,3 +279,22 @@ def test_write_errors_are_redacted_before_they_reach_the_action_and_the_audit() 
     with pytest.raises(WriteError) as caught:
         _fail(inv, "post")
     assert "rw-slack-123" not in str(caught.value) and "post: bad" in str(caught.value)
+
+
+async def test_spec_fetches_stop_at_the_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    import httpx
+    from z_server.errors import Problem
+    from z_server.gateway import admin
+
+    async def allowed(url: str, state: object) -> None:
+        return None
+
+    monkeypatch.setattr(admin, "check_outbound_url", allowed)
+    huge = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=b"x" * 6_000_000)))
+    with pytest.raises(Problem, match="larger than 5 MB"):
+        await admin.fetch_spec(SimpleNamespace(http=huge), "https://specs.example.internal/openapi.json")  # type: ignore[arg-type]
+    with pytest.raises(Problem, match="larger than 5 MB"):
+        await admin.fetch_introspection(SimpleNamespace(http=huge), "https://gql.example.internal/graphql")  # type: ignore[arg-type]
+    await huge.aclose()

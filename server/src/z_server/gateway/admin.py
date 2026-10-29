@@ -122,43 +122,49 @@ async def sync_credentials(db: AsyncSession, connector: Connector) -> None:
             await db.delete(row)
 
 
-async def fetch_spec(state: AppState, url: str) -> dict[str, Any]:
+async def _fetch_capped(state: AppState, method: str, url: str, what: str, **kwargs: Any) -> tuple[int, bytes]:
+    """(status, body) of an admin-entered URL, read with a byte cap (never buffered whole)."""
     await check_outbound_url(url, state)
+    data = bytearray()
     try:
-        resp = await state.http.get(url, timeout=20, follow_redirects=False)
+        async with state.http.stream(method, url, timeout=20, follow_redirects=False, **kwargs) as resp:
+            async for chunk in resp.aiter_bytes():
+                data += chunk
+                if len(data) > MAX_SPEC_BYTES:
+                    raise Problem("validation", f"the {what} is larger than 5 MB")
+            return resp.status_code, bytes(data)
+    except Problem:
+        raise
     except Exception as exc:
-        raise Problem("validation", f"could not fetch the spec: {type(exc).__name__}") from exc
-    if resp.status_code != 200:
-        raise Problem("validation", f"the spec URL answered {resp.status_code}")
-    if len(resp.content) > MAX_SPEC_BYTES:
-        raise Problem("validation", "the spec is larger than 5 MB")
-    return parse_spec(resp.text)
+        raise Problem("validation", f"could not fetch the {what}: {type(exc).__name__}") from exc
+
+
+async def fetch_spec(state: AppState, url: str) -> dict[str, Any]:
+    status, body = await _fetch_capped(state, "GET", url, "spec")
+    if status != 200:
+        raise Problem("validation", f"the spec URL answered {status}")
+    return parse_spec(body.decode("utf-8", errors="replace"))
 
 
 async def fetch_introspection(state: AppState, endpoint: str) -> dict[str, Any]:
     """Run the introspection query against a GraphQL endpoint, without credentials (like a spec URL)."""
-    await check_outbound_url(endpoint, state)
+    status, raw = await _fetch_capped(
+        state,
+        "POST",
+        endpoint,
+        "introspection result",
+        json={"query": INTROSPECTION_QUERY},
+        headers={"Accept": "application/json"},
+    )
     try:
-        resp = await state.http.post(
-            endpoint,
-            json={"query": INTROSPECTION_QUERY},
-            headers={"Accept": "application/json"},
-            timeout=20,
-            follow_redirects=False,
-        )
-    except Exception as exc:
-        raise Problem("validation", f"could not reach the GraphQL endpoint: {type(exc).__name__}") from exc
-    if len(resp.content) > MAX_SPEC_BYTES:
-        raise Problem("validation", "the introspection result is larger than 5 MB")
-    try:
-        body = resp.json()
+        body = json.loads(raw)
     except ValueError:
         body = None
     errors = body.get("errors") if isinstance(body, dict) else None
-    if resp.status_code != 200 or errors or not isinstance(body, dict):
+    if status != 200 or errors or not isinstance(body, dict):
         raise Problem(
             "validation",
-            f"the endpoint refused introspection (HTTP {resp.status_code}): run it with a read token and paste the "
+            f"the endpoint refused introspection (HTTP {status}): run it with a read token and paste the "
             "result instead",
         )
     return body
