@@ -7,7 +7,7 @@ import { useHotkeys } from '@/lib/hotkeys'
 import { CommandPalette } from './CommandPalette'
 import { HelpDialog } from './HelpDialog'
 import { IconRail, Sidebar } from './Navigation'
-import { NAV } from './nav'
+import { NAV, visibleNav } from './nav'
 import { PaletteContext } from './palette-context'
 
 function LiveBanner() {
@@ -45,7 +45,8 @@ function AccountBanners() {
   )
 }
 
-function MobileBar() {
+export function MobileBar() {
+  const me = useCurrentMe()
   const [open, setOpen] = useState(false)
   return (
     <div className="md:hidden">
@@ -67,7 +68,7 @@ function MobileBar() {
       </div>
       {open && (
         <nav aria-label="Main navigation" className="flex flex-col border-b border-line px-3 pb-3">
-          {NAV.map((n) => (
+          {visibleNav(NAV, me).map((n) => (
             <Link
               key={n.to}
               to={n.to}

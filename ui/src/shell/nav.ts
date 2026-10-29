@@ -1,5 +1,7 @@
 import type { PermissionName } from '@/api/permissions.gen'
+import type { Me } from '@/api/types'
 import type { IconName } from '@/components/Icon'
+import { can } from '@/lib/auth'
 
 export interface NavItem {
   to: string
@@ -81,6 +83,11 @@ export const NAV: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: 'settings', group: 'configure', shortcut: 'G S' },
   { to: '/admin', label: 'Admin', icon: 'admin', group: 'configure', permission: 'users:manage' },
 ]
+
+/** The entries this user may open: every navigation (sidebar, rail, mobile menu) uses this filter. */
+export function visibleNav(items: NavItem[], me: Me | null): NavItem[] {
+  return items.filter((i) => !i.permission || can(me, i.permission))
+}
 
 export function isActive(path: string, to: string): boolean {
   if (to === '/') return path === '/' || path.startsWith('/missions')

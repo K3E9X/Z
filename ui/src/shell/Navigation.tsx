@@ -7,7 +7,7 @@ import { can, useCurrentMe } from '@/lib/auth'
 import { percent } from '@/lib/format'
 import { MOD } from '@/lib/hotkeys'
 import { useCommandPalette } from './palette-context'
-import { isActive, NAV, type NavItem } from './nav'
+import { isActive, NAV, visibleNav, type NavItem } from './nav'
 import { useShellData } from './useShellData'
 import { UserMenu } from './UserMenu'
 
@@ -40,10 +40,6 @@ function useBadges() {
   }
 }
 
-function visible(items: NavItem[], me: ReturnType<typeof useCurrentMe>) {
-  return items.filter((i) => !i.permission || can(me, i.permission))
-}
-
 /** Full sidebar of Mission control (docs/09 §3). */
 export function Sidebar() {
   const me = useCurrentMe()
@@ -51,7 +47,7 @@ export function Sidebar() {
   const badge = useBadges()
   const palette = useCommandPalette()
   const [menu, setMenu] = useState(false)
-  const items = visible(NAV, me)
+  const items = visibleNav(NAV, me)
   const canStart = can(me, 'missions:start')
 
   const row = (i: NavItem) => {
@@ -161,7 +157,7 @@ export function IconRail() {
   const badge = useBadges()
   const d = useShellData()
   const [menu, setMenu] = useState(false)
-  const items = visible(NAV, me)
+  const items = visibleNav(NAV, me)
   const healthTone = d.health
     ? d.health.status === 'healthy'
       ? 'ok'
