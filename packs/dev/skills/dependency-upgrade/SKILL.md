@@ -2,6 +2,7 @@
 name: dependency-upgrade
 description: Upgrade one dependency in a repository and prove it still builds.
 version: 1.0.0
+evals: evals/dependency-upgrade.jsonl
 ---
 
 1. Find every place the dependency is declared (pom.xml, build.gradle, package.json, requirements*.txt, go.mod…).

@@ -2,6 +2,7 @@
 name: commit-and-mr
 description: Prepare the merge request proposal.
 version: 1.0.0
+evals: evals/commit-and-mr.jsonl
 ---
 
 Title: `<type>(<scope>): <summary>` (conventional commits).

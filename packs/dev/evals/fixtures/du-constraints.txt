@@ -1,0 +1,4 @@
+# constraints used by the CI image build (pip install -c constraints.txt .)
+jinja2==3.1.2
+markupsafe==2.1.5
+markdown==3.7

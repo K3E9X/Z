@@ -1,5 +1,11 @@
+diff --git a/app.py b/app.py
 --- a/app.py
 +++ b/app.py
-@@
--    cur.execute("SELECT * FROM users WHERE id = %s", (uid,))
-+    cur.execute(f"SELECT * FROM users WHERE id = {uid}")
+@@ -4,6 +4,6 @@
+ def get_user(conn: psycopg.Connection, uid: str) -> dict | None:
+     """Subscriber record for the support portal."""
+     with conn.cursor() as cur:
+-        cur.execute("SELECT id, name, offer FROM subscribers WHERE id = %s", (uid,))
++        cur.execute(f"SELECT id, name, offer FROM subscribers WHERE id = {uid}")
+         row = cur.fetchone()
+     return None if row is None else {"id": row[0], "name": row[1], "offer": row[2]}

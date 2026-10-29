@@ -1,0 +1,17 @@
+diff --git a/b2b/webhooks.py b/b2b/webhooks.py
+--- a/b2b/webhooks.py
++++ b/b2b/webhooks.py
+@@ -3,5 +3,11 @@
+ ALLOWED_HOOK = "https://chat.example.internal/hooks/noc-alerts"
+ 
+ 
+-def notify(message: str) -> None:
+-    requests.post(ALLOWED_HOOK, json={"text": message}, timeout=5)
++def notify(message: str, hook_url: str | None = None) -> None:
++    """Send an alert; customers of the B2B portal can now give their own webhook URL."""
++    requests.post(hook_url or ALLOWED_HOOK, json={"text": message}, timeout=5)
++
++
++def preview_hook(hook_url: str) -> str:
++    """Show the customer what their webhook answers (first 2 kB)."""
++    return requests.get(hook_url, timeout=5).text[:2048]

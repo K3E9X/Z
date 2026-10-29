@@ -1,0 +1,9 @@
+diff --git a/templates/outage.html b/templates/outage.html
+--- a/templates/outage.html
++++ b/templates/outage.html
+@@ -1,3 +1,4 @@
+ <h2>Outage {{ outage.reference }}</h2>
+ <p class="status">{{ outage.status }}</p>
+-<p class="message">{{ outage.public_message }}</p>
++<p class="message">{{ outage.public_message | safe }}</p>
++<p class="comment">Last customer comment: {{ outage.last_customer_comment | safe }}</p>

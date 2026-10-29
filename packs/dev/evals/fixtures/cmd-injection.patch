@@ -1,0 +1,13 @@
+diff --git a/netcheck.py b/netcheck.py
+--- a/netcheck.py
++++ b/netcheck.py
+@@ -1,7 +1,7 @@
+ import subprocess
+ 
+ 
+-def ping(host: str) -> bool:
++def ping(host: str, count: int = 3) -> bool:
+     """Reachability check used by the NOC chat command /ping."""
+-    result = subprocess.run(["ping", "-c", "3", "-W", "2", host], capture_output=True, timeout=15)
++    result = subprocess.run(f"ping -c {count} -W 2 {host}", shell=True, capture_output=True, timeout=15)
+     return result.returncode == 0

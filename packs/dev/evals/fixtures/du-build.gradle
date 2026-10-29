@@ -1,0 +1,21 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'internal.example.oss'
+version = '3.2.0'
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.yaml:snakeyaml:1.33'
+    implementation 'com.google.guava:guava:33.3.1-jre'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
+}
+
+application { mainClass = 'internal.example.oss.TopologyLoader' }
+
+test { useJUnitPlatform() }

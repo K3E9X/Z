@@ -1,0 +1,20 @@
+diff --git a/outage/lines.py b/outage/lines.py
+--- a/outage/lines.py
++++ b/outage/lines.py
+@@ -1,8 +1,13 @@
+ import psycopg
+ 
++MAX_CITY_LEN = 80
+ 
+-def find_lines(conn: psycopg.Connection, city: str) -> list[str]:
+-    """Fibre lines of a city for the outage map."""
++
++def find_lines(conn: psycopg.Connection, city: str, limit: int = 500) -> list[str]:
++    """Fibre lines of a city for the outage map (at most `limit` lines)."""
++    if not city or len(city) > MAX_CITY_LEN:
++        raise ValueError("city must be 1 to 80 characters")
++    limit = max(1, min(limit, 500))
+     with conn.cursor() as cur:
+-        cur.execute("SELECT line_id FROM ftth_lines WHERE city = %s", (city,))
++        cur.execute("SELECT line_id FROM ftth_lines WHERE city = %s ORDER BY line_id LIMIT %s", (city, limit))
+         return [r[0] for r in cur.fetchall()]

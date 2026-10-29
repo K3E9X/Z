@@ -1,0 +1,12 @@
+[project]
+name = "report-renderer"
+version = "0.9.4"
+description = "Renders the weekly NOC availability report"
+requires-python = ">=3.11"
+dependencies = [
+    "jinja2==3.1.2",
+    "markdown==3.7",
+]
+
+[project.optional-dependencies]
+test = []

@@ -2,6 +2,7 @@
 name: fix-issue
 description: Fix a described issue with the smallest correct change.
 version: 1.0.0
+evals: evals/fix-issue.jsonl
 ---
 
 1. Reproduce or locate the problem from the issue text.

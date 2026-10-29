@@ -1,0 +1,25 @@
+diff --git a/vlan.py b/vlan.py
+--- a/vlan.py
++++ b/vlan.py
+@@ -8,7 +8,7 @@
+         part = part.strip()
+         if "-" in part:
+             start, end = (int(x) for x in part.split("-", 1))
+-            vlans.update(range(start, end))
++            vlans.update(range(start, end + 1))
+         else:
+             vlans.add(int(part))
+     for vlan in vlans:
+diff --git a/test_vlan.py b/test_vlan.py
+--- a/test_vlan.py
++++ b/test_vlan.py
+@@ -10,6 +10,9 @@
+     def test_list(self) -> None:
+         self.assertEqual(parse_vlan_range("300, 100"), [100, 300])
+ 
++    def test_range_is_inclusive(self) -> None:
++        self.assertEqual(parse_vlan_range("100-102"), [100, 101, 102])
++
+     def test_out_of_range(self) -> None:
+         with self.assertRaises(ValueError):
+             parse_vlan_range("4095")

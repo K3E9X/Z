@@ -1,0 +1,1 @@
+{"verdict": "approve", "blockers": [], "remarks": ["urllib3 2.x drops support for OpenSSL older than 1.1.1; the CI image python:3.12-slim is fine."]}

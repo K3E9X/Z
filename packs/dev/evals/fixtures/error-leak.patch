@@ -1,0 +1,21 @@
+diff --git a/billing/errors.py b/billing/errors.py
+--- a/billing/errors.py
++++ b/billing/errors.py
+@@ -1,12 +1,13 @@
+-import logging
++import traceback
+ 
+ from flask import Flask, jsonify
+ 
++from .settings import DATABASE_URL
++
+ app = Flask(__name__)
+-log = logging.getLogger("billing")
+ 
+ 
+ @app.errorhandler(Exception)
+ def on_error(exc: Exception):
+-    log.exception("unhandled error")
+-    return jsonify({"error": "internal error"}), 500
++    # easier debugging for the hotline
++    return jsonify({"error": str(exc), "trace": traceback.format_exc(), "database": DATABASE_URL}), 500

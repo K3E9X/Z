@@ -1,0 +1,8 @@
+# .gitlab-ci.yml of netops/ops-scripts
+stages: [test]
+
+unit:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - python -m unittest discover -v
