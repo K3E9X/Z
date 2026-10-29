@@ -12,8 +12,8 @@ limited, and how a flow is kept to what an admin reviewed.
 1. **Flow format.** A connector has `flows: {name: {start_url?, allowed_hosts?, timeout_s?, steps}}`; each
    `declared` operation names one (`flow`). Steps: `goto, click, fill, select, check, uncheck, press, wait_for,
    wait_for_url, extract_text, extract_table, extract_attribute, assert_text, assert_visible, screenshot`, each
-   with an optional `timeout_ms` and `optional`. Flows are written in the connector file or the builder (JSON);
-   interactive recording is a later feature (`recordBrowserFlow` answers 503 until then).
+   with an optional `timeout_ms` and `optional`. Flows are written in the connector file or the builder (JSON),
+   or recorded by demonstration (item 9).
 2. **Placeholders are fenced.** `{{args.x}}` may appear only in `goto`/`wait_for_url` URLs (percent-encoded) and
    in `fill`/`select`/`assert_text` values, never in a selector: what a flow clicks is fixed by the reviewed
    file, not by an agent. `{{auth.username}}`/`{{auth.password}}` may appear only in `fill` values. Every argument
@@ -42,10 +42,19 @@ limited, and how a flow is kept to what an admin reviewed.
 8. **Worker API.** `POST /v1/run` with a bearer `Z_BROWSER_TOKEN` (>= 16 characters, refused otherwise), at
    most `Z_BROWSER_CONCURRENCY` runs at a time, each bounded by the flow timeout (5–300 s).
 
+9. **Recording.** An admin opens a live page on a browser connector (signed in with its read or write account,
+   behind the same guard) and drives it from the web app: clicks at a point, typed text (optionally as an
+   argument, recorded as `{{args.<name>}}`), "type the user name / password" (the worker types the credential
+   and records `{{auth.*}}`; the admin never sees or types it), keys, URLs, extractions and visibility checks.
+   Each step gets the first selector candidate that matches exactly one element (id, test ids, name,
+   aria-label, text, then a short CSS path); a click on no element is refused. The recording only produces a
+   draft: the admin saves it into the connector through the normal reviewed update, and its operation stays
+   unexposed until the exposure review. Recording sessions are per admin, audited input by input, at most two
+   per worker, closed after 10 idle minutes.
+
 ## Consequences
 - A web-only tool is usable by agents within minutes, with the same review, audit, judge and approval rules
   as an API connector.
 - Flows are brittle by nature (selectors change): `optional` steps absorb cookie banners and similar noise,
   `assert_*` steps make a changed page fail loudly, and failure screenshots help the admin repair the flow.
-- Recording in a sandboxed browser, flow reuse across operations (e.g. one shared login) and a visual flow
-  editor are left for later.
+- Flow reuse across operations (e.g. one shared login) and editing a recorded step in place are left for later.

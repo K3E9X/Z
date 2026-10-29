@@ -48,7 +48,7 @@ Every connector has a health probe (path, MCP `ping`, or a cheap read). The moni
 Adding a tool should take minutes:
 1. **From a spec**: paste an OpenAPI/GraphQL URL or file → operations listed with proposed classes → admin reviews exposure → test call → save.
 2. **From docs**: the builder agent (`z-heavy`) reads API docs pasted or uploaded, drafts a `rest` connector YAML and tests it; an admin reviews.
-3. **From the browser**: the admin writes the flow (steps such as `fill`, `click`, `extract_table`, `assert_text`) for a named, parameterised `browser` operation; the gateway-side `z-browser` worker replays it with the read or write account, limited to the connector's hosts (ADR 0016). Recording the flow in a sandboxed browser comes later.
+3. **From the browser**: the admin writes the flow (steps such as `fill`, `click`, `extract_table`, `assert_text`) for a named, parameterised `browser` operation; the gateway-side `z-browser` worker replays it with the read or write account, limited to the connector's hosts (ADR 0016). The admin can also record it by demonstration: drive a live page from the web app ("Record a flow" on the connector); credentials are typed by Z and recorded as placeholders; the draft is reviewed before exposure.
 4. **From an MCP server**: give the command or URL; Z discovers tools and proposes classes.
 
 Every connector created this way is versioned YAML that can live in Git (`packs/*/connectors/`).
