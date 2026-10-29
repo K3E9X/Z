@@ -85,9 +85,11 @@ async def oauth_callback(
     if datetime.fromisoformat(value["expires_at"]) < datetime.now(UTC):
         await ctx.audit("connection.failed", "connector", None, result="error", after={"reason": "state expired"})
         return _back("this sign-in link expired")
-    if ctx.principal is not None and ctx.principal.user_id != value["user_id"]:
+    if ctx.principal is None or ctx.principal.user_id != value["user_id"]:
+        # the grant goes to whoever started the flow: only that person's own browser session may complete it,
+        # or a victim's consent could be attached to an attacker's connection (login CSRF on the callback)
         await ctx.audit("connection.failed", "connector", None, result="denied", after={"reason": "user mismatch"})
-        return _back("signed in as someone else than who started the connection")
+        return _back("sign in to Z as the person who started the connection, then connect again")
     connector = (
         await ctx.db.execute(select(Connector).where(Connector.name == value["connector"]))
     ).scalar_one_or_none()

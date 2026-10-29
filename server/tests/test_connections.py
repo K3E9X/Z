@@ -249,7 +249,18 @@ def test_callback_rejects_replays_and_errors(app: TestClient, jars: dict[str, di
     state = parse_qs(urlparse(start["redirect_url"]).query)["state"][0]
     use_jar(app, jars["carol"])  # someone else's browser finishes bob's flow
     wrong = app.get(f"/api/v1/oauth/callback?state={state}&code=abc", follow_redirects=False)
-    assert "someone else" in wrong.headers["location"].replace("%20", " ")
+    assert "as the person who started the connection" in wrong.headers["location"].replace("%20", " ")
+    assert app.get("/api/v1/me/connections").json() == []
+
+    # a browser with no Z session (a victim lured to bob's link after consenting) cannot attach its grant to bob
+    use_jar(app, jars["bob"])
+    start = app.post("/api/v1/me/connections/mail/oauth/start", json={"purpose": "read"}, headers=csrf(app)).json()
+    consent = httpx.get(start["redirect_url"], follow_redirects=False)
+    back = urlparse(consent.headers["location"])
+    app.cookies.clear()
+    lured = app.get(f"{back.path}?{back.query}", follow_redirects=False)
+    assert "as the person who started the connection" in lured.headers["location"].replace("%20", " ")
+    use_jar(app, jars["bob"])
     assert app.get("/api/v1/me/connections").json() == []
 
 

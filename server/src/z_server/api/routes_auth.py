@@ -16,7 +16,7 @@ from z_server.api.framework import API_PREFIX, CSRF_COOKIE, SESSION_COOKIE, Cont
 from z_server.api.views import session_out, token_out, user_out
 from z_server.auth import gitlab, identity, local
 from z_server.auth.oidc import OIDCClient, OIDCError
-from z_server.crypto import new_token, pkce_pair, token_hash
+from z_server.crypto import constant_time_equal, new_token, pkce_pair, token_hash
 from z_server.db.models import ApiToken, AuthSession, LoginState, Setting, User
 from z_server.errors import Problem, problem_response
 from z_server.ids import new_id
@@ -43,12 +43,29 @@ def set_session_cookies(response: Response, token: str, csrf: str | None, max_ag
         response.set_cookie(CSRF_COOKIE, csrf, max_age=max_age, path="/", secure=True, httponly=False, samesite="lax")
 
 
+LOGIN_COOKIE = "__Host-z_login"  # binds an OIDC login in flight to the browser that started it
+
+
+def bind_login(response: Response, state: str) -> None:
+    """Without it, a login started by someone else could be completed in a victim's browser (login CSRF): the victim
+    would work, and connect their own accounts, inside the other person's Z session."""
+    response.set_cookie(
+        LOGIN_COOKIE,
+        token_hash(state),
+        max_age=int(STATE_TTL.total_seconds()),
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="lax",
+    )
+
+
 def clear_session_cookies(response: Response) -> None:
     for name in (SESSION_COOKIE, CSRF_COOKIE):
         response.delete_cookie(name, path="/", secure=True, samesite="lax")
 
 
-async def _begin_oidc(ctx: Ctx, purpose: str, redirect_to: str, session_id: str | None = None) -> str:
+async def _begin_oidc(ctx: Ctx, purpose: str, redirect_to: str, session_id: str | None = None) -> tuple[str, str]:
     auth = await ctx.state.auth_settings(ctx.db)
     if not auth.get("issuer_url") or not auth.get("client_id"):
         raise Problem("unavailable", "GitLab sign-in is not configured yet (Admin -> Sign-in)")
@@ -66,7 +83,7 @@ async def _begin_oidc(ctx: Ctx, purpose: str, redirect_to: str, session_id: str 
     ctx.db.add(row)
     max_age = int(auth.get("step_up_max_age_s", 300)) if purpose == "step_up" else None
     try:
-        return await client.authorize_url(
+        url = await client.authorize_url(
             callback_url(ctx),
             row.state,
             row.nonce,
@@ -74,6 +91,7 @@ async def _begin_oidc(ctx: Ctx, purpose: str, redirect_to: str, session_id: str 
             list(auth.get("scopes", ["openid", "profile", "email"])),
             step_up_max_age=max_age,
         )
+        return url, row.state
     except OIDCError as exc:
         raise Problem("unavailable", f"GitLab is not reachable ({exc.reason})") from exc
 
@@ -82,10 +100,14 @@ async def _begin_oidc(ctx: Ctx, purpose: str, redirect_to: str, session_id: str 
 async def auth_login(ctx: CtxDep, request: Request, redirect: str | None = None) -> Response:
     if ctx.state.settings.auth_mode == "dev":
         return RedirectResponse(safe_redirect(redirect), status_code=302)
-    url = await _begin_oidc(ctx, "login", redirect or "/")
-    if "application/json" in request.headers.get("accept", ""):
-        return JSONResponse(m.LoginRedirect(redirect_url=url).dump())
-    return RedirectResponse(url, status_code=302)
+    url, state = await _begin_oidc(ctx, "login", redirect or "/")
+    response: Response = (
+        JSONResponse(m.LoginRedirect(redirect_url=url).dump())
+        if "application/json" in request.headers.get("accept", "")
+        else RedirectResponse(url, status_code=302)
+    )
+    bind_login(response, state)
+    return response
 
 
 @router.operation("authCallback", status_code=302)
@@ -104,6 +126,10 @@ async def auth_callback(
     await ctx.db.delete(login_state)  # single use: a replayed state is refused
     if login_state.expires_at <= identity.now():
         return await fail("expired_state")
+    if login_state.purpose == "login" and not constant_time_equal(
+        ctx.request.cookies.get(LOGIN_COOKIE, ""), token_hash(login_state.state)
+    ):
+        return await fail("unbound_state")  # this browser did not start this sign-in
     client = await ctx.state.oidc(ctx.db)
     try:
         tokens = await client.exchange_code(code, callback_url(ctx), login_state.code_verifier)
@@ -194,7 +220,7 @@ async def auth_step_up(ctx: CtxDep, body: m.StepUpRequest | None = None) -> Resp
         return JSONResponse(m.StepUpResponse(step_up_at=session.step_up_at).dump())
     if principal.session_kind != "web" or not principal.session_id:
         raise Problem("forbidden", "step-up needs a web session; sign in from the browser")
-    url = await _begin_oidc(ctx, "step_up", body.return_to or "/", principal.session_id)
+    url, _ = await _begin_oidc(ctx, "step_up", body.return_to or "/", principal.session_id)
     await ctx.audit("auth.step_up_started", "session", principal.session_id)
     return JSONResponse(m.StepUpResponse(redirect_url=url).dump())
 
@@ -370,8 +396,16 @@ async def get_me(ctx: CtxDep) -> m.Me:
     return await _me(ctx, principal_user=user, principal=ctx.user, session=session)
 
 
+def _not_by_token(ctx: Ctx) -> None:
+    """Sessions and tokens are managed by the person, never by an API token: a stolen narrow token must not mint a
+    fresh 90-day one, list the owner's sessions or sign them out."""
+    if ctx.user.kind == "api_token":
+        raise Problem("forbidden", "sessions and tokens are managed from a signed-in session, not with an API token")
+
+
 @router.operation("listMySessions")
 async def list_my_sessions(ctx: CtxDep) -> list[m.AuthSession]:
+    _not_by_token(ctx)
     rows = (
         await ctx.db.execute(
             select(AuthSession)
@@ -384,6 +418,7 @@ async def list_my_sessions(ctx: CtxDep) -> list[m.AuthSession]:
 
 @router.operation("revokeMySession", status_code=204)
 async def revoke_my_session(ctx: CtxDep, id: str) -> Response:
+    _not_by_token(ctx)
     row = await ctx.db.get(AuthSession, id)
     if row is None or row.user_id != ctx.user.user_id:
         raise Problem("not-found")
@@ -394,6 +429,7 @@ async def revoke_my_session(ctx: CtxDep, id: str) -> Response:
 
 @router.operation("listMyTokens")
 async def list_my_tokens(ctx: CtxDep) -> list[m.ApiToken]:
+    _not_by_token(ctx)
     rows = (
         await ctx.db.execute(
             select(ApiToken).where(ApiToken.user_id == ctx.user.user_id).order_by(ApiToken.created_at.desc())
@@ -404,6 +440,7 @@ async def list_my_tokens(ctx: CtxDep) -> list[m.ApiToken]:
 
 @router.operation("createMyToken", status_code=201)
 async def create_my_token(ctx: CtxDep, body: m.ApiTokenCreate) -> m.ApiToken:
+    _not_by_token(ctx)
     max_days = int(ctx.state.config_auth.get("api_tokens", {}).get("max_days", 90))
     if body.expires_in_days > max_days:
         raise Problem("validation", f"tokens expire after at most {max_days} days")
@@ -433,6 +470,7 @@ async def create_my_token(ctx: CtxDep, body: m.ApiTokenCreate) -> m.ApiToken:
 
 @router.operation("revokeMyToken", status_code=204)
 async def revoke_my_token(ctx: CtxDep, id: str) -> Response:
+    _not_by_token(ctx)
     row = await ctx.db.get(ApiToken, id)
     if row is None or row.user_id != ctx.user.user_id:
         raise Problem("not-found")

@@ -223,3 +223,17 @@ def test_idle_and_absolute_timeouts(client: TestClient, oidc: FakeGitLabOIDC) ->
     finally:
         identity.now = original  # type: ignore[assignment]
     _ = time
+
+
+def test_a_sign_in_started_elsewhere_cannot_be_completed_here(client: TestClient, oidc: FakeGitLabOIDC) -> None:
+    """Login CSRF: bob starts a sign-in and sends the callback link to a victim; the victim's browser must not end
+    up signed in as bob (they would connect their own accounts to bob's Z identity)."""
+    oidc.set_current_user("bob")
+    client.cookies.clear()
+    start = client.get("/api/v1/auth/login", follow_redirects=False)
+    authorize = httpx.get(start.headers["location"], follow_redirects=False)
+    callback = urlparse(authorize.headers["location"])
+    client.cookies.clear()  # the victim's browser: no login cookie of this flow
+    lured = client.get(f"{callback.path}?{callback.query}", follow_redirects=False)
+    assert lured.headers["location"] == "/signin?error=unbound_state"
+    assert client.get("/api/v1/me").status_code == 401

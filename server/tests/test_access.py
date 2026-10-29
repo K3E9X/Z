@@ -162,6 +162,11 @@ def test_api_tokens_are_scoped_shown_once_and_revocable(client: TestClient, oidc
     bearer = {"Authorization": f"Bearer {token}"}
     assert client.get("/api/v1/audit", headers=bearer).status_code == 200
     assert client.get("/api/v1/teams", headers=bearer).status_code == 403  # teams:read not in the token scopes
+    # a token never manages tokens or sessions: no self-renewal for 90 days, no signing its owner out
+    renew = {"name": "again", "scopes": ["audit:read"], "expires_in_days": 90}
+    assert client.post("/api/v1/me/tokens", json=renew, headers=bearer).status_code == 403
+    assert client.get("/api/v1/me/sessions", headers=bearer).status_code == 403
+    assert client.delete("/api/v1/me/sessions/ses_any", headers=bearer).status_code == 403
     use_jar(client, sign_in_as(client, oidc, "dave"))
     token_id = created.json()["id"]
     assert client.delete(f"/api/v1/me/tokens/{token_id}", headers=csrf(client)).status_code == 204
