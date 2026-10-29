@@ -275,6 +275,31 @@ in the Secret. External: the DSN comes from database.existingSecret.
     - { protocol: TCP, port: 53 }
 {{- end -}}
 
+{{/*
+Egress proxy peers: egressProxy.egressTo (default 0.0.0.0/0). Every 0.0.0.0/0 peer gets `except` for
+link-local / cloud metadata, the cluster pod and service CIDRs and RFC 1918, so the proxy cannot be used to
+reach the cluster or internal networks; egressProxy.privateAllow adds private ranges back as their own peers.
+*/}}
+{{- define "z.egress.peers" -}}
+{{- $except := list "169.254.0.0/16" -}}
+{{- range (list .Values.cluster.podCIDR .Values.cluster.serviceCIDR) -}}
+{{- if and . (contains "." .) }}{{ $except = append $except . }}{{ end -}}
+{{- end -}}
+{{- $except = concat $except (list "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16") | uniq -}}
+{{- $peers := list -}}
+{{- range (default (list (dict "ipBlock" (dict "cidr" "0.0.0.0/0"))) .Values.egressProxy.egressTo) -}}
+{{- $p := deepCopy . -}}
+{{- if eq (dig "ipBlock" "cidr" "" $p) "0.0.0.0/0" -}}
+{{- $_ := set $p.ipBlock "except" (concat (default (list) $p.ipBlock.except) $except | uniq) -}}
+{{- end -}}
+{{- $peers = append $peers $p -}}
+{{- end -}}
+{{- range .Values.egressProxy.privateAllow -}}
+{{- $peers = append $peers (dict "ipBlock" (dict "cidr" .)) -}}
+{{- end -}}
+{{- toYaml $peers -}}
+{{- end -}}
+
 {{/* Production: LiteLLM egress must be pinned to the inference cluster (invariant 1/2) */}}
 {{- define "z.validateLitellmEgress" -}}
 {{- $pinned := false -}}

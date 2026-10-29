@@ -108,7 +108,7 @@ spec:
         - { protocol: UDP, port: 53 }
         - { protocol: TCP, port: 53 }
     - to:
-        {{- toYaml .Values.egressProxy.egressTo | nindent 8 }}
+        {{- toYaml (include "z.egress.peers" . | fromYamlArray) | nindent 8 }}
       ports:
         - { protocol: TCP, port: 443 }
         - { protocol: TCP, port: 80 }

@@ -149,8 +149,13 @@ the migrations ran).
   `runners.networkPolicy.reachablePorts` (8000, 4000) to pods labelled `z.io/runner-reachable: "true"` in the
   release namespace (z-server, LiteLLM) and DNS to `dns.podLabels` in `dns.namespace` (CoreDNS is labelled
   `k8s-app: kube-dns` in `kube-system` on k3s and most distributions; adjust for NodeLocal DNSCache). No
-  internet, no Kubernetes API, no traffic between runner pods. The egress proxy for package mirrors
-  (`egress.mirrors`) will join the reachable pods when it ships; until then runners reach no mirror.
+  internet, no Kubernetes API, no traffic between runner pods. With `egressProxy.enabled` the proxy joins the
+  reachable pods and lets runners reach only the package mirrors (`config.z.egress.mirrors`).
+- Egress proxy: TCP 80/443 to `egressProxy.egressTo` (default `0.0.0.0/0`). Every `0.0.0.0/0` peer gets
+  `except` for `169.254.0.0/16` (link-local, cloud metadata), `cluster.podCIDR` and `cluster.serviceCIDR`
+  (k3s defaults `10.42.0.0/16`, `10.43.0.0/16`: set yours) and RFC 1918, so a manipulated agent cannot use the
+  proxy to reach the cluster or internal networks. An internal mirror is an explicit opt-in:
+  `egressProxy.privateAllow: [10.20.5.0/24]`.
 - Release namespace (ingress only): z-server from `z-runners` and z-ui (or the ingress controller when
   `ui.enabled: false`), plus `networkPolicy.metricsFrom`; LiteLLM from `z-runners` and z-server; z-ui from
   the ingress controller (`networkPolicy.ingressController`, Traefik in `kube-system` on k3s, ingress-nginx
@@ -241,6 +246,9 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `runners.networkPolicy.reachablePorts` | `[8000, 4000]` | ports runners may open on reachable pods |
 | `runners.networkPolicy.extraEgress` | `[]` | extra egress rules for runners |
 | `dns.namespace`, `dns.podLabels` | `kube-system`, `k8s-app: kube-dns` | DNS peer of the runner policy |
+| `cluster.podCIDR`, `cluster.serviceCIDR` | `10.42.0.0/16`, `10.43.0.0/16` | cluster ranges (k3s defaults) the egress proxy never reaches |
+| `egressProxy.egressTo` | `[]` (`0.0.0.0/0`) | proxy egress peers; `0.0.0.0/0` gets metadata, cluster and RFC 1918 `except` |
+| `egressProxy.privateAllow` | `[]` | private ranges the proxy may reach (internal mirrors) |
 | `ui.enabled`, `ui.replicas`, `ui.image` | `true`, `1`, `ghcr.io/k3e9x/z-ui` | web app |
 | `litellm.image` | `docker.io/litellm/litellm:v1.105.0@sha256:6094...` | same reference as compose; never 1.82.7/1.82.8 |
 | `litellm.inferenceApiBase` | `""` | `INFERENCE_API_BASE` |

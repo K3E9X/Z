@@ -57,6 +57,12 @@ releaseNamespace:
   # Argo CD. Leave false with `helm install` / `helm upgrade` (the Namespace would conflict with the release).
   create: false
 
+# Address ranges of the cluster (defaults: k3s). The egress proxy may never reach them. Other distributions:
+# set your own (kubeadm services 10.96.0.0/12; pods per CNI, e.g. Calico 192.168.0.0/16).
+cluster:
+  podCIDR: 10.42.0.0/16
+  serviceCIDR: 10.43.0.0/16
+
 # --------------------------------------------------------------------------------------------------- z-server
 server:
   # `all`: api + scheduler + gateway + executor + learner + monitor in one process. Several replicas are safe
@@ -209,8 +215,13 @@ egressProxy:
     digest: ""
     pullPolicy: IfNotPresent
   port: 3128
-  # Where the mirrors are (NetworkPolicy egress of the proxy). Default: any address on 80/443.
-  egressTo: [{ ipBlock: { cidr: 0.0.0.0/0 } }]
+  # Where the mirrors are (NetworkPolicy egress peers of the proxy, TCP 80/443). Empty: 0.0.0.0/0. Every
+  # 0.0.0.0/0 peer (yours too) gets `except` for 169.254.0.0/16 (link-local, cloud metadata),
+  # cluster.podCIDR, cluster.serviceCIDR and RFC 1918 (10/8, 172.16/12, 192.168/16). IPv4 only.
+  egressTo: []             # e.g. [{ ipBlock: { cidr: 203.0.113.0/24 } }] to name the mirrors exactly
+  # Private ranges the proxy may reach anyway (an internal mirror), each added as its own peer. Explicit opt-in:
+  # never list a range that holds the cluster CIDRs.
+  privateAllow: []         # e.g. [10.20.5.0/24]
   resources:
     requests: { cpu: 50m, memory: 64Mi }
     limits: { cpu: 500m, memory: 256Mi }
