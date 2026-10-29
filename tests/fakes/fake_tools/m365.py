@@ -131,6 +131,21 @@ def router(store: Store) -> APIRouter:
         grant_of(request, "read-client")
         return {"value": [{**m, "owner": user} for m in MAILBOX]}
 
+    events: dict[str, dict[str, Any]] = {}  # transactionId -> event (Graph does not create it twice)
+
+    @r.post("/v1.0/me/events", status_code=201)
+    async def create_event(request: Request) -> dict[str, Any]:
+        grant = grant_of(request, "write-client")
+        body = await request.json()
+        tx = body.get("transactionId")
+        if tx and tx in events:
+            return events[tx]
+        event = {**body, "id": "AAMkE" + secrets.token_hex(6), "webLink": "https://outlook.office.com/calendar/item"}
+        if tx:
+            events[tx] = event
+        store.record("m365", "m365.calendar.events.create", "write", {"as": grant["user"], **event})
+        return event
+
     @r.post("/v1.0/me/sendMail", status_code=202)
     async def send_mail(request: Request) -> Response:
         grant = grant_of(request, "write-client")

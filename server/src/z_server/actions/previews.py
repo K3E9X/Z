@@ -138,11 +138,22 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
             attendees=[str(a.get("email")) for a in event.get("attendees") or []] or None,
             location=event.get("location"),
             body="\n\n".join(
-                x for x in (event.get("description"), f"({notify})" if event.get("attendees") else None) if x
+                x
+                for x in (
+                    event.get("description"),
+                    _calendar_note(payload.get("calendarId")),
+                    f"({notify})" if event.get("attendees") else None,
+                )
+                if x
             )
             or None,
         ).dump()
     return JsonPreview(kind="json", data=payload).dump()
+
+
+def _calendar_note(calendar: Any) -> str | None:
+    """The calendar an event goes to, when it is not the person's own (a shared or delegated calendar)."""
+    return f"(in the calendar {calendar})" if calendar and calendar != "primary" else None
 
 
 def _addresses(recipients: Any) -> list[str]:

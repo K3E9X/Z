@@ -79,3 +79,11 @@ def test_the_graph_mail_refuses_what_the_preview_would_not_show(extra: dict[str,
     jsonschema.validate(MAIL, schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({**MAIL, "message": {**MAIL["message"], **extra}}, schema)
+
+
+def test_an_event_in_another_calendar_says_which() -> None:
+    event = {"summary": "On-call", "start": {"date": "2026-11-09"}, "end": {"date": "2026-11-10"}}
+    shared = previews.build("google.calendar.events.insert", {"calendarId": "secops@example.test", "body": event})
+    assert shared["body"] == "(in the calendar secops@example.test)" and shared["start"] == "2026-11-09"
+    own = previews.build("google.calendar.events.insert", {"calendarId": "primary", "body": event})
+    assert "body" not in own

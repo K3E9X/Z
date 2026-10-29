@@ -105,6 +105,10 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   and Google's OpenID configuration. Unauthenticated probes showed gmail/calendar/drive on www.googleapis.com and
   Chat only on chat.googleapis.com, hence two connectors. The fake enforces Google's rules (no offline_access,
   refresh token only with access_type=offline, gmail.metadata cannot use q, requestId idempotence).
+- Microsoft 365: Graph write bodies closed (an agent could add bccRecipients or replyTo, visible only in a JSON
+  dump), readable previews, events idempotent by `transactionId`. learn.microsoft.com and graph.microsoft.com are
+  blocked here; the official description `microsoftgraph/msgraph-metadata` (openapi/v1.0) on GitHub is reachable
+  and was the reference. The `m365` pack connector is now tested end to end against the fake.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
   operation could be approved (422). The pack linter now refuses it (the connector API already did).
 - Trap: `pkill -f <pattern>` with the pattern in the same command line kills the shell (exit 144): kill by PID.

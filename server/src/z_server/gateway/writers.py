@@ -594,6 +594,28 @@ class GoogleChat:
         return Applied(inv, {"name": posted.get("name"), "thread": (posted.get("thread") or {}).get("name")})
 
 
+class Microsoft365:
+    """Microsoft Graph as the mission starter. An event is created with `transactionId = <action id>`: Graph does
+    not create a second event for a repeated transaction id, so creating it again after a crash is safe. Mails and
+    Teams posts have no such key: after a crash they end "outcome unknown" (never a blind second send)."""
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        return None
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        if op.local_id != "calendar.events.create":
+            return await Generic().apply(gw, connector, op, action, files)
+        event = {**(action.payload.get("body") or {}), "transactionId": action.id}
+        inv = await gw.send(connector, "POST", "/me/events", "write", json_body=event)
+        _fail(inv, "create event")
+        created = inv.body if isinstance(inv.body, dict) else {}
+        return Applied(inv, {"id": created.get("id"), "url": created.get("webLink")})
+
+
 class Generic:
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -624,6 +646,8 @@ def writer_for(connector: Connector, op: Operation) -> Writer:
         return Mattermost()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("slack."):
         return Slack()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("m365."):
+        return Microsoft365()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("google."):
         return Google()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("gchat."):
@@ -635,5 +659,6 @@ def idempotent(op: Operation) -> bool:
     return (
         op.source_ref.split(" ", 1)[0].upper() in {"PUT", "DELETE"}
         or op.local_id in {"issues.update", "issues.transition"}
-        or op.id == "gchat.messages.create"  # the request id makes a second post return the first
+        # a repeated Chat request id returns the first post; a repeated Graph transactionId the first event
+        or op.id in {"gchat.messages.create", "m365.calendar.events.create"}
     )
