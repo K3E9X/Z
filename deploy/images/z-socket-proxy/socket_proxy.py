@@ -155,7 +155,7 @@ class Policy:
             (host.get("CapDrop") == ["ALL"], "every capability must be dropped"),
             (host.get("SecurityOpt") == ["no-new-privileges:true"], "SecurityOpt must be exactly no-new-privileges"),
             (host.get("Privileged") in (None, False), "privileged containers are refused"),
-            ((host.get("RestartPolicy") or {"Name": "no"}).get("Name") in ("no", ""), "no restart policy"),
+            (_no_restart(host.get("RestartPolicy")), "no restart policy"),
             (host.get("Runtime") in (None, "", *self.runtimes), "runtime not allowed"),
             (_within(host.get("Memory"), self.max_memory), "Memory limit required and within the ceiling"),
             (_within(host.get("NanoCpus"), self.max_nano_cpus), "NanoCpus limit required and within the ceiling"),
@@ -171,6 +171,16 @@ class Policy:
             flags = set(str(options).split(","))
             if not {"nosuid", "nodev"} <= flags:
                 raise Refused("tmpfs mounts need nosuid,nodev")
+
+
+def _no_restart(policy: Any) -> bool:
+    """No restart policy. Docker decodes JSON keys case-insensitively, so only the exact keys are accepted
+    (a lowercase `name` must not slip past the check on `Name`)."""
+    if policy is None:
+        return True
+    return (
+        isinstance(policy, dict) and set(policy) <= {"Name", "MaximumRetryCount"} and policy.get("Name") in ("no", "")
+    )
 
 
 def _within(value: Any, ceiling: int) -> bool:

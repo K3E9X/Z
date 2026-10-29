@@ -193,6 +193,8 @@ TOOL_ESCALATIONS = [
     ("privileged", lambda b: b["HostConfig"].update(Privileged=True)),
     ("host network", lambda b: b["HostConfig"].update(NetworkMode="host")),
     ("entrypoint", lambda b: b.update(Entrypoint=["/bin/sh"])),
+    ("restart policy", lambda b: b["HostConfig"].update(RestartPolicy={"Name": "always"})),
+    ("lowercase restart key", lambda b: b["HostConfig"].update(RestartPolicy={"Name": "no", "name": "always"})),
 ]
 
 
