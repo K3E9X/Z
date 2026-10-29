@@ -197,3 +197,52 @@ def test_docker_log_demux() -> None:
     assert demux(frame) == "out\nerr\n"
     assert demux(b"plain text") == "plain text"
     assert json.loads(json.dumps(demux(b""))) == ""
+
+
+def test_raw_text_bodies_from_the_spec_are_sent_as_is() -> None:
+    from z_common.connectors.operations import from_openapi
+
+    spec = {
+        "openapi": "3.0.3",
+        "paths": {
+            "/items/{parent_id}:/{filename}:/content": {
+                "put": {
+                    "operationId": "files.upload",
+                    "parameters": [
+                        {"name": "parent_id", "in": "path", "required": True},
+                        {"name": "filename", "in": "path", "required": True},
+                    ],
+                    "requestBody": {"required": True, "content": {"text/plain": {"schema": {"type": "string"}}}},
+                }
+            }
+        },
+    }
+    (op,) = from_openapi({"name": "m365", "kind": "openapi"}, spec)
+    assert op.input_schema["properties"]["body"]["x-content-type"] == "text/plain"
+    req = h.prepare(
+        "https://g", op.source_ref, op.input_schema, {"parent_id": "p1", "filename": "a b.md", "body": "# x"}
+    )
+    assert req.url == "https://g/items/p1:/a%20b.md:/content" and req.content == b"# x" and req.json is None
+    assert req.headers["Content-Type"] == "text/plain"
+    with pytest.raises(h.InvokeError, match="as text"):
+        h.prepare("https://g", op.source_ref, op.input_schema, {"parent_id": "p", "filename": "f", "body": {"a": 1}})
+    with pytest.raises(h.InvokeError, match="larger than"):
+        big = "x" * (h.MAX_RAW_BODY_BYTES + 1)
+        h.prepare("https://g", op.source_ref, op.input_schema, {"parent_id": "p", "filename": "f", "body": big})
+
+
+def test_send_puts_the_raw_body_on_the_wire() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(201, json={"id": "item1"})
+
+    req = h.PreparedRequest("PUT", "https://g/items/p:/f.md:/content", {}, None, {"Content-Type": "text/plain"}, b"hi")
+
+    async def go() -> h.HttpResult:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await h.send(client, req, {"Authorization": "Bearer t"})
+
+    result = asyncio.run(go())
+    assert result.status == 201 and seen[0].content == b"hi" and seen[0].headers["content-type"] == "text/plain"

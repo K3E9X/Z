@@ -1,7 +1,8 @@
 """HTTP invoker for `openapi` and `rest` connectors (docs/05 §2 steps 4 and 7).
 
 `source_ref` is `METHOD /path/{param}`. Arguments map to the request this way: `{param}` placeholders from the
-argument of that name; an argument named `body` is the JSON body; properties marked `x-in: query|path|body|header`
+argument of that name; an argument named `body` is the JSON body (or the raw text body when its schema has
+`x-content-type`, from a text/* or application/octet-stream request body in the spec); properties marked `x-in: query|path|body|header`
 in the input schema go there; remaining arguments go to the query string for GET/HEAD/DELETE and into the
 JSON body otherwise. Idempotent reads are retried on 429/502/503/504 and network errors (Retry-After honoured,
 capped). Responses larger than MAX_RESPONSE_BYTES are refused rather than buffered.
@@ -27,6 +28,7 @@ IDEMPOTENT = {"GET", "HEAD"}
 RETRY_STATUS = {429, 502, 503, 504}
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_RETRY_AFTER_S = 10.0
+MAX_RAW_BODY_BYTES = 4 * 1024 * 1024  # raw (file) bodies an agent may send; larger files need a resumable upload
 
 
 class InvokeError(RuntimeError):
@@ -52,6 +54,7 @@ class PreparedRequest:
     params: dict[str, Any]
     json: Any
     headers: dict[str, str]
+    content: bytes | None = None  # a raw body, sent instead of `json`
 
 
 def base_url(connector_base: str | None, manifest: dict[str, Any], env: dict[str, str] | None = None) -> str:
@@ -94,6 +97,15 @@ def prepare(base: str, source_ref: str, input_schema: dict[str, Any], args: dict
         else:
             body = {**(body if isinstance(body, dict) else {}), **remaining}
     params = {k: (json.dumps(v) if isinstance(v, dict | list) else v) for k, v in params.items() if v is not None}
+    raw_type = (props.get("body") or {}).get("x-content-type")
+    if raw_type and method not in IDEMPOTENT:
+        if not isinstance(body, str):
+            raise InvokeError("this operation takes its body as text")
+        if len(body.encode()) > MAX_RAW_BODY_BYTES:
+            raise InvokeError(f"the body is larger than {MAX_RAW_BODY_BYTES // (1024 * 1024)} MB")
+        return PreparedRequest(
+            method, base + path, params, None, {**headers, "Content-Type": str(raw_type)}, body.encode()
+        )
     return PreparedRequest(method, base + path, params, body, headers)
 
 
@@ -124,7 +136,8 @@ async def send(
                 request.method,
                 request.url,
                 params=request.params or None,
-                json=request.json if request.method not in IDEMPOTENT else None,
+                json=request.json if request.method not in IDEMPOTENT and request.content is None else None,
+                content=request.content if request.method not in IDEMPOTENT else None,
                 headers=headers,
                 timeout=timeout_s,
                 follow_redirects=False,

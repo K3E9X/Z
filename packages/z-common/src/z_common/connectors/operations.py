@@ -66,7 +66,12 @@ def _openapi_input_schema(operation: dict[str, Any], path_item: dict[str, Any]) 
         properties[param["name"]] = param.get("schema") or {"type": "string"}
         if param.get("required") or param.get("in") == "path":
             required.append(param["name"])
-    body = (((operation.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get("schema")
+    content = (operation.get("requestBody") or {}).get("content") or {}
+    body = (content.get("application/json") or {}).get("schema")
+    raw_type = next((ct for ct in content if ct.startswith("text/") or ct == "application/octet-stream"), None)
+    if not isinstance(body, dict) and raw_type is not None:
+        # a raw body (file content): sent as is with this content type, never JSON-encoded (gateway.http.prepare)
+        body = {"type": "string", "x-content-type": raw_type, "description": "Raw request body (text)"}
     if isinstance(body, dict):
         properties["body"] = body
         if (operation.get("requestBody") or {}).get("required"):
