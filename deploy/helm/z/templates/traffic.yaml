@@ -2,13 +2,34 @@
 {{- $backend := ternary (include "z.ui.fullname" .) (include "z.server.fullname" .) .Values.ui.enabled }}
 {{- $port := ternary .Values.ui.port .Values.server.port .Values.ui.enabled }}
 {{- if .Values.ingress.enabled }}
+{{- $annotations := deepCopy (default dict .Values.ingress.annotations) }}
+{{- $redirect := and .Values.ingress.tls.enabled .Values.ingress.traefikHttpsRedirect.enabled }}
+{{- $middleware := printf "%s-https-redirect" (include "z.fullname" .) }}
+{{- if $redirect }}
+{{- $key := "traefik.ingress.kubernetes.io/router.middlewares" }}
+{{- $ref := printf "%s-%s@kubernetescrd" .Release.Namespace $middleware }}
+{{- $_ := set $annotations $key (join "," (compact (list (get $annotations $key) $ref))) }}
+# Traefik: plain HTTP requests on this router get a permanent redirect to HTTPS; HTTPS requests pass
+# (RedirectScheme only acts when the scheme differs).
+apiVersion: {{ .Values.ingress.traefikHttpsRedirect.apiVersion }}
+kind: Middleware
+metadata:
+  name: {{ $middleware }}
+  labels:
+    {{- include "z.labels" . | nindent 4 }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "z.fullname" . }}
   labels:
     {{- include "z.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}

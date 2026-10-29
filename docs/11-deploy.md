@@ -32,7 +32,7 @@ Templates: Deployments for `api`, `scheduler`, `gateway`, `executor`, `learner`,
 
 Values files:
 - `values.yaml`: safe defaults, everything hardened.
-- `values-k3s.yaml`: `ingress.className: traefik`, `persistence.storageClass: local-path`, `postgres.embedded: true`, single replica per component.
+- `values-k3s.yaml`: `ingress.className: traefik` with an HTTP→HTTPS redirect (`ingress.traefikHttpsRedirect`: a Traefik `RedirectScheme` Middleware on the Ingress router while TLS is on), `persistence.storageClass: local-path`, `postgres.embedded: true`, single replica per component.
 - `values-k8s.yaml`: `ingress.className: nginx`, `postgres.embedded: false` (external DSN), 2 replicas for api and gateway, PDBs on.
 
 `env` is `production` (default), `staging` or `development`. With `production` the chart refuses to render when the network policies are switched off (`networkPolicy.enabled`, `networkPolicy.serverEgress.enabled`, `runners.networkPolicy.enabled`; schema `if`/`then` and a template `fail`) or LiteLLM egress is not pinned (below), or an image it runs (z-server, z-runner, LiteLLM, and z-ui, z-browser, egress-proxy, Postgres when enabled) is not pinned by digest.

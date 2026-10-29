@@ -351,6 +351,12 @@ ingress:
   tls:
     enabled: true
     secretName: z-tls      # provided by cert-manager or created beforehand
+  # Traefik only: redirect HTTP to HTTPS with a RedirectScheme Middleware (Traefik CRD, bundled with k3s)
+  # attached to the Ingress router (router.middlewares annotation, appended to yours). Rendered only with
+  # ingress.tls.enabled. values-k3s.yaml turns it on; ingress-nginx already redirects when the Ingress has TLS.
+  traefikHttpsRedirect:
+    enabled: false
+    apiVersion: traefik.io/v1alpha1   # Traefik v3 (k3s >= 1.32); traefik.containo.us/v1alpha1 for Traefik v2
 
 # Gateway API instead of (or next to) the Ingress.
 httpRoute:

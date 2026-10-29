@@ -254,7 +254,14 @@
         "enabled": { "type": "boolean" },
         "className": { "type": "string" },
         "host": { "type": "string" },
-        "tls": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "secretName": { "type": "string" } } }
+        "tls": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "secretName": { "type": "string" } } },
+        "traefikHttpsRedirect": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "apiVersion": { "enum": ["traefik.io/v1alpha1", "traefik.containo.us/v1alpha1"] }
+          }
+        }
       }
     },
     "httpRoute": {

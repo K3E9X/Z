@@ -74,7 +74,11 @@ helm upgrade --install z deploy/helm/z -n z \
 
 Then read the one-time password of `z-bootstrap` as described in [First connection](#first-connection).
 
-Traefik and `local-path` come with k3s, and k3s enforces NetworkPolicy with its bundled controller. The
+Traefik and `local-path` come with k3s, and k3s enforces NetworkPolicy with its bundled controller.
+`values-k3s.yaml` sets `ingress.traefikHttpsRedirect.enabled`: with TLS on, the chart renders a Traefik
+`RedirectScheme` Middleware (`traefik.io/v1alpha1`, Traefik v3) and attaches it to the Ingress router, so plain
+HTTP gets a permanent redirect to HTTPS (for Traefik v2 set `ingress.traefikHttpsRedirect.apiVersion:
+traefik.containo.us/v1alpha1`). The
 embedded Postgres gets generated passwords (Secret `z-db`, kept on uninstall like its volume).
 
 ### Kubernetes
@@ -261,6 +265,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `secrets.externalSecret.enabled` | `false` | render an ExternalSecret (`external-secrets.io/v1`) |
 | `persistence.artifacts.{enabled,size,storageClass,accessModes,existingClaim}` | `true`, `20Gi`, `""`, `[ReadWriteOnce]`, `""` | `Z_ARTIFACTS_DIR` volume |
 | `ingress.{enabled,className,host,tls}` | `true`, `""`, `z.example.internal`, TLS on | Ingress to z-ui |
+| `ingress.traefikHttpsRedirect.enabled` | `false` (`true` in k3s values) | Traefik Middleware redirecting HTTP to HTTPS (with TLS) |
 | `httpRoute.{enabled,parentRefs,hostnames}` | `false` | Gateway API HTTPRoute |
 | `networkPolicy.enabled` | `true` | release namespace policies; refused `false` in production |
 | `networkPolicy.ingressController` | `kube-system` | namespace/pod selector of the ingress controller |

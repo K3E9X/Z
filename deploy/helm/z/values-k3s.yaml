@@ -30,6 +30,9 @@ persistence:
 
 ingress:
   className: traefik
+  # HTTP -> HTTPS (permanent) through a Traefik RedirectScheme Middleware while ingress.tls.enabled.
+  traefikHttpsRedirect:
+    enabled: true
 
 networkPolicy:
   ingressController:
