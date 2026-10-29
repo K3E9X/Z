@@ -134,7 +134,7 @@ def _job_block(job: JobView, view: MissionView, *, expand: bool, max_calls: int)
     glyph_style = state_style(job.status if job.status != "needs_attention" else "waiting")
     head = Text()
     head.append("● ", style=glyph_style)
-    head.append(job.agent, style="z.b")
+    head.append(view.display_names.get(job.agent, job.agent), style="z.b")
     bits = [job.status if job.status != "needs_attention" else f"waiting: {job.reason or 'attention'}"]
     if job.parent_job_id:
         bits.insert(0, "sub-agent")
@@ -489,7 +489,8 @@ def preview_body(preview: dict[str, Any], payload: dict[str, Any] | None = None)
     return rows
 
 
-def action_panel(action: dict[str, Any], *, options: list[str] | None = None, selected: int = 0) -> Panel:
+def action_body(action: dict[str, Any], *, options: list[str] | None = None, selected: int = 0) -> Group:
+    """Header (operation, runs as, reversibility, judge), preview and optional numbered choices."""
     body: list[RenderableType] = [action_header(action), Text("")]
     body += preview_body(action.get("preview") or {}, action.get("payload"))
     if options:
@@ -499,11 +500,20 @@ def action_panel(action: dict[str, Any], *, options: list[str] | None = None, se
             t.append(f"{POINTER} " if i == selected else "  ", style="z.acc")
             t.append(f"{i + 1}. {option}", style="z.b" if i == selected else "z.text")
             body.append(t)
+    return Group(*body)
+
+
+def action_panel(action: dict[str, Any], *, options: list[str] | None = None, selected: int = 0) -> Panel:
     destructive = action.get("class") == "destructive"
-    return Panel(Group(*body), border_style="z.err" if destructive else "z.wait", padding=(0, 2), expand=False)
+    return Panel(
+        action_body(action, options=options, selected=selected),
+        border_style="z.err" if destructive else "z.wait",
+        padding=(0, 2),
+        expand=False,
+    )
 
 
-def question_panel(question: dict[str, Any], *, selected: int = 0, show_options: bool = True) -> Panel:
+def question_body(question: dict[str, Any], *, selected: int = 0, show_options: bool = True) -> Group:
     body: list[RenderableType] = []
     head = Text()
     head.append("Question", style="z.wait")
@@ -518,4 +528,13 @@ def question_panel(question: dict[str, Any], *, selected: int = 0, show_options:
             t.append(f"{POINTER} " if i == selected else "  ", style="z.acc")
             t.append(f"{i + 1}. {option}", style="z.b" if i == selected else "z.text")
             body.append(t)
-    return Panel(Group(*body), border_style="z.wait", padding=(0, 2), expand=False)
+    return Group(*body)
+
+
+def question_panel(question: dict[str, Any], *, selected: int = 0, show_options: bool = True) -> Panel:
+    return Panel(
+        question_body(question, selected=selected, show_options=show_options),
+        border_style="z.wait",
+        padding=(0, 2),
+        expand=False,
+    )

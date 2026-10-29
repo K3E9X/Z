@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -94,13 +95,57 @@ def success(text: str) -> None:
     out().print(line)
 
 
-def table(columns: Sequence[str | tuple[str, dict[str, Any]]], rows: Sequence[Sequence[RenderableType]]) -> Table:
-    t = Table(box=None, pad_edge=False, header_style="z.d", show_edge=False, expand=False, padding=(0, 2, 0, 0))
-    for column in columns:
-        if isinstance(column, tuple):
-            t.add_column(column[0].upper(), **column[1])
-        else:
-            t.add_column(column.upper(), overflow="fold")
+ID = re.compile(r"^[a-z]{1,5}_[0-9A-Za-z]{10,}$|^[a-z]+(\.[a-z0-9_]+){2,}$")
+
+
+def _plain(cell: RenderableType) -> str:
+    return cell.plain if isinstance(cell, Text) else cell if isinstance(cell, str) else ""
+
+
+SHORT = 12  # columns this narrow (statuses, counts, dates) are never shortened
+GAP = 2
+
+
+def table(
+    columns: Sequence[str | tuple[str, dict[str, Any]]],
+    rows: Sequence[Sequence[RenderableType]],
+    *,
+    width: int | None = None,
+) -> Table:
+    """One line per row, fitted to the terminal: long free-text cells end with an ellipsis; ids, operation ids
+    and short cells are never cut (ids are what people copy into the next command)."""
+    names: list[str] = []
+    options_list: list[dict[str, Any]] = []
+    natural: list[int] = []
+    fixed: list[bool] = []
+    ids: list[bool] = []
+    for i, column in enumerate(columns):
+        name, options = (column[0], dict(column[1])) if isinstance(column, tuple) else (column, {})
+        values = [_plain(row[i]) for row in rows if i < len(row)]
+        filled = [v for v in values if v]
+        longest = max([len(name), *(len(v) for v in values)]) if values else len(name)
+        is_id = bool(filled) and all(ID.match(v) for v in filled)
+        names.append(name)
+        options_list.append(options)
+        natural.append(longest if is_id else min(longest, 60))
+        fixed.append(is_id or longest <= SHORT)
+        ids.append(is_id)
+    available = (width or out().width) - GAP * len(columns)
+    widths = list(natural)
+    while sum(widths) > available:
+        flexible = [i for i, w in enumerate(widths) if not fixed[i] and w > 8]
+        if not flexible:
+            break
+        widest = max(flexible, key=lambda i: widths[i])
+        widths[widest] -= 1
+    t = Table(box=None, pad_edge=False, header_style="z.d", show_edge=False, expand=False, padding=(0, GAP, 0, 0))
+    for name, options, w, is_id in zip(names, options_list, widths, ids, strict=True):
+        options.setdefault("no_wrap", True)
+        options.setdefault("overflow", "ellipsis")
+        options.setdefault("width", w)
+        if is_id:
+            options.setdefault("min_width", w)
+        t.add_column(name.upper(), **options)
     for row in rows:
         t.add_row(*row)
     return t

@@ -103,6 +103,7 @@ class TopModel:
     def view(self, mission_id: str) -> MissionView:
         if mission_id not in self.views:
             self.views[mission_id] = MissionView(mission_id)
+            self.views[mission_id].use_agents(list(self.agents.values()))
             if mission_id in self.missions:
                 self.views[mission_id].load_mission(self.missions[mission_id])
         return self.views[mission_id]

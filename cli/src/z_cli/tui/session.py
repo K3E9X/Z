@@ -519,6 +519,7 @@ class SessionApp(App[int]):
             return
         view = MissionView(mid)
         view.load_mission(mission)
+        view.use_agents(self.agents)
         block = MissionBlock(view)
         self.blocks[mid] = block
         self.query_one("#transcript", VerticalScroll).mount(block)

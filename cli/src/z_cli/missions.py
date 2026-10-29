@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import mimetypes
 import sys
@@ -14,7 +15,7 @@ from rich.live import Live
 
 from z_cli import output, sse
 from z_cli.client import Api
-from z_cli.errors import UsageError
+from z_cli.errors import CliError, UsageError
 from z_cli.live import TERMINAL_MISSION, MissionView
 from z_cli.render import event_line, mission_tree
 
@@ -102,6 +103,9 @@ class Follower:
         self.mode = mode
         self.view = MissionView(str(mission["id"]))
         self.view.load_mission(mission)
+        if mode == "live":
+            with contextlib.suppress(CliError):
+                self.view.use_agents(list(api.paginate("/agents", limit=500)))
         self.stream_state = sse.StreamState()
         self.events: list[dict[str, Any]] = []
 

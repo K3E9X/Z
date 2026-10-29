@@ -12,7 +12,7 @@ from rich.text import Text
 
 from z_cli.client import AsyncApi
 from z_cli.errors import CliError
-from z_cli.render import action_header, action_panel, question_panel
+from z_cli.render import action_body, action_header, question_body
 
 
 class Presenter(Protocol):
@@ -91,7 +91,7 @@ async def review_action(api: AsyncApi, ui: Presenter, action: dict[str, Any]) ->
     """One action: approve / edit / reject / not now. Returns what happened."""
     while True:
         options = ["Approve", "Show the payload", "Edit before approving", "Reject, and tell the agent why", "Not now"]
-        idx = await ui.choose(action_panel(action), options, danger=action.get("class") == "destructive")
+        idx = await ui.choose(action_body(action), options, danger=action.get("class") == "destructive")
         if idx == 0:
             return "approved" if await approve_one(api, ui, action) else "skipped"
         if idx == 1:
@@ -112,7 +112,7 @@ async def review_action(api: AsyncApi, ui: Presenter, action: dict[str, Any]) ->
 async def answer_question(api: AsyncApi, ui: Presenter, question: dict[str, Any]) -> str:
     options = list(question.get("options") or [])
     if options:
-        idx = await ui.choose(question_panel(question, show_options=False), [*options, "Not now"])
+        idx = await ui.choose(question_body(question, show_options=False), [*options, "Not now"])
         if idx is None or idx >= len(options):
             return "skipped"
         answer = options[idx]

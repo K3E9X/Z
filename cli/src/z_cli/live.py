@@ -58,8 +58,8 @@ class JobView:
     status: str = "queued"
     reason: str | None = None
     model: str | None = None
-    tokens_in: int = 0
-    tokens_out: int = 0
+    api_tokens: int = 0  # as the REST API reports it
+    usage_tokens: int = 0  # sum of usage events seen
     started: datetime | None = None
     ended: datetime | None = None
     item: str | None = None
@@ -74,7 +74,7 @@ class JobView:
 
     @property
     def tokens(self) -> int:
-        return self.tokens_in + self.tokens_out
+        return max(self.api_tokens, self.usage_tokens)
 
 
 @dataclass
@@ -138,12 +138,16 @@ class MissionView:
     jobs: OrderedDict[str, JobView] = field(default_factory=OrderedDict)
     actions: OrderedDict[str, ActionView] = field(default_factory=OrderedDict)
     questions: OrderedDict[str, QuestionView] = field(default_factory=OrderedDict)
-    tokens_in: int = 0
-    tokens_out: int = 0
+    api_tokens: int = 0
+    usage_tokens: int = 0
     last_seq: int = 0
     log: deque[LogEntry] = field(default_factory=lambda: deque(maxlen=RECENT))
     messages: list[tuple[str, str]] = field(default_factory=list)  # (role/by, text)
     writes: list[str] = field(default_factory=list)
+    display_names: dict[str, str] = field(default_factory=dict)  # agent name -> display name, for rendering
+
+    def use_agents(self, agents: list[dict[str, Any]]) -> None:
+        self.display_names = {str(a["name"]): str(a.get("display_name") or a["name"]) for a in agents}
 
     # ---------------------------------------------------------------- derived
 
@@ -153,7 +157,7 @@ class MissionView:
 
     @property
     def tokens(self) -> int:
-        return self.tokens_in + self.tokens_out
+        return max(self.api_tokens, self.usage_tokens)
 
     def pending_actions(self) -> list[ActionView]:
         return [a for a in self.actions.values() if a.status == "pending"]
@@ -196,8 +200,7 @@ class MissionView:
         self.plan_first = bool(mission.get("plan_first"))
         self.created_at = parse_ts(mission.get("created_at"))
         self.error = mission.get("error")
-        self.tokens_in = max(self.tokens_in, int(mission.get("tokens_in") or 0))
-        self.tokens_out = max(self.tokens_out, int(mission.get("tokens_out") or 0))
+        self.api_tokens = int(mission.get("tokens_in") or 0) + int(mission.get("tokens_out") or 0)
         plan = mission.get("plan") or {}
         if plan.get("steps"):
             self._load_plan(plan.get("steps") or [], plan.get("writes"))
@@ -207,8 +210,7 @@ class MissionView:
         view.status = str(job.get("status") or view.status)
         view.reason = job.get("needs_attention_reason")
         view.model = job.get("model") or view.model
-        view.tokens_in = max(view.tokens_in, int(job.get("tokens_in") or 0))
-        view.tokens_out = max(view.tokens_out, int(job.get("tokens_out") or 0))
+        view.api_tokens = int(job.get("tokens_in") or 0) + int(job.get("tokens_out") or 0)
         view.started = parse_ts(job.get("started_at")) or view.started
         view.ended = parse_ts(job.get("ended_at")) or view.ended
         view.item = job.get("item_key")
@@ -239,8 +241,8 @@ class MissionView:
     def _load_plan(self, steps: list[dict[str, Any]], writes: list[str] | None) -> None:
         for raw in steps:
             sid = str(raw.get("id"))
-            step = self.steps.get(sid) or StepView(sid, str(raw.get("title") or raw.get("prompt") or sid), "")
-            step.title = str(raw.get("title") or (raw.get("prompt") or sid).split("\n")[0])[:120]
+            step = self.steps.get(sid) or StepView(sid, sid, "")
+            step.title = step_title(raw)
             step.agent = str(raw.get("agent") or step.agent)
             step.writes = list(raw.get("writes") or [])
             step.fanout = bool(raw.get("fanout"))
@@ -364,12 +366,10 @@ class MissionView:
                 job.lines.append(Line("invalid", text, ts))
             self._log(ts, "invalid", text, agent, job_id, "z.wait")
         elif etype == "usage":
-            tin, tout = int(p.get("tokens_in") or 0), int(p.get("tokens_out") or 0)
-            self.tokens_in += tin
-            self.tokens_out += tout
+            used = int(p.get("tokens_in") or 0) + int(p.get("tokens_out") or 0)
+            self.usage_tokens += used
             if job is not None:
-                job.tokens_in += tin
-                job.tokens_out += tout
+                job.usage_tokens += used
                 job.model = str(p.get("model") or job.model or "")
         elif etype == "artifact":
             text = f"{p.get('kind')} {p.get('name')}"
@@ -389,6 +389,8 @@ class MissionView:
             qv = self.questions.get(qid)
             if qv is not None:
                 qv.answer, qv.answered_by = str(p.get("answer")), p.get("answered_by")
+            if job is not None:
+                job.lines.append(Line("answer", f"{p.get('answered_by')}: {p.get('answer')}", ts))
             self._log(ts, "answer", f"{p.get('answered_by')}: {p.get('answer')}", agent, job_id)
         elif etype == "action_proposed":
             a = ActionView(
@@ -431,6 +433,16 @@ class MissionView:
                 if job is not None:
                     job.lines.append(Line("judge", text, ts, verdict))
                 self._log(ts, "judge", text, agent, job_id, "z.wait" if verdict == "flagged" else "z.err")
+
+
+def step_title(raw: dict[str, Any]) -> str:
+    """The step's title; else its prompt's first line unless it is a template; else its id."""
+    if raw.get("title"):
+        return str(raw["title"])[:120]
+    prompt = str(raw.get("prompt") or "").strip().split("\n")[0]
+    if prompt and "{{" not in prompt and len(prompt) <= 90:
+        return prompt
+    return str(raw.get("id")).replace("-", " ").replace("_", " ")
 
 
 def short_args(args: dict[str, Any], width: int = 48) -> str:
