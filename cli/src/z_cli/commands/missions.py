@@ -10,8 +10,8 @@ import typer
 from rich.console import Group
 from rich.text import Text
 
+from z_cli import contract, output, review, sse, state
 from z_cli import missions as ms
-from z_cli import output, review, sse, state
 from z_cli.client import Api
 from z_cli.commands._common import JsonOpt, LimitOpt, YesOpt, command, confirm, exit_code_for_mission, interactive
 from z_cli.errors import CliError, ExitCode, UsageError
@@ -374,9 +374,8 @@ def logs(
         return str(api.get(f"/missions/{mission_id}")["status"]) in TERMINAL_MISSION
 
     for message in sse.stream(api, path, finished=finished):
-        event = message.json()
-        if isinstance(event, dict):
-            output.print_jsonl(event) if as_json else output.out().print(event_line(event))
+        event = contract.check_event(message.json())
+        output.print_jsonl(event) if as_json else output.out().print(event_line(event))
 
 
 # ---------------------------------------------------------------- run / ask / headless

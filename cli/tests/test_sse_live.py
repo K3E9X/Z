@@ -256,3 +256,42 @@ def test_mission_view_folds_events() -> None:
     lines = [event_line(e).plain for e in events]
     assert "approval" in lines[7] and "jira.issues.create" in lines[7]
     assert "blocked" in lines[5]
+
+
+def test_contract_checks_requests_and_responses() -> None:
+    from z_cli import contract
+    from z_cli.errors import ContractMismatch, UsageError
+
+    with pytest.raises(UsageError, match="invalid request"):
+        contract.check_request("POST", "/actions/act_1/reject", {"reason": ""})  # min length 1
+    with pytest.raises(UsageError):
+        contract.check_request("POST", "/missions", {"prompt": "x", "unknown_field": 1})  # never invent a field
+    contract.check_request("POST", "/missions/msn_1/files", None)  # multipart: nothing to check
+
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path.endswith("/broken"):
+            return httpx.Response(200, json={"id": "msn_1", "title": "x"})
+        return httpx.Response(200, json={"mission_id": "m"})
+
+    api = Api("http://z.test", "zs_t", transport=httpx.MockTransport(handler))
+    with pytest.raises(ContractMismatch, match="data_class: Field required"):
+        api.get("/missions/broken")
+    with pytest.raises(UsageError):
+        api.post("/missions", {"prompt": "x", "nope": True})
+    assert calls == ["/api/v1/missions/broken"]  # the invalid request never left the machine
+
+    event = {
+        "mission_id": "m",
+        "job_id": None,
+        "seq": 1,
+        "ts": "2026-10-28T10:00:00Z",
+        "type": "plan",
+        "payload": {},
+        "new_key": 1,
+    }
+    assert contract.check_event(event) is event  # a newer server may add keys
+    with pytest.raises(ContractMismatch):
+        contract.check_event({"seq": 1})

@@ -18,7 +18,7 @@ import httpx
 from pydantic import ValidationError
 from z_common.models.common import Problem
 
-from z_cli import __version__
+from z_cli import __version__, contract
 from z_cli.errors import (
     ApiError,
     AuthRequired,
@@ -133,6 +133,11 @@ def _network_error(exc: httpx.HTTPError, server: str) -> CliError:
     )
 
 
+def _check_response(method: str, path: str, response: httpx.Response) -> None:
+    if response.content and response.headers.get("content-type", "").startswith("application/json"):
+        contract.check_response(method, path, response.json())
+
+
 def _decode(response: httpx.Response) -> Any:
     if response.status_code == 204 or not response.content:
         return None
@@ -196,11 +201,14 @@ class Api(_Base):
         feature: str | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
+        contract.check_request(method, path, json)
         try:
             response = self.http.request(method, path, params=_clean(params), json=json, **kwargs)
         except httpx.HTTPError as exc:
             raise _network_error(exc, self.url) from exc
-        return self.check(response, feature or self.feature(method, path))
+        self.check(response, feature or self.feature(method, path))
+        _check_response(method, path, response)
+        return response
 
     def get(self, path: str, params: Params | None = None, *, feature: str | None = None) -> Any:
         return _decode(self.request("GET", path, params=params, feature=feature))
@@ -282,6 +290,7 @@ class AsyncApi(_Base):
         feature: str | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
+        contract.check_request(method, path, json)
         try:
             response = await self.http.request(method, path, params=_clean(params), json=json, **kwargs)
         except httpx.HTTPError as exc:
@@ -290,6 +299,7 @@ class AsyncApi(_Base):
             raise error_for(
                 response, feature or self.feature(method, path), signed_in=bool(self.token), server=self.url
             )
+        _check_response(method, path, response)
         return response
 
     async def get(self, path: str, params: Params | None = None, *, feature: str | None = None) -> Any:

@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from rich.live import Live
 
-from z_cli import output, sse
+from z_cli import contract, output, sse
 from z_cli.client import Api
 from z_cli.errors import CliError, UsageError
 from z_cli.live import TERMINAL_MISSION, MissionView
@@ -131,9 +131,7 @@ class Follower:
             for message in sse.stream(
                 self.api, f"/missions/{view.mission_id}/events", finished=finished, state=self.stream_state
             ):
-                event = message.json()
-                if not isinstance(event, dict):
-                    continue
+                event = contract.check_event(message.json())
                 self.events.append(event)
                 view.apply(event)
                 if self.mode == "jsonl":

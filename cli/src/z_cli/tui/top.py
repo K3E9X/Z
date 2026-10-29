@@ -26,7 +26,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import DataTable, Static
 
-from z_cli import sse
+from z_cli import contract, sse
 from z_cli.client import AsyncApi
 from z_cli.errors import CliError, NotAvailable
 from z_cli.live import TERMINAL_JOB, MissionView
@@ -422,9 +422,7 @@ class TopApp(App[int]):
             async for message in sse.astream(
                 self.api, f"/missions/{mission_id}/events", finished=finished, state=state, on_error=on_error
             ):
-                event = message.json()
-                if not isinstance(event, dict):
-                    continue
+                event = contract.check_event(message.json())
                 view = self.model.view(mission_id)
                 view.apply(event)
                 if event.get("type") == "status":

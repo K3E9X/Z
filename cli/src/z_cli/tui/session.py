@@ -29,7 +29,7 @@ from textual.message import Message
 from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
-from z_cli import __version__, credentials, sse
+from z_cli import __version__, contract, credentials, sse
 from z_cli import state as state_mod
 from z_cli.client import Api, AsyncApi
 from z_cli.config import state_dir
@@ -546,9 +546,7 @@ class SessionApp(App[int]):
 
         try:
             async for message in sse.astream(api, f"/missions/{mission_id}/events", finished=finished):
-                event = message.json()
-                if not isinstance(event, dict):
-                    continue
+                event = contract.check_event(message.json())
                 view.apply(event)
                 block.redraw()
                 self.update_tasks()
