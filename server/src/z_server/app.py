@@ -26,6 +26,7 @@ from z_server.api import (
     routes_internal,
     routes_missions,
     routes_review,
+    routes_sessions,
     routes_usage,
 )
 from z_server.crypto import AuditSigner, Sealer
@@ -51,6 +52,7 @@ ROUTERS = (
     routes_internal.router,
     routes_usage.router,
     routes_intake.router,
+    routes_sessions.router,
 )
 
 
