@@ -476,6 +476,12 @@ config:
       org_monthly_tokens: 600000000
       default_mission_tokens: 10000000
       alert_at: 0.8
+    # docs/04 §6: the pattern scan always runs; the model stage (z-judge) can only raise its verdict and is
+    # governed by the locked judge_injection_scan guardrail below. Same as config/z.example.yaml.
+    judge:
+      model: z-judge
+      model_stage: true
+      timeout_s: 8
     guardrails:
       human_approval_for_writes: { value: true, locked: true }
       two_approvers_for_destructive: { value: true, locked: true }
