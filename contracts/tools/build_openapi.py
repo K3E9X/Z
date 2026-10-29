@@ -1392,6 +1392,56 @@ schemas = {
         {"retention_days": {"type": "integer", "minimum": 90}, "checkpoint_minutes": I, "forward": {"type": "object"}},
         ["retention_days", "checkpoint_minutes", "forward"],
     ),
+    "NotificationKind": {
+        "enum": [
+            "approval_requested",
+            "question_asked",
+            "needs_attention",
+            "mission_succeeded",
+            "mission_failed",
+            "budget_alert",
+            "connector_unhealthy",
+            "breakglass_used",
+        ]
+    },
+    "NotificationDelivery": obj(
+        {"last_sent_at": nul(TS), "last_error": nul(S), "last_error_at": nul(TS)},
+        desc="Read-only delivery state of a target, reported by the notification worker.",
+    ),
+    "NotificationTarget": obj(
+        {
+            "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"},
+            "name": S,
+            "kind": {"enum": ["slack", "mattermost", "teams", "webhook", "email"]},
+            "enabled": B,
+            "events": arr(ref("NotificationKind")),
+            "teams": arr(S),
+            "content_up_to": ext(C + "DataClass"),
+            "url_ref": {
+                "type": "string",
+                "description": "Secret reference of the incoming webhook URL (it carries a token)",
+            },
+            "secret_ref": {"type": "string", "description": "webhook: secret reference of the HMAC-SHA256 signing key"},
+            "to": arr(S),
+            "status": ref("NotificationDelivery"),
+        },
+        ["id", "kind", "events"],
+    ),
+    "SmtpSettings": obj(
+        {
+            "host": S,
+            "port": I,
+            "starttls": B,
+            "username": S,
+            "password_ref": {"type": "string", "description": "Secret reference, never the value"},
+            "from": S,
+        },
+        ["host", "from"],
+    ),
+    "NotificationSettings": obj(
+        {"targets": arr(ref("NotificationTarget")), "smtp": nul(ref("SmtpSettings"))},
+        ["targets"],
+    ),
     "Guardrail": obj({"value": {}, "locked": B, "description": S}, ["value", "locked"]),
     "Guardrails": {
         "type": "object",
@@ -3454,6 +3504,40 @@ op(
     req=ref("AuditSettings"),
     resp=ref("AuditSettings"),
     step_up=True,
+)
+op(
+    "get",
+    "/admin/notifications",
+    "adminGetNotifications",
+    "guardrails:manage",
+    "B1",
+    "Notification targets (Slack, Mattermost, Teams, webhook, email) and their delivery state",
+    "admin",
+    resp=ref("NotificationSettings"),
+)
+op(
+    "put",
+    "/admin/notifications",
+    "adminPutNotifications",
+    "guardrails:manage",
+    "B1",
+    "Change notification targets",
+    "admin",
+    req=ref("NotificationSettings"),
+    resp=ref("NotificationSettings"),
+    step_up=True,
+    desc="Webhook URLs, signing keys and the SMTP password are secret references, never values.",
+)
+op(
+    "post",
+    "/admin/notifications:test",
+    "adminTestNotification",
+    "guardrails:manage",
+    "B1",
+    "Send a test notification to one target",
+    "admin",
+    req=obj({"target_id": S}, ["target_id"]),
+    status=204,
 )
 op(
     "post",

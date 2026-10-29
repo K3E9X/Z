@@ -5123,6 +5123,85 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /admin/notifications:
+    get:
+      operationId: adminGetNotifications
+      tags:
+      - admin
+      summary: Notification targets (Slack, Mattermost, Teams, webhook, email) and their delivery state
+      x-permission: guardrails:manage
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      operationId: adminPutNotifications
+      tags:
+      - admin
+      summary: Change notification targets
+      x-permission: guardrails:manage
+      x-owner: B1
+      x-audit: true
+      x-step-up: true
+      description: Webhook URLs, signing keys and the SMTP password are secret references, never values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/notifications:test:
+    post:
+      operationId: adminTestNotification
+      tags:
+      - admin
+      summary: Send a test notification to one target
+      x-permission: guardrails:manage
+      x-owner: B1
+      x-audit: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_id: *id001
+              required:
+              - target_id
+              additionalProperties: false
+      responses:
+        '204':
+          description: Done
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /admin/audit:verify:
     post:
       operationId: adminVerifyAudit
@@ -9040,6 +9119,102 @@ components:
       - retention_days
       - checkpoint_minutes
       - forward
+      additionalProperties: false
+    NotificationKind:
+      enum:
+      - approval_requested
+      - question_asked
+      - needs_attention
+      - mission_succeeded
+      - mission_failed
+      - budget_alert
+      - connector_unhealthy
+      - breakglass_used
+    NotificationDelivery:
+      type: object
+      properties:
+        last_sent_at:
+          oneOf:
+          - *id005
+          - type: 'null'
+        last_error:
+          oneOf:
+          - *id001
+          - type: 'null'
+        last_error_at:
+          oneOf:
+          - *id005
+          - type: 'null'
+      additionalProperties: false
+      description: Read-only delivery state of a target, reported by the notification worker.
+    NotificationTarget:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,39}$
+        name: *id001
+        kind:
+          enum:
+          - slack
+          - mattermost
+          - teams
+          - webhook
+          - email
+        enabled: *id007
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationKind'
+        teams:
+          type: array
+          items: *id001
+        content_up_to:
+          $ref: common.schema.json#/$defs/DataClass
+        url_ref:
+          type: string
+          description: Secret reference of the incoming webhook URL (it carries a token)
+        secret_ref:
+          type: string
+          description: 'webhook: secret reference of the HMAC-SHA256 signing key'
+        to:
+          type: array
+          items: *id001
+        status:
+          $ref: '#/components/schemas/NotificationDelivery'
+      required:
+      - id
+      - kind
+      - events
+      additionalProperties: false
+    SmtpSettings:
+      type: object
+      properties:
+        host: *id001
+        port: *id006
+        starttls: *id007
+        username: *id001
+        password_ref:
+          type: string
+          description: Secret reference, never the value
+        from: *id001
+      required:
+      - host
+      - from
+      additionalProperties: false
+    NotificationSettings:
+      type: object
+      properties:
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTarget'
+        smtp:
+          oneOf:
+          - $ref: '#/components/schemas/SmtpSettings'
+          - type: 'null'
+      required:
+      - targets
       additionalProperties: false
     Guardrail:
       type: object
