@@ -533,6 +533,56 @@ export function AuditTab({
 
 // ------------------------------------------------------------------ Platform (guardrails summary, channels, health)
 
+type ChannelField = { key: string; label: string; placeholder: string; required?: boolean; hint?: string }
+const REF = 'A secret reference (env:, file:, vault:, kubernetes:), never the value'
+/** What each channel kind needs (server: channels.validate_config). Secrets are references only. */
+const CHANNEL_FIELDS: Record<'teams' | 'slack' | 'mattermost' | 'email', ChannelField[]> = {
+  teams: [
+    {
+      key: 'app_id',
+      label: 'Bot app id',
+      placeholder: '00000000-0000-0000-0000-000000000000',
+      required: true,
+    },
+    {
+      key: 'app_password',
+      label: 'Bot app password',
+      placeholder: 'vault:kv/z/teams#password',
+      required: true,
+      hint: REF,
+    },
+  ],
+  slack: [
+    {
+      key: 'signing_secret',
+      label: 'Signing secret',
+      placeholder: 'env:SLACK_SIGNING_SECRET',
+      required: true,
+      hint: REF,
+    },
+    { key: 'bot_token', label: 'Bot token (thread replies)', placeholder: 'env:SLACK_BOT_TOKEN', hint: REF },
+  ],
+  mattermost: [
+    {
+      key: 'token',
+      label: 'Slash command token',
+      placeholder: 'env:MATTERMOST_TOKEN',
+      required: true,
+      hint: REF,
+    },
+    { key: 'server_url', label: 'Server URL', placeholder: 'https://chat.example.internal' },
+  ],
+  email: [
+    {
+      key: 'secret',
+      label: 'Mail relay HMAC secret',
+      placeholder: 'env:Z_MAIL_RELAY_SECRET',
+      required: true,
+      hint: REF,
+    },
+  ],
+}
+
 function ChannelDialog({ onClose }: { onClose: () => void }) {
   const agents = useAgents()
   const teams = useTeams()
@@ -542,10 +592,17 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<'teams' | 'slack' | 'mattermost' | 'email'>('mattermost')
   const [agent, setAgent] = useState('orchestrator')
   const [allowed, setAllowed] = useState<string[]>([])
+  const [config, setConfig] = useState<Record<string, string>>({})
+  const [contentUpTo, setContentUpTo] = useState('C1')
   const [busy, setBusy] = useState(false)
+  const fields = CHANNEL_FIELDS[kind]
+  const missing = fields.filter((f) => f.required && !config[f.key]?.trim())
   const save = async () => {
     setBusy(true)
     try {
+      const values = Object.fromEntries(
+        fields.filter((f) => config[f.key]?.trim()).map((f) => [f.key, config[f.key]?.trim() ?? '']),
+      )
       await stepUp.run(
         () =>
           unwrap(
@@ -555,6 +612,7 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
                 name: titleCase(kind),
                 default_agent: agent,
                 allowed_teams: allowed,
+                config: { ...values, content_up_to: contentUpTo },
                 enabled: true,
               },
             }),
@@ -579,7 +637,7 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" busy={busy} onClick={() => void save()}>
+          <Button variant="primary" busy={busy} disabled={missing.length > 0} onClick={() => void save()}>
             Add channel
           </Button>
         </>
@@ -588,7 +646,14 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Kind">
           {(id) => (
-            <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+            <Select
+              id={id}
+              value={kind}
+              onChange={(e) => {
+                setKind(e.target.value as typeof kind)
+                setConfig({})
+              }}
+            >
               <option value="teams">Microsoft Teams</option>
               <option value="slack">Slack</option>
               <option value="mattermost">Mattermost</option>
@@ -602,6 +667,39 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
               {(agents.data?.items ?? []).map((a) => (
                 <option key={a.id} value={a.name}>
                   {a.display_name} (@{a.handle})
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        {fields.map((f) => (
+          <Field key={`${kind}-${f.key}`} label={f.label} hint={f.hint}>
+            {(id, d) => (
+              <Input
+                id={id}
+                aria-describedby={d}
+                value={config[f.key] ?? ''}
+                placeholder={f.placeholder}
+                onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })}
+                className="font-mono text-sm"
+              />
+            )}
+          </Field>
+        ))}
+        <Field
+          label="Content posted up to"
+          hint="Follow-ups carry summaries and questions only for missions up to this data class; above it they link to Z"
+        >
+          {(id, d) => (
+            <Select
+              id={id}
+              aria-describedby={d}
+              value={contentUpTo}
+              onChange={(e) => setContentUpTo(e.target.value)}
+            >
+              {['C0', 'C1', 'C2', 'C3'].map((c) => (
+                <option key={c} value={c}>
+                  {c}
                 </option>
               ))}
             </Select>
