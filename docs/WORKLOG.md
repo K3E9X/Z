@@ -55,6 +55,16 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   C2/C3 keys; verified against the real LiteLLM 1.105.0 image with a fake upstream (200 without the header, 403
   with it).
 - Dropped pre-commit (no hooks configured; its virtualenv dependency got GHSA-cx6f-vjhg-g3cc).
+- Raw request bodies for operations whose spec declares text/* or octet-stream (max 4 MB): m365 `files.upload`
+  for small text files in OneDrive/SharePoint.
+- Personal notifications: Settings → Notifications, email about one's own missions (`notify_prefs:<user>`).
+- cli connectors (ADR 0025): argv template with no shell, agent arguments can never start with `-`, credentials
+  only in the tool's environment, image pinned by digest and allowlisted in `executor.tool_images`; Docker runs
+  through the socket proxy's tool profile (uid 65534, verified on real Docker), Kubernetes as a Job with a per-run
+  Secret. The connector builder drafts them (`POST /connectors/import` source `cli`).
+- Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
+  run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
+  (CI went red on b8dd30f8 for exactly this).
 - Traps: the dependency test caught an undeclared `anyio` import in the CLI (use asyncio.run); `MissionStatus`
   ends in `succeeded`, not `completed`; ZModel drops None fields, so read optional status keys with `.get`.
 
