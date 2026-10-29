@@ -12,35 +12,35 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email, browser connectors with reviewed flows replayed by z-browser and recording by demonstration (ADR 0016), GraphQL and read-only PostgreSQL connectors (ADR 0020) done; cli connectors, GraphQL introspection import, M365 catalog templates later) |
 | CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
-| Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | doing (sub-agent) |
-| Judge, routing policy (key allowlists), evals, memory | B6 | doing (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates and apply/try done; shadow replay, agent builder and memory retrieval in job specs pending) |
+| Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | done (every screen of docs/09, plus admin, take-over, browser recorder, notifications) |
+| Judge, routing policy (key allowlists), evals, memory | B6 | done (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates, shadow replay, apply/try, memory retrieval in job specs) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
-| Inference monitor (inferX health on the Inference screen) | B1 | done (API: LiteLLM health, model info, Prometheus/DCGM queries; web pending) |
-| Named agents (rename, handle, avatar, duplicate) | B1, B5 | doing (API done; web pending) |
+| Inference monitor (inferX health on the Inference screen) | B1 | done (LiteLLM health, model info, Prometheus/DCGM queries, Inference screen; inferX catalogue wired in ADR 0024) |
+| Named agents (rename, handle, avatar, duplicate) | B1, B5 | done |
 | GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |
 | RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (incl. approval rules: four-eyes, two approvers for destructive) |
-| Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
+| Admin area (web + `z admin`) | B1, B4, B5 | done |
 | Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | done (scheduled signed checkpoints and at-least-once syslog/TLS and HTTPS forwarding with delivery status, ADR 0021) |
 | CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | done for guard, lint, tests, security scans, images (build, scan, sign, SBOM), chart policy, compose e2e, GitLab staging/production deploy (ADR 0018), license gate on installed packages, kind smoke install under PSS restricted, release notes from conventional commits, ZAP baseline in the e2e job |
 | Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose with z-ui, Helm chart linted and kubeconform-valid for k3s and k8s, kubernetes executor, egress proxy (squid allowlist), z-browser image + compose profile + Helm Deployment/NetworkPolicy done) |
-| E2E and acceptance | C | todo |
+| E2E and acceptance | C | doing (compose e2e: a real mission through the hardened runner, LiteLLM and the fake LLM, plus a ZAP baseline; kind smoke install; acceptance against the real inferX, GitLab and Jira pending) |
 
 ## v1.1 — complete (BUILD P1)
 | Item | Status |
 |---|---|
-| Learning loop: signals, proposals, shadow replay, apply/rollback | doing (all but shadow replay; see ADR 0014) |
-| Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | todo |
+| Learning loop: signals, proposals, shadow replay, apply/rollback | done (ADR 0014) |
+| Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | doing (GraphQL, PostgreSQL, browser with recording, connector builder and inbound webhooks done; `cli` connectors need their own sandbox) |
 | `z top`, sessions, `z mcp serve`, themes | done (`/mcp` on z-server and `z mcp serve` share one tool table, ADR 0022) |
-| Tasks, Playbooks, Agents and skills, Learning, Mobile screens | todo |
-| Trace replay, Evals, Analytics screens | todo |
-| Agent builder | todo |
-| `workplace` pack | todo |
-| Objectives and assignments (proactive agents) | done (API, z and connector metrics, suggestions in Review, read-only auto-start within budget, `report_objective` endpoint; web tab pending) |
-| Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | todo |
-| Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies; approval cards pending; ADR 0015) |
-| Personal (delegated) connections | todo |
+| Tasks, Playbooks, Agents and skills, Learning, Mobile screens | done |
+| Trace replay, Evals, Analytics screens | done |
+| Agent builder | done (`POST /agents/draft` and the web builder) |
+| `workplace` pack | done (assistant and researcher agents, inbox triage and weekly report; m365 backed by a shipped Graph v1.0 subset spec) |
+| Objectives and assignments (proactive agents) | done (API, z and connector metrics, suggestions in Review, read-only auto-start within budget, `report_objective` endpoint, Objectives screen) |
+| Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | doing (Microsoft 365 mail, calendar, chats, transcripts and file metadata; Google Workspace and Slack/Mattermost as tool connectors later; OneDrive uploads need raw-body support in the HTTP invoker) |
+| Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies, follow-up approval cards linking to Z; ADR 0015, 0017) |
+| Personal (delegated) connections | done (OAuth PKCE per user, read and write grants apart) |
 | Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications; ADR 0023; personal preferences later) |
-| kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | todo |
+| kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | doing (kind smoke install, ExternalSecret template, gVisor how-to in the chart README done; Grafana dashboard later) |
 
 ## v2 — later
 - Admin-enabled `auto_reversible` autonomy for specific low-risk operations (comments, labels), never destructive, always audited.
