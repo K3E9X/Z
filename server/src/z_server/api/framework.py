@@ -179,13 +179,16 @@ async def _ctx(request: Request) -> AsyncIterator[Ctx]:
         raise Problem("internal", "route is not bound to a contract operation")
     async with state.sessions() as db:
         async with db.begin():
-            try:
-                principal = await authenticate(request, db, state)
-            except Problem:
-                if op.permission == "public":
-                    principal = None
-                else:
-                    raise
+            if op.permission == "hmac":
+                principal = None  # signed by the sender (platform signature or JWT), never a Z session or token
+            else:
+                try:
+                    principal = await authenticate(request, db, state)
+                except Problem:
+                    if op.permission == "public":
+                        principal = None
+                    else:
+                        raise
             denial = _check(op, principal, request, await state.step_up_max_age(db))
         if denial is not None:
             kind, reason = denial
