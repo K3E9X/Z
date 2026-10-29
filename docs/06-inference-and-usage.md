@@ -65,7 +65,11 @@ Also: `GET /v1/models` on the gateway every minute, and a synthetic tool-call pr
 - **Budgets** at org, team, user, playbook, mission, agent, objective. Each has `limit`, `period` (`mission`, `day`, `week`, `month`), `alert_at` (default 80 %). Hard limits stop new jobs; running jobs finish their current step then stop with `budget_exceeded`.
 - **Alerts** to Review (banner), notifications and the event feed.
 - **CLI**: `z usage --by agent|model|mission|team --since 7d [--json]`.
-- **Export**: CSV/JSON; Prometheus metrics `z_tokens_total{model,agent,team}`, `z_missions_total{status}`, `z_review_pending`, `z_connector_up{connector}` on `z-server /metrics`.
+- **Export**: CSV/JSON; Prometheus metrics on `z-server /metrics` (bearer `Z_METRICS_TOKEN`), read from the database at
+  each scrape: `z_tokens_total{model,agent,team,direction}`, `z_missions_total{status}` (ended missions, by final
+  status), `z_missions_active{status}`, `z_jobs{status}` (not ended), `z_review_pending{kind}` (action, question),
+  `z_connector_up{connector}`, `z_notifications_pending`. Every replica reports the same values: aggregate with `max`.
+  The chart ships a "Z overview" Grafana dashboard (`metrics.grafanaDashboard.enabled`).
 
 ## 7. Cost model
 Internal tokens have no invoice, but GPU time is not free. `config/z.yaml` can set an internal cost per 1M input/output tokens per alias so budgets and analytics can show a comparable cost, and external providers their real price.

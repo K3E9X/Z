@@ -40,7 +40,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies, follow-up approval cards linking to Z; ADR 0015, 0017) |
 | Personal (delegated) connections | done (OAuth PKCE per user, read and write grants apart) |
 | Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications; ADR 0023; personal preferences later) |
-| kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | doing (kind smoke install, ExternalSecret template, gVisor how-to in the chart README done; Grafana dashboard later) |
+| kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | done (kind smoke install, ExternalSecret template, gVisor how-to in the chart README, Z metrics on /metrics and the "Z overview" Grafana dashboard done) |
 
 ## v2 — later
 - Admin-enabled `auto_reversible` autonomy for specific low-risk operations (comments, labels), never destructive, always audited.
