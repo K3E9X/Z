@@ -14,6 +14,7 @@ import { useToast } from '@/components/toast'
 import { Button, Field, Input, PageTitle, ProgressBar, Select } from '@/components/ui'
 import { useCan } from '@/lib/auth'
 import { describeCron } from '@/lib/cron'
+import { SCHEDULE_TZ_NOTE, sourceTrigger, type SourceKind } from '@/lib/triggers'
 import { clock, isToday, relative, shortAge, titleCase } from '@/lib/format'
 import { missionAgent, playbookTitle, progress } from '@/lib/mission'
 import { missionStatus } from '@/lib/status'
@@ -32,7 +33,12 @@ function triggerLabel(t: Trigger): string {
   const f = t.filter
   if (t.kind === 'schedule')
     return `${t.name ?? playbookTitle(t.playbook)} · ${describeCron(typeof t.config.cron === 'string' ? t.config.cron : null)}`
-  if (t.kind === 'jira') return `Jira · ${typeof f.label === 'string' ? `label ${f.label}` : 'issues'}`
+  if (t.kind === 'jira') {
+    // z-server reads the project and label from config (label defaults to z)
+    const c = t.config
+    const label = typeof c.label === 'string' ? c.label : typeof f.label === 'string' ? f.label : 'z'
+    return `Jira · ${typeof c.project === 'string' ? `${c.project}, ` : ''}label ${label}`
+  }
   if (t.kind === 'gitlab')
     return `GitLab · ${typeof f.assignee === 'string' ? `issues assigned to @${f.assignee}` : typeof f.label === 'string' ? `label ${f.label}` : 'events'}`
   return `${t.name ?? titleCase(t.kind)} · ${t.kind}`
@@ -166,13 +172,20 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
   const playbooks = usePlaybooks()
   const qc = useQueryClient()
   const toast = useToast()
-  const [kind, setKind] = useState<'jira' | 'gitlab' | 'webhook' | 'schedule' | 'email'>('jira')
-  const [value, setValue] = useState('z')
+  const [kind, setKind] = useState<SourceKind>('jira')
+  const [project, setProject] = useState('')
+  const [label, setLabel] = useState('z')
+  const [assignee, setAssignee] = useState('')
+  const [cron, setCron] = useState('0 8 * * 1')
   const [playbook, setPlaybook] = useState('')
   const [autoStart, setAutoStart] = useState(false)
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<Trigger | null>(null)
+  const body = sourceTrigger(kind, { project, label, assignee, cron })
+  const invalid = 'error' in body ? body.error : null
+  const needsPlaybook = autoStart && !playbook
   const save = async () => {
+    if ('error' in body || needsPlaybook) return
     setBusy(true)
     try {
       const t = await unwrap(
@@ -180,8 +193,8 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
           body: {
             kind,
             name: `${titleCase(kind)} intake`,
-            config: kind === 'schedule' ? { cron: value } : {},
-            filter: kind === 'jira' ? { label: value } : kind === 'gitlab' ? { assignee: value } : {},
+            config: body.config,
+            filter: body.filter,
             ...(playbook ? { playbook } : {}),
             auto_start: autoStart,
             enabled: true,
@@ -215,7 +228,12 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
         ) : (
           <>
             <Button onClick={onClose}>Cancel</Button>
-            <Button variant="primary" busy={busy} onClick={() => void save()}>
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!!invalid || needsPlaybook}
+              onClick={() => void save()}
+            >
               Add source
             </Button>
           </>
@@ -242,7 +260,7 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Source">
             {(id) => (
-              <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+              <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as SourceKind)}>
                 <option value="jira">Jira label</option>
                 <option value="gitlab">GitLab assignee</option>
                 <option value="webhook">Inbound webhook</option>
@@ -251,19 +269,66 @@ function AddSource({ open, onClose }: { open: boolean; onClose: () => void }) {
               </Select>
             )}
           </Field>
-          {(kind === 'jira' || kind === 'gitlab' || kind === 'schedule') && (
-            <Field label={kind === 'jira' ? 'Label' : kind === 'gitlab' ? 'Assignee' : 'Cron'}>
+          {kind === 'jira' && (
+            <>
+              <Field label="Project" error={project.trim() ? null : invalid}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={project}
+                    placeholder="SECOPS"
+                    onChange={(e) => setProject(e.target.value)}
+                    className="font-mono"
+                  />
+                )}
+              </Field>
+              <Field label="Label" error={project.trim() && !label.trim() ? invalid : null}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    className="font-mono"
+                  />
+                )}
+              </Field>
+            </>
+          )}
+          {kind === 'gitlab' && (
+            <Field label="Assignee" error={invalid}>
               {(id) => (
                 <Input
                   id={id}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
+                  value={assignee}
+                  placeholder="z-bot"
+                  onChange={(e) => setAssignee(e.target.value)}
                   className="font-mono"
                 />
               )}
             </Field>
           )}
-          <Field label="Playbook" className="sm:col-span-2">
+          {kind === 'schedule' && (
+            <Field
+              label="Cron"
+              hint={invalid ? undefined : `${describeCron(cron)}. ${SCHEDULE_TZ_NOTE}`}
+              error={invalid}
+            >
+              {(id, d) => (
+                <Input
+                  id={id}
+                  aria-describedby={d}
+                  value={cron}
+                  onChange={(e) => setCron(e.target.value)}
+                  className="font-mono"
+                />
+              )}
+            </Field>
+          )}
+          <Field
+            label="Playbook"
+            className="sm:col-span-2"
+            error={needsPlaybook ? 'Starting automatically needs a playbook.' : null}
+          >
             {(id) => (
               <Select id={id} value={playbook} onChange={(e) => setPlaybook(e.target.value)}>
                 <option value="">Let Z suggest one per task</option>
