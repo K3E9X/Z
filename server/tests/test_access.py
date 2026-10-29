@@ -20,7 +20,9 @@ ROLE_USERS = {
     "builder": "erin",
     "viewer": "victor",
 }
-# (method, path, roles that are allowed) for the routes built so far; everything else must be 403
+# (method, path, roles that are allowed) for a sample of read routes, one per permission family; every other role
+# must get 403. That every route declares a permission and takes the context that enforces it is checked for
+# all routes in test_contract_routes.py.
 MATRIX = [
     ("GET", "/api/v1/admin/users", {"admin"}),
     ("GET", "/api/v1/admin/permissions", {"admin"}),
