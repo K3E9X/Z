@@ -176,7 +176,7 @@ async def forward(db: AsyncSession, name: str, target: dict[str, Any], sender: S
                 break
         entry["last_error"] = None
     except (ForwardError, Problem) as exc:
-        entry["last_error"] = str(exc.detail if isinstance(exc, Problem) else exc)[:300]
+        entry["last_error"] = str((exc.detail or exc.kind) if isinstance(exc, Problem) else exc)[:300]
         entry["last_error_at"] = now().isoformat()
         log.warning("audit forwarding to %s failed: %s", name, entry["last_error"])
     status[name] = entry
