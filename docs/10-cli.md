@@ -68,9 +68,9 @@ z agents create --describe "an agent that keeps our Jira SECOPS backlog clean"
 z objectives [list|show|add|pause] --agent @vega
 z assign @vega jira_project:SECOPS group:infra/
 z connect m365                            # personal delegated connection to Microsoft 365 (browser opens)
-z skills [show|diff|rollback]
-z playbooks [show|run|save-from <mission>]
-z connectors [list|test <name>|import --openapi <url>|record-browser]
+z skills [list|show|versions]               # diff, rollback: not built yet (API: POST /skills/{id}/rollback)
+z playbooks [list|show|run]                 # save-from <mission>: not built yet (API: POST /missions/{id}/save-as-playbook)
+z connectors [list|show|operations|test <name>|approve-exposure|set-operation]   # import, record-browser: not built yet (web: Connector builder, Browser recorder)
 z usage --by agent|model|mission|team --since 7d
 z inference status
 z eval <agent|skill> --models z-fast,z-heavy
@@ -86,6 +86,6 @@ z config get|set <key> <value>
 `~/.config/z/config.toml`: `url`, `team`, `theme`, `autonomy_default`, `editor`. Token in the OS keyring (fallback: `~/.config/z/token` mode 0600). Env overrides: `Z_URL`, `Z_TOKEN`.
 
 ## 5. Tests
-- Snapshot tests of Textual screens (Textual's pilot/snapshot testing).
+- Textual pilot tests (`App.run_test`) of the session and `z top`. Snapshot tests (`pytest-textual-snapshot`) are not built yet.
 - Contract tests against a mock server generated from `openapi.yaml`.
-- Headless mode tested end to end in the e2e suite.
+- Headless mode tested in `cli/tests` against a faked API; not yet in the Compose e2e suite.
