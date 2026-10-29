@@ -254,7 +254,11 @@ def test_problem_details_and_unserved_endpoints(z: Z) -> None:
     bad_input = bob("run", "summarize-file", "-i", "oops")
     assert bad_input.exit_code == 2
 
-    for args in (["connectors", "test", "jira"], ["usage"], ["inference", "status"], ["--resume"]):
+    denied = bob("connectors", "test", "jira")  # served, but an operator cannot test connectors
+    assert denied.exit_code == 4 and "connectors:manage" in plain(denied.output)
+    for args in (["usage"], ["inference", "status"]):
+        assert bob(*args).exit_code == 0, args
+    for args in (["--resume"],):
         result = bob(*args)
         assert result.exit_code == 1, (args, result.output)
         assert "not available on this server yet" in plain(result.output), args

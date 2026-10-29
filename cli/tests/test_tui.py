@@ -113,7 +113,9 @@ async def test_top_dashboard_decide_filter_stop(
         )
         header = text_of(app.query_one("#header", Static))
         assert "Z top" in header and "Cyber Ops" in header and "inferX" in header
-        assert "not served" in header or "health" in header  # honest about /inference/health
+        await until(
+            pilot, lambda: "tokens today" in text_of(app.query_one("#header", Static)), what="live health and usage"
+        )
         await until(pilot, lambda: "1 pending" in text_of(app.query_one("#review", Static)), what="review counts")
         assert "jira" in text_of(app.query_one("#connectors", Static))
         await select(pilot, app, lambda r: r.agent == "Summarizer")
@@ -208,7 +210,8 @@ async def test_session_prompt_completion_question_and_commands(
 
     async with app.run_test(size=(150, 60)) as pilot:
         await until(pilot, lambda: bool(app.agents), what="the catalog")
-        await until(pilot, lambda: "not served" in text_of(app.query_one("#welcome", Static)), what="the welcome box")
+        await until(pilot, lambda: "z-heavy" in text_of(app.query_one("#welcome", Static)), what="the welcome box")
+        assert "down" in text_of(app.query_one("#welcome", Static))  # no LiteLLM in the test stack
         welcome = text_of(app.query_one("#welcome", Static))
         assert "Welcome to Z" in welcome and "Cyber Ops" in welcome and "inferX" in welcome and "bob" in welcome
 
@@ -269,7 +272,7 @@ async def test_session_prompt_completion_question_and_commands(
         await until(pilot, lambda: "pending_review" in transcript_text(app), what="connectors")
         type_in(area, "/usage")
         await pilot.press("enter")
-        await until(pilot, lambda: "not available on this server yet" in transcript_text(app), what="usage")
+        await until(pilot, lambda: "Tokens today by model" in transcript_text(app), what="usage")
         type_in(area, "/theme day")
         await pilot.press("enter")
         await until(pilot, lambda: app.theme_name == "day", what="theme")
