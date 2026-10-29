@@ -390,7 +390,10 @@ class Gateway:
             mission_row = await db.get(Mission, mission.id, with_for_update=True)
             job_row = await db.get(Job, job.id, with_for_update=True)
             assert mission_row is not None and job_row is not None
-            if inv.ok and DataClass(connector.data_class).rank > DataClass(mission_row.data_class).rank:
+            # an error can carry the tool's data too (an HTTP error body, a GraphQL partial result, MCP isError
+            # content, an error_body message): any answer from the tool raises the class, only "unreachable" does not
+            answered = inv.ok or inv.status is not None or inv.body not in (None, "")
+            if answered and DataClass(connector.data_class).rank > DataClass(mission_row.data_class).rank:
                 try:
                     await service.raise_data_class(
                         db,
