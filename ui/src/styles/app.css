@@ -103,6 +103,12 @@
   a:hover {
     color: var(--text-2);
   }
+  /* A link inside running text is underlined: colour alone does not set it apart (WCAG 1.4.1). */
+  p a,
+  li > a:not([class]) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   button,
   input,
   textarea,

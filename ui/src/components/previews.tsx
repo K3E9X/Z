@@ -219,7 +219,7 @@ function FileBody({ p }: { p: FilePreview }) {
 
 export function JsonView({ data, className = '' }: { data: unknown; className?: string }) {
   return (
-    <pre className={`scrollbar-thin m-0 max-h-[520px] overflow-auto rounded-panel border border-line bg-code px-4 py-3 font-mono text-xs leading-[1.65] text-text-2 ${className}`}>
+    <pre tabIndex={0} className={`scrollbar-thin m-0 max-h-[520px] overflow-auto rounded-panel border border-line bg-code px-4 py-3 font-mono text-xs leading-[1.65] text-text-2 ${className}`}>
       {JSON.stringify(data, null, 2)}
     </pre>
   )

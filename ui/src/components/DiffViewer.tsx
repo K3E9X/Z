@@ -139,6 +139,8 @@ export function DiffViewer({
               <div
                 className="scrollbar-thin overflow-auto"
                 style={maxHeight ? { maxHeight } : undefined}
+                // Focusable so keyboard users can scroll long lines and hunks.
+                tabIndex={0}
                 role="table"
                 aria-label={`Changes in ${f.name}`}
               >

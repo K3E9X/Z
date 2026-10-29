@@ -1,6 +1,6 @@
 // Interaction flows against a running UI backed by a real z-server. Each flow screenshots its result.
 // Usage: node e2e/flows.mjs <baseUrl> <flow> [theme]
-//   flows: palette | help | mobile | review-single | review-batch | atlas | signin-error
+//   flows: palette | help | mobile | review-single | review-batch | atlas | signin | noaccess | stepup
 // These change real state on the server (decisions, a new agent): run them on a dev server only.
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright-core'
@@ -116,6 +116,46 @@ switch (flow) {
     await page.keyboard.press('Enter')
     await page.waitForTimeout(300)
     console.log('composer text:', await page.getByRole('combobox', { name: 'What should Z do?' }).inputValue())
+    break
+  }
+  case 'signin': {
+    // The dev server signs everyone in; answer /me with the server's 401 problem to show the sign-in page.
+    await page.route('**/api/v1/me', (r) =>
+      r.fulfill({
+        status: 401,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }),
+      }),
+    )
+    await go('/review')
+    await shot('signin')
+    console.log('sign-in link:', await page.getByRole('link', { name: /GitLab/ }).first().getAttribute('href').catch(() => null))
+    break
+  }
+  case 'noaccess': {
+    await page.route('**/api/v1/me', (r) =>
+      r.fulfill({ status: 401, contentType: 'application/problem+json', body: JSON.stringify({ type: 'urn:z:problem:unauthenticated', title: 'Sign-in required', status: 401 }) }),
+    )
+    await go('/signin?error=not_in_allowed_group')
+    await shot('noaccess')
+    break
+  }
+  case 'stepup': {
+    // The dev server has no step-up: answer the audit verification with the step-up problem once.
+    let asked = false
+    await page.route('**/api/v1/admin/audit:verify', (r) => {
+      if (asked) return r.continue()
+      asked = true
+      return r.fulfill({
+        status: 403,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ type: 'urn:z:problem:step-up-required', title: 'Step-up required', status: 403, detail: 'Re-authenticate to continue.' }),
+      })
+    })
+    await go('/admin?tab=audit')
+    await page.getByRole('button', { name: /Verify/ }).first().click()
+    await page.waitForTimeout(500)
+    await shot('stepup')
     break
   }
   default:

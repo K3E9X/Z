@@ -66,8 +66,8 @@
   --inv-bg: #171715;
   --inv-text: #ffffff;
   --run: #1f5fd1;
-  --wait: #9a5b00;
-  --ok: #1c7a4a;
+  --wait: #8f5400; /* design #9a5b00 is 4.28:1 on --wait-bg over raised rows; AA needs 4.5 */
+  --ok: #187044; /* design #1c7a4a is 4.32:1 on --ok-bg */
   --err: #b92b27;
   --run-bg: rgba(31, 95, 209, 0.08);
   --wait-bg: rgba(154, 91, 0, 0.09);
