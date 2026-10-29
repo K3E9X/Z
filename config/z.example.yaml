@@ -39,9 +39,9 @@ auth:
 audit:
   retention_days: 365
   checkpoint_minutes: 60
-  forward:
-    syslog: { enabled: false, url: "tls://syslog.example.internal:6514", format: rfc5424 }
-    https: { enabled: false, url: "" }
+  forward:                      # at-least-once, in order; a new destination starts from now unless from_now: false
+    syslog: { enabled: false, url: "tls://syslog.example.internal:6514", format: rfc5424 }   # TLS only, octet-counted
+    https: { enabled: false, url: "", token_ref: "" }   # JSON lines; token_ref: env:/file:/vault:/kubernetes: reference
 
 executor:
   kind: docker                  # docker | process (dev only) | kubernetes

@@ -658,16 +658,18 @@ async def put_guardrails(ctx: CtxDep, body: dict[str, m.Guardrail]) -> dict[str,
 
 
 async def audit_settings(ctx: Ctx) -> m.AuditSettings:
-    cfg = ctx.state.config.get("audit", {})
-    row = await ctx.db.get(Setting, AUDIT_SETTINGS_KEY)
-    value = {
-        "retention_days": cfg.get("retention_days", 365),
-        "checkpoint_minutes": cfg.get("checkpoint_minutes", 60),
-        "forward": cfg.get("forward", {}),
-    }
-    if row is not None:
-        value.update(row.value)
-    return m.AuditSettings.model_validate(value)
+    """The effective settings; each forwarding target carries its read-only delivery `status` (cursor, errors)."""
+    from z_server.workers import audit as audit_worker
+
+    value = await audit_worker.effective_settings(ctx.db, ctx.state.config)
+    status = await audit_worker.forward_state(ctx.db)
+    forward = {}
+    for name, target in (value.get("forward") or {}).items():
+        entry = status.get(name)
+        if isinstance(target, dict) and isinstance(entry, dict) and entry.get("url") == target.get("url"):
+            target = {**target, "status": {k: v for k, v in entry.items() if k != "url"}}
+        forward[name] = target
+    return m.AuditSettings.model_validate({**value, "forward": forward})
 
 
 @router.operation("adminGetAuditSettings")
@@ -677,16 +679,31 @@ async def admin_get_audit_settings(ctx: CtxDep) -> m.AuditSettings:
 
 @router.operation("adminPutAuditSettings")
 async def admin_put_audit_settings(ctx: CtxDep, body: m.AuditSettings) -> m.AuditSettings:
+    from z_server.gateway.admin import BACKENDS as SECRET_BACKENDS
     from z_server.security import check_outbound_url
 
-    for target in body.forward.values():
-        if isinstance(target, dict) and target.get("enabled") and target.get("url"):
-            await check_outbound_url(str(target["url"]), ctx.state)
+    forward: dict[str, Any] = {}
+    for name, target in body.forward.items():
+        if name not in {"syslog", "https"} or not isinstance(target, dict):
+            raise Problem("validation", "forwarding targets are syslog and https")
+        target = {k: v for k, v in target.items() if k != "status"}  # delivery status is read-only
+        if target.get("enabled") and target.get("url"):
+            url = str(target["url"])
+            if not url.startswith("tls://" if name == "syslog" else "https://"):
+                raise Problem("validation", "syslog forwards to tls://host:port, https to an https:// URL")
+            await check_outbound_url(url, ctx.state)
+        if target.get("token_ref") and str(target["token_ref"]).partition(":")[0] not in SECRET_BACKENDS:
+            raise Problem("validation", "token_ref is a secret reference (env:, file:, vault:, kubernetes:)")
+        forward[name] = target
+    if body.checkpoint_minutes < 1:
+        raise Problem("validation", "checkpoint_minutes must be at least 1")
+    value = {**body.dump(), "forward": forward}
     before = (await audit_settings(ctx)).dump()
     row = await ctx.db.get(Setting, AUDIT_SETTINGS_KEY)
     if row is None:
-        ctx.db.add(Setting(key=AUDIT_SETTINGS_KEY, value=body.dump(), updated_by=ctx.user.username))
+        ctx.db.add(Setting(key=AUDIT_SETTINGS_KEY, value=value, updated_by=ctx.user.username))
     else:
-        row.value, row.updated_by = body.dump(), ctx.user.username
-    await ctx.audit("admin.audit_settings_changed", "audit_settings", None, before=before, after=body.dump())
-    return body
+        row.value, row.updated_by = value, ctx.user.username
+    await ctx.db.flush()
+    await ctx.audit("admin.audit_settings_changed", "audit_settings", None, before=before, after=value)
+    return await audit_settings(ctx)

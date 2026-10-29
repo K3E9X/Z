@@ -127,9 +127,12 @@ class Verification:
 
 
 async def verify(db: AsyncSession, signer: AuditSigner, batch: int = 5000) -> Verification:
+    """Walk the chain. After a retention purge the first remaining event must continue a signed checkpoint
+    (its prev_hash is that checkpoint's hash); checkpoints of purged events are checked by signature only."""
     prev, expected_seq, checked = GENESIS, 1, 0
     heads: dict[int, str] = {}
-    last_seq = 0
+    last_seq, first_seq = 0, None
+    checkpoints = {cp.seq: cp for cp in (await db.execute(select(AuditCheckpoint))).scalars()}
     while True:
         rows = (
             (
@@ -143,6 +146,19 @@ async def verify(db: AsyncSession, signer: AuditSigner, batch: int = 5000) -> Ve
         if not rows:
             break
         for row in rows:
+            if first_seq is None:
+                first_seq = row.seq
+                if row.seq != 1:
+                    anchor = checkpoints.get(row.seq - 1)
+                    if (
+                        anchor is None
+                        or anchor.hash != row.prev_hash
+                        or not signer.verify(f"{anchor.seq}:{anchor.hash}", anchor.signature)
+                    ):
+                        detail = f"events before seq {row.seq} are missing and no signed checkpoint anchors the rest"
+                        return Verification(False, checked, row.seq, 0, detail)
+                    prev, expected_seq = row.prev_hash, row.seq
+                    heads[anchor.seq] = anchor.hash
             if row.seq != expected_seq:
                 return Verification(False, checked, row.seq, 0, f"gap: expected seq {expected_seq}, found {row.seq}")
             if row.prev_hash != prev or compute_hash(prev, event_dict(row)) != row.hash:
@@ -150,8 +166,10 @@ async def verify(db: AsyncSession, signer: AuditSigner, batch: int = 5000) -> Ve
             heads[row.seq] = row.hash
             prev, expected_seq, checked, last_seq = row.hash, row.seq + 1, checked + 1, row.seq
     verified = 0
-    for cp in (await db.execute(select(AuditCheckpoint).order_by(AuditCheckpoint.seq))).scalars():
-        if heads.get(cp.seq) != cp.hash or not signer.verify(f"{cp.seq}:{cp.hash}", cp.signature):
+    for seq in sorted(checkpoints):
+        cp = checkpoints[seq]
+        purged = first_seq is not None and seq < first_seq - 1
+        if (not purged and heads.get(seq) != cp.hash) or not signer.verify(f"{cp.seq}:{cp.hash}", cp.signature):
             return Verification(False, checked, cp.seq, verified, f"checkpoint {cp.seq} does not match the chain")
         verified += 1
     return Verification(True, checked, None, verified, "chain and checkpoints verified")
