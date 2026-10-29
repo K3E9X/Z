@@ -11,6 +11,7 @@ class ExecutorError(RuntimeError):
 
 
 MAX_TOOL_OUTPUT = 1024 * 1024  # bytes of stdout kept from a cli tool run (the rest is cut, `truncated` is set)
+MAX_TOOL_STDERR = 64 * 1024  # bytes of the end of stderr read (the last 4000 characters are kept)
 
 
 @dataclass

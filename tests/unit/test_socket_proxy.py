@@ -237,10 +237,15 @@ def test_cli_tool_runs_through_the_proxy_on_real_docker(proxy: tuple[str, str]) 
         ok = asyncio.run(executor.run_tool(tool, ["python3", "-c", code], {"T": "tok"}, 60))
         failed = asyncio.run(executor.run_tool(tool, ["python3", "-c", "import sys; sys.exit(3)"], {}, 60))
         slow = asyncio.run(executor.run_tool(tool, ["python3", "-c", "import time; time.sleep(60)"], {}, 3))
+        loud = "import sys; sys.stdout.write('x' * 3_000_000); sys.stderr.write('e' * 200_000)"
+        big = asyncio.run(executor.run_tool(tool, ["python3", "-c", loud], {}, 60))
     finally:
         server.shutdown()
     assert ok.exit_code == 0 and json.loads(ok.stdout) == {"uid": 65534, "tok": "tok"} and ok.stderr.strip() == "diag"
     assert failed.exit_code == 3 and not failed.timed_out
     assert slow.timed_out
+    # bounded: at most MAX_TOOL_OUTPUT of stdout and the end of stderr reach z-server
+    assert big.truncated and len(big.stdout) == 1024 * 1024 and set(big.stdout) == {"x"}
+    assert len(big.stderr) == 4000
     leftovers = _docker("GET", "/v1.43/containers/json", params={"all": 1}).json()
     assert not [c for c in leftovers if any(n.startswith("/z-tool-") for n in c.get("Names") or [])]

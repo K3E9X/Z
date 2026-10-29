@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from z_server.executors import MAX_TOOL_OUTPUT, ExecutorError, ToolRun
+from z_server.executors import MAX_TOOL_OUTPUT, MAX_TOOL_STDERR, ExecutorError, ToolRun
 
 API_VERSION = "v1.43"
 LABEL = "io.z.job"
@@ -183,16 +183,34 @@ class DockerExecutor:
             except TimeoutError:
                 timed_out = True
                 await self._call("POST", f"/containers/{container}/stop", params={"t": 1})
-            out = await self._call("GET", f"/containers/{container}/logs", params={"stdout": 1, "stderr": 0})
-            err = await self._call("GET", f"/containers/{container}/logs", params={"stdout": 0, "stderr": 1})
-            stdout = demux(out.content) if out.status_code == 200 else ""
-            stderr = demux(err.content) if err.status_code == 200 else ""
+            # bounded reads: a tool can write gigabytes in its run; z-server keeps at most MAX_TOOL_OUTPUT of it
+            raw_out, truncated = await self._logs(container, {"stdout": 1, "stderr": 0}, MAX_TOOL_OUTPUT)
+            raw_err, _ = await self._logs(container, {"stdout": 0, "stderr": 1, "tail": 100}, MAX_TOOL_STDERR)
         finally:
             await self._call("DELETE", f"/containers/{container}", params={"force": "true"})
-        truncated = len(stdout.encode()) > MAX_TOOL_OUTPUT
-        if truncated:
+        stdout = demux(raw_out)
+        if len(stdout.encode()) > MAX_TOOL_OUTPUT:
+            truncated = True
             stdout = stdout.encode()[:MAX_TOOL_OUTPUT].decode("utf-8", errors="ignore")
-        return ToolRun(exit_code, stdout, stderr[-4000:], timed_out, truncated)
+        return ToolRun(exit_code, stdout, demux(raw_err)[-4000:], timed_out, truncated)
+
+    async def _logs(self, container: str, params: dict[str, Any], limit: int) -> tuple[bytes, bool]:
+        """At most `limit` bytes of payload (plus frame headers) of a container's logs; True when cut."""
+        budget = limit + limit // 8 + 8  # room for the 8-byte frame headers
+        data = bytearray()
+        try:
+            async with self.client().stream(
+                "GET", f"/{API_VERSION}/containers/{container}/logs", params=params
+            ) as resp:
+                if resp.status_code != 200:
+                    return b"", False
+                async for chunk in resp.aiter_bytes():
+                    data += chunk
+                    if len(data) > budget:
+                        return bytes(data[:budget]), True
+        except httpx.HTTPError as exc:
+            raise ExecutorError(f"Docker API unreachable: {exc}") from exc
+        return bytes(data), False
 
 
 def demux(raw: bytes) -> str:
