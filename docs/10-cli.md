@@ -47,7 +47,7 @@ Full-screen, refreshes over SSE (like k9s/htop):
 - Agent table: agent, mission, state, step, tokens, time; selected row highlighted.
 - Connectors line with health marks; Review line with counts and oldest age.
 - Live pane for the selected agent's last events.
-- Keys: `↵` open · `a` approve (opens the decision) · `l` logs · `p` pause · `t` take over (opens the workspace shell, read-only by default) · `x` stop · `/` filter · `:` command · `?` help.
+- Keys: `↵` open · `a` approve (opens the decision) · `l` logs · `p` pause · `t` take over (pauses the job with a read-only take-over and prints the link to the web take-over page; the CLI does not open a shell itself) · `x` stop · `/` filter · `:` command · `?` help.
 
 ## 3. Subcommands
 ```bash
