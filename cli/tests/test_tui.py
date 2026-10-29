@@ -285,6 +285,20 @@ async def test_session_prompt_completion_question_and_commands(
         assert area.text == "/export session.md"
         type_in(area, "")
 
+        # Ctrl+T task list, Ctrl+O expanded tool output, Ctrl+R history search
+        await pilot.press("ctrl+t")
+        assert "summarize" in text_of(app.query_one("#tasks", Static))
+        await pilot.press("ctrl+t")
+        await pilot.press("ctrl+o")
+        assert block.expand
+        await pilot.press("ctrl+o")
+        type_in(area, "summ")
+        await pilot.press("ctrl+r")
+        assert app.completion_open
+        await pilot.press("enter")
+        assert area.text == "@summarizer summarize the notes"
+        type_in(area, "")
+
         # a prompt without an agent is refused with a hint, nothing is created
         type_in(area, "do something")
         await pilot.press("enter")

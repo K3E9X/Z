@@ -269,3 +269,19 @@ def test_input_parsing(pairs: list[str]) -> None:
     }
     assert parse_inputs(pairs, schema) == {"n": 3, "flag": True, "tags": ["a", "b"], "obj": {"k": 1}}
     assert parse_inputs(["url=https://x.example/?a=b"]) == {"url": "https://x.example/?a=b"}
+
+
+def test_ask_and_follow_logs(z: Z, live: LiveServer, executor: RecordingExecutor) -> None:
+    bob = z.as_user("bob")
+    asked = bob("ask", "summarize the release notes", "@summarizer", "--no-wait", "--output-format", "json")
+    assert asked.exit_code == 0, asked.output
+    mission = json.loads(asked.output)
+    assert mission["status"] == "queued" and mission["prompt"] == "summarize the release notes"
+    runner = runner_for(live, executor, mission["id"])
+    worker = in_thread(play_summary, runner, delay=0.2)
+    followed = bob("logs", mission["id"], "-f", "--json")
+    join_ok(worker)
+    assert followed.exit_code == 0, followed.output
+    events = [json.loads(line) for line in followed.output.splitlines()]
+    assert events[-1]["type"] == "status" and events[-1]["payload"]["to"] == "succeeded"
+    assert "summarize the release notes" in runner.spec["prompt"]

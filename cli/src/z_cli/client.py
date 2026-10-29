@@ -121,6 +121,9 @@ def error_for(response: httpx.Response, feature: str, *, signed_in: bool, server
         return ApiError(status, problem, hint=f"Retry in {retry}s." if retry else "Wait a moment and retry.")
     if kind == "not-found":
         return ApiError(status, problem, message=f"Not found: {problem.detail or feature}")
+    if status >= 500:
+        ref = f" (request id {problem.request_id})" if problem.request_id else ""
+        return ApiError(status, problem, hint=f"The server failed{ref}; give this to your Z admin, or retry later.")
     return ApiError(status, problem)
 
 
