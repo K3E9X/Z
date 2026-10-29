@@ -101,6 +101,33 @@ class DockerExecutor:
             raise ExecutorError(f"inspect failed ({resp.status_code})")
         return bool(resp.json().get("State", {}).get("Running"))
 
+    async def logs(self, ref: str, tail: int = 80) -> str:
+        try:
+            resp = await self._call("GET", f"/containers/{ref}/logs", params={"stdout": 1, "stderr": 1, "tail": tail})
+            state = await self._call("GET", f"/containers/{ref}/json")
+        except ExecutorError:
+            return ""
+        if resp.status_code != 200:
+            return ""
+        text = demux(resp.content)
+        if state.status_code == 200:
+            exit_code = state.json().get("State", {}).get("ExitCode")
+            text += f"\n[exit code {exit_code}]"
+        return text
+
     async def stop(self, ref: str) -> None:
         await self._call("POST", f"/containers/{ref}/stop", params={"t": 10})
         await self._call("DELETE", f"/containers/{ref}", params={"force": "true"})
+
+
+def demux(raw: bytes) -> str:
+    """Docker multiplexes stdout/stderr of non-TTY containers in frames: 1 byte stream, 3 zero, 4 size (BE)."""
+    out = []
+    i = 0
+    while i + 8 <= len(raw) and raw[i] in (0, 1, 2) and raw[i + 1 : i + 4] == b"\0\0\0":
+        size = int.from_bytes(raw[i + 4 : i + 8], "big")
+        out.append(raw[i + 8 : i + 8 + size])
+        i += 8 + size
+    if i < len(raw):
+        out.append(raw[i:])
+    return b"".join(out).decode("utf-8", errors="replace")

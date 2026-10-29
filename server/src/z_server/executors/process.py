@@ -21,6 +21,7 @@ class ProcessExecutor:
     async def launch(self, job_id: str, env: dict[str, str]) -> str:
         workspace = self.workdir / job_id
         workspace.mkdir(parents=True, exist_ok=True)
+        log_file = (self.workdir / f"{job_id}.log").open("ab")
         base = {
             k: v for k, v in os.environ.items() if k in {"PATH", "HOME", "LANG", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"}
         }
@@ -30,15 +31,22 @@ class ProcessExecutor:
             job_id,
             env={**base, **env, "Z_WORKSPACE": str(workspace)},
             cwd=workspace,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=asyncio.subprocess.STDOUT,
         )
+        log_file.close()
         self._procs[job_id] = proc
         return job_id
 
     async def is_running(self, ref: str) -> bool:
         proc = self._procs.get(ref)
         return proc is not None and proc.returncode is None
+
+    async def logs(self, ref: str, tail: int = 80) -> str:
+        path = self.workdir / f"{ref}.log"
+        if not path.is_file():
+            return ""
+        return "\n".join(path.read_text(errors="replace").splitlines()[-tail:])
 
     async def stop(self, ref: str) -> None:
         proc = self._procs.pop(ref, None)

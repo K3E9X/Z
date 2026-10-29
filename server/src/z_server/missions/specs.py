@@ -176,7 +176,7 @@ async def build(
             api_key=mission_key(state, mission),
         ),
         gateway_url=f"{base}/gateway/mcp",
-        server_url=base,
+        server_url=f"{base}/api/v1",
         session_token=session_token,
         deadline=deadline,
         checkpoint_b64=base64.b64encode(job.checkpoint).decode() if job.checkpoint else None,

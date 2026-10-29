@@ -100,10 +100,12 @@ def test_summarize_file_mission_end_to_end(
     assert dispatch(app, executor) == []  # claimed once
     env = executor.launched[job["id"]]
     assert set(env) == {"Z_SERVER_URL", "Z_JOB_ID", "Z_JOB_TOKEN"}  # no model key, no credentials in the env
+    assert env["Z_SERVER_URL"].endswith("/api/v1")  # the runner appends /internal/jobs/... (contract servers)
 
     runner = ScriptedRunner.for_job(app, executor, job["id"])
     spec = runner.get_spec()
     assert spec["llm"]["api_key"] == next(iter(keys.keys))
+    assert spec["server_url"] == env["Z_SERVER_URL"]
     assert spec["workspace"]["mode"] == "files" and spec["workspace"]["archive_url"].endswith(
         f"/internal/jobs/{job['id']}/workspace"
     )

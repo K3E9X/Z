@@ -186,6 +186,19 @@ def test_dead_runner_is_detected_and_fails_after_max_attempts(
     assert keys.calls[-1][0] == "delete"
 
 
+def test_runner_output_is_kept_redacted_when_it_dies(app: TestClient, executor: RecordingExecutor) -> None:
+    mission_id = mission(app)
+    [job_id] = dispatch(app, executor)
+    executor.output[f"rec-{job_id}"] = (
+        "Traceback: boom\nAuthorization: Bearer glpat-abcdefghij0123456789\n[exit code 1]"
+    )
+    executor.alive.discard(f"rec-{job_id}")
+    assert tick(app, executor)["requeued"] == [job_id]
+    [job] = jobs(app, mission_id)
+    assert "last runner output" in job["error"]["message"] and "boom" in job["error"]["message"]
+    assert "glpat-abcdefghij0123456789" not in job["error"]["message"]
+
+
 def test_job_and_mission_deadlines(app: TestClient, executor: RecordingExecutor, keys: RecordingKeyAdmin) -> None:
     late_job = mission(app)
     [job_id] = dispatch(app, executor)

@@ -20,6 +20,7 @@ from typing import Any
 
 from sqlalchemy import select
 from z_common.models.enums import JobStatus, MissionStatus
+from z_common.redaction import Redactor
 
 from z_server.crypto import new_token, token_hash
 from z_server.db.models import Job, Mission
@@ -43,7 +44,8 @@ class TickReport:
 
 
 def runner_env(state: AppState, job: Job, bootstrap: str) -> dict[str, str]:
-    return {"Z_SERVER_URL": state.settings.internal_url, "Z_JOB_ID": job.id, "Z_JOB_TOKEN": bootstrap}
+    # the contract's server is /api/v1: internal paths (/internal/jobs/...) are relative to it
+    return {"Z_SERVER_URL": f"{state.settings.internal_url}/api/v1", "Z_JOB_ID": job.id, "Z_JOB_TOKEN": bootstrap}
 
 
 def _fanout_limits(mission: Mission) -> dict[str, int]:
@@ -120,14 +122,22 @@ async def dispatch(state: AppState, executor: Executor, worker: str) -> list[str
     return started
 
 
-async def requeue_or_fail(state: AppState, job_id: str, reason: str) -> str:
+LOG_TAIL_CHARS = 4000
+
+
+async def requeue_or_fail(state: AppState, job_id: str, reason: str, log_tail: str = "") -> str:
+    """`log_tail` (the runner's last output, redacted here) is kept in the job error for diagnosis."""
     async with state.sessions() as db, db.begin():
         job = await db.get(Job, job_id, with_for_update=True)
         if job is None or JobStatus(job.status).terminal:
             return "skipped"
         mission = await db.get(Mission, job.mission_id)
+        if log_tail:
+            known = [service.mission_key(state, mission)] if mission is not None and mission.llm_key_enc else []
+            tail = Redactor(known).text(log_tail)[-LOG_TAIL_CHARS:]
+            job.error = {"class": "runner_lost", "message": f"{reason}\n--- last runner output ---\n{tail}"}
         if job.attempt >= job.max_attempts:
-            job.error = {"class": "runner_lost", "message": reason}
+            job.error = job.error if log_tail else {"class": "runner_lost", "message": reason}
             await service.set_job_status(db, job, JobStatus.failed, reason)
             outcome = "failed"
         else:
@@ -172,13 +182,15 @@ async def watchdog(state: AppState, executor: Executor) -> TickReport:
                 alive = True  # unknown: rely on the lease
         lease_expired = job.lease_expires_at is not None and job.lease_expires_at < now
         if lease_expired or not alive:
+            tail = ""
             if job.executor_ref:
+                tail = await executor.logs(job.executor_ref)
                 try:
                     await executor.stop(job.executor_ref)
                 except ExecutorError:
                     log.warning("could not stop %s", job.executor_ref)
             outcome = await requeue_or_fail(
-                state, job.id, "runner stopped without completing" if not alive else "lease expired"
+                state, job.id, "runner stopped without completing" if not alive else "lease expired", tail
             )
             (report.requeued if outcome == "requeued" else report.failed).append(job.id)
     report.reaped = await reap(state, executor)

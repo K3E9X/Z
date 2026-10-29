@@ -21,6 +21,7 @@ class RecordingExecutor:
     launched: dict[str, dict[str, str]] = field(default_factory=dict)
     stopped: list[str] = field(default_factory=list)
     alive: set[str] = field(default_factory=set)
+    output: dict[str, str] = field(default_factory=dict)
 
     async def launch(self, job_id: str, env: dict[str, str]) -> str:
         self.launched[job_id] = env
@@ -33,6 +34,9 @@ class RecordingExecutor:
     async def stop(self, ref: str) -> None:
         self.alive.discard(ref)
         self.stopped.append(ref)
+
+    async def logs(self, ref: str, tail: int = 80) -> str:
+        return self.output.get(ref, "")
 
 
 def dispatch(client: TestClient, executor: RecordingExecutor) -> list[str]:

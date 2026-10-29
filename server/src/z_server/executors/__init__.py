@@ -19,3 +19,6 @@ class Executor(Protocol):
 
     async def stop(self, ref: str) -> None:
         """Stop and clean up. Idempotent."""
+
+    async def logs(self, ref: str, tail: int = 80) -> str:
+        """Last lines of the runner's output (best effort, "" when unavailable), for diagnosing a runner that died."""
