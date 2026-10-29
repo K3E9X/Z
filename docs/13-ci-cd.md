@@ -61,7 +61,9 @@ dev sign-in and the seeded playbooks.
 Release notes: the GitLab `release:notes` job runs `ci/scripts/changelog.py` (conventional commits since the previous
 `vX.Y.Z` tag, grouped into breaking changes, features, fixes and maintenance) and the release uses that file.
 
-Not built yet: ZAP baseline (ADR 0018).
+ZAP baseline: the compose e2e job ends with a passive scan of the web app (`zap-baseline.py`, ZAP pinned by
+digest); missing security headers or cookie flags fail the job (`security/zap-baseline.conf`), everything else is a
+warning in the uploaded report.
 
 ## 5. What the repository owner sets up
 **GitHub**

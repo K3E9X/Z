@@ -21,7 +21,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (incl. approval rules: four-eyes, two approvers for destructive) |
 | Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
 | Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | done (scheduled signed checkpoints and at-least-once syslog/TLS and HTTPS forwarding with delivery status, ADR 0021) |
-| CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | done for guard, lint, tests, security scans, images (build, scan, sign, SBOM), chart policy, compose e2e, GitLab staging/production deploy (ADR 0018), license gate on installed packages, kind smoke install under PSS restricted, release notes from conventional commits; ZAP later |
+| CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | done for guard, lint, tests, security scans, images (build, scan, sign, SBOM), chart policy, compose e2e, GitLab staging/production deploy (ADR 0018), license gate on installed packages, kind smoke install under PSS restricted, release notes from conventional commits, ZAP baseline in the e2e job |
 | Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose with z-ui, Helm chart linted and kubeconform-valid for k3s and k8s, kubernetes executor, egress proxy (squid allowlist), z-browser image + compose profile + Helm Deployment/NetworkPolicy done) |
 | E2E and acceptance | C | todo |
 
