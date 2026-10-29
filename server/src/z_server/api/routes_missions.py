@@ -10,6 +10,7 @@ from typing import Annotated, Any
 from fastapi import File, Form, Header, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import Select, func, or_, select
+from z_common.models import api_catalog as cm
 from z_common.models import api_missions as m
 from z_common.models.enums import DataClass, JobStatus, MissionStatus, StepStatus
 from z_common.models.manifests import MissionPlan, PlanStep
@@ -17,9 +18,9 @@ from z_common.models.manifests import MissionPlan, PlanStep
 from z_server import artifacts, events
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.paging import page
-from z_server.api.routes_catalog import _playbook, find_agent
+from z_server.api.routes_catalog import _playbook, find_agent, insert_playbook
 from z_server.api.routes_internal import artifact_out, job_out
-from z_server.db.models import Artifact, Job, JobMessage, Mission, ProposedAction, Question, Team, User
+from z_server.db.models import Artifact, ChatSession, Job, JobMessage, Mission, ProposedAction, Question, Team, User
 from z_server.errors import Problem
 from z_server.ids import new_id
 from z_server.missions import service
@@ -138,6 +139,10 @@ async def mission_out(ctx: Ctx, mission: Mission) -> m.Mission:
 async def _create(ctx: Ctx, body: m.MissionCreate, *, playbook_ref: str | None = None) -> Mission:
     ref = playbook_ref or body.playbook
     playbook = await _playbook(ctx, ref) if ref else None
+    if body.session_id:
+        owned = await ctx.db.get(ChatSession, body.session_id)
+        if owned is None or owned.user_id != ctx.user.user_id:
+            raise Problem("not-found", "no such session")
     plan = body.plan
     if playbook is None and plan is None and body.agents:
         if len(body.agents) != 1 or not body.prompt:
@@ -183,6 +188,21 @@ async def _create(ctx: Ctx, body: m.MissionCreate, *, playbook_ref: str | None =
 @router.operation("createMission", status_code=201)
 async def create_mission(ctx: CtxDep, body: m.MissionCreate) -> m.Mission:
     return await mission_out(ctx, await _create(ctx, body))
+
+
+@router.operation("draftPlan")
+async def draft_plan(ctx: CtxDep, body: m.DraftPlanRequest) -> m.DraftPlan:
+    from z_server.missions import planner
+
+    result = await planner.draft(ctx.db, ctx.state, ctx.user, body.prompt, body.agents, body.connectors)
+    return m.DraftPlan.model_validate(
+        {
+            "plan": result.plan.dump(),
+            "suggested_playbook": result.suggested_playbook,
+            "parsed": result.parsed,
+            "estimated_tokens": result.estimated_tokens,
+        }
+    )
 
 
 @router.operation("runPlaybook", status_code=201)
@@ -517,4 +537,67 @@ async def stream_job_events(
         _stream(ctx.state, mission.id, _after(None, last_event_id), job.id),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
+    )
+
+
+# ---------------------------------------------------------------- save as playbook
+
+STEP_KEYS = (
+    "id",
+    "title",
+    "agent",
+    "depends_on",
+    "fanout",
+    "inputs_from",
+    "when",
+    "output",
+    "writes",
+    "workspace",
+    "repo",
+    "credentials",
+    "model",
+)
+
+
+@router.operation("saveMissionAsPlaybook", status_code=201)
+async def save_mission_as_playbook(ctx: CtxDep, id: str, body: m.SaveAsPlaybook) -> cm.Playbook:
+    """The mission's plan becomes a reviewed, versioned playbook (docs/09 "New mission": Save as playbook)."""
+    mission = await get_mission(ctx, id)
+    if mission.team_id:
+        ctx.require("playbooks:write", mission.team_id)
+    plan = MissionPlan.model_validate(mission.plan)
+    steps = []
+    for step in plan.steps:
+        raw = step.dump()
+        steps.append({**{k: raw[k] for k in STEP_KEYS if k in raw}, "prompt": step.effective_prompt})
+    budget = {k: v for k, v in (mission.budget or {}).items() if k in {"max_tokens", "timeout_s"} and v}
+    manifest: dict[str, Any] = {
+        "name": body.name,
+        "version": "1.0.0",
+        "description": (body.description or mission.title)[:500],
+        "team": sorted({s.agent for s in plan.steps}),
+        "connectors": list(mission.connectors or []),
+        "steps": steps,
+        "autonomy": mission.autonomy,
+        "four_eyes": mission.four_eyes,
+        "data_class": mission.data_class,
+    }
+    if body.domain:
+        manifest["domain"] = body.domain
+    if budget:
+        manifest["budget"] = budget
+    return await insert_playbook(ctx, manifest, mission.team_id, {"from_mission": mission.id})
+
+
+@router.operation("takeOverMission")
+async def take_over_mission(ctx: CtxDep, id: str, body: m.TakeOver) -> m.TakeOverSession:
+    """The web terminal into a paused workspace is P1 (docs/BUILD.md): say so instead of pretending."""
+    mission = await get_mission(ctx, id, control="missions:control")
+    job = await ctx.db.get(Job, body.job_id)
+    if job is None or job.mission_id != mission.id:
+        raise Problem("not-found", "no such job in this mission")
+    raise Problem(
+        "unavailable",
+        "taking over a workspace in a terminal is not available yet: pause the mission, guide the agent, "
+        "or download its files from the Files tab",
     )

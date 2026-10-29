@@ -409,10 +409,16 @@ async def list_playbooks(
 
 @router.operation("createPlaybook", status_code=201)
 async def create_playbook(ctx: CtxDep, body: dict[str, Any]) -> m.Playbook:
+    return await insert_playbook(ctx, body, None)
+
+
+async def insert_playbook(
+    ctx: Ctx, body: dict[str, Any], team: str | None, origin: dict[str, Any] | None = None
+) -> m.Playbook:
     if (await ctx.db.execute(select(Playbook.id).where(Playbook.name == body.get("name")))).first():
         raise Problem("conflict", "a playbook with this name exists")
     await validate_playbook(ctx.db, body, ctx.state.settings.packs_path, None)
-    row = Playbook(id=new_id("pbk"), name=body["name"], version=body["version"], manifest=body, owner_team_id=None)
+    row = Playbook(id=new_id("pbk"), name=body["name"], version=body["version"], manifest=body, owner_team_id=team)
     ctx.db.add(row)
     await ctx.db.flush()
     ctx.db.add(
@@ -421,7 +427,7 @@ async def create_playbook(ctx: CtxDep, body: dict[str, Any]) -> m.Playbook:
         )
     )
     out = await playbook_out(ctx, row)
-    await ctx.audit("playbook.created", "playbook", row.id, after=body)
+    await ctx.audit("playbook.created", "playbook", row.id, team=team, after={**body, **(origin or {})})
     return out
 
 

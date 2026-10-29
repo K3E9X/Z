@@ -51,6 +51,33 @@ async def record(
         "cached_tokens": cached,
         "requests": 1,
     }
+    await _upsert(db, values)
+
+
+async def record_platform(
+    db: AsyncSession, purpose: str, model: str, user_id: str, team: str, tokens_in: int, tokens_out: int, at: datetime
+) -> None:
+    """Tokens the platform spends itself (planner, judge, learner), attributed to the user who caused them."""
+    await _upsert(
+        db,
+        {
+            "bucket": "hour",
+            "ts_bucket": hour(at),
+            "model": model[:64],
+            "agent": f"z:{purpose}"[:64],
+            "mission_id": "",
+            "playbook": "",
+            "team": team[:120],
+            "user_id": user_id,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "cached_tokens": 0,
+            "requests": 1,
+        },
+    )
+
+
+async def _upsert(db: AsyncSession, values: dict[str, object]) -> None:
     stmt = insert(UsageRecord).values(**values)
     stmt = stmt.on_conflict_do_update(
         constraint="uq_usage_records_key",
