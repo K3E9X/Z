@@ -14,7 +14,7 @@ import threading
 from collections.abc import Iterator
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
 import pytest
@@ -97,8 +97,16 @@ def test_names_and_routes() -> None:
 
 # ---------------------------------------------------------------- against the real Docker daemon
 
+# They need the Docker daemon and the z-server:local image, so they skip on a laptop or in the python CI job; the
+# e2e CI job, which builds the images, runs them with Z_E2E_REQUIRED=1 so a missing prerequisite fails instead.
 DOCKER_SOCKET = "/var/run/docker.sock"
 TOKEN = "proxy-token-0123456789"
+
+
+def _unavailable(reason: str) -> NoReturn:
+    if os.environ.get("Z_E2E_REQUIRED"):
+        pytest.fail(f"{reason} (Z_E2E_REQUIRED is set)")
+    pytest.skip(reason)
 
 
 def _docker(method: str, path: str, **kw: Any) -> httpx.Response:
@@ -118,10 +126,10 @@ def _local_image() -> str | None:
 @pytest.fixture
 def proxy() -> Iterator[tuple[str, str]]:
     if not os.path.exists(DOCKER_SOCKET):
-        pytest.skip("no Docker daemon")
+        _unavailable("no Docker daemon")
     image = _local_image()
     if image is None:
-        pytest.skip("z-server:local not built")
+        _unavailable("z-server:local not built")
     net = "z_test_runners"
     _docker("POST", "/v1.43/networks/create", json={"Name": net, "Internal": True})
     with socket.socket() as s:
@@ -225,10 +233,14 @@ def test_no_tool_images_means_no_tool_containers() -> None:
 
 
 def _local_tool_image() -> str | None:
+    """A python:3.12 slim image (no ENTRYPOINT: the command is the whole argv), by tag or, as CI pulls the base of
+    the Z images, by digest."""
     for image in _docker("GET", "/v1.43/images/json").json():
-        for tag in image.get("RepoTags") or []:
-            if tag.startswith("python:3.12-slim"):  # no ENTRYPOINT: the command is the whole argv
-                return str(image["Id"])
+        tags = image.get("RepoTags") or []
+        if any(t.startswith("python:3.12-slim") for t in tags) or (
+            not tags and any(d.startswith("python@sha256:") for d in image.get("RepoDigests") or [])
+        ):
+            return str(image["Id"])
     return None
 
 
@@ -236,7 +248,7 @@ def test_cli_tool_runs_through_the_proxy_on_real_docker(proxy: tuple[str, str]) 
     _url, runner_image = proxy
     tool = _local_tool_image()
     if tool is None:
-        pytest.skip("no local python:3.12-slim image")
+        _unavailable("no local python:3.12-slim image")
     # the fixture's proxy only knows the runner image: start a second one that also allows the tool image
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))

@@ -382,6 +382,9 @@ e2e:compose:
     - docker build -t z-runner:local -f deploy/images/z-runner/Dockerfile .
     - cd deploy/compose && DOCKER_GID=$(stat -c %g /var/run/docker.sock) $COMPOSE up -d --build --wait --wait-timeout 600 && cd ../..
     - uv run pytest -m e2e tests/e2e -v
+    # the socket proxy on the real daemon: needs z-server:local (built above) and the pinned python base image
+    - docker pull -q "$(sed -n 's/^ARG PYTHON_IMAGE=//p' deploy/images/z-server/Dockerfile)"
+    - Z_E2E_REQUIRED=1 uv run pytest tests/unit/test_socket_proxy.py -v -k real_docker
   after_script:
     - cd deploy/compose && docker compose --env-file ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml
       -f ../../tests/e2e/compose.e2e.yml logs --no-color --tail 200 || true

@@ -67,6 +67,16 @@ jobs:
             docker compose --env-file ../../.env $COMPOSE_FILES up -d --build --wait --wait-timeout 600
       - name: pytest -m e2e
         run: uv run pytest -m e2e tests/e2e -v
+      # The socket proxy against the real daemon needs z-server:local (built above) and a python:3.12 slim image
+      # (the pinned base of the Z images): they skip in the python job, Z_E2E_REQUIRED makes them fail here.
+      - name: Socket proxy on the real Docker daemon
+        env:
+          Z_E2E_REQUIRED: "1"
+        run: |
+          set -euo pipefail
+          base=$(sed -n 's/^ARG PYTHON_IMAGE=//p' deploy/images/z-server/Dockerfile)
+          docker pull -q "$base"
+          uv run pytest tests/unit/test_socket_proxy.py -v -k real_docker
       - name: ZAP baseline (passive scan of the web app; security headers and cookie flags fail the job)
         run: |
           set -euo pipefail
