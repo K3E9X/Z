@@ -1,6 +1,7 @@
 name: ticketing
-version: 1.0.0
-description: Ticket creation, deduplication and backlog hygiene
+version: 1.0.1
+description: >-
+  Ticket creation, deduplication and backlog hygiene. Needs the vuln pack, which ships the cmdb connector.
 owner: cyber-ops
 requires_connectors: [jira, cmdb]
 optional_connectors: [logos]
