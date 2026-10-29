@@ -40,11 +40,12 @@ docker compose --env-file .env -f deploy/compose/docker-compose.yml up -d --wait
 docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # first sign-in
 open http://localhost:8080
 
-# k3s
-helm install z deploy/helm/z -n z --create-namespace -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
-
-# Kubernetes
-helm install z deploy/helm/z -n z --create-namespace -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
+# k3s and Kubernetes: create the release namespace and make it enforce Pod Security `restricted` first
+# (not --create-namespace: Helm would create it unlabelled; deploy/README.md, docs/11 §2)
+kubectl create namespace z
+kubectl label namespace z pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest
+helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f my-values.yaml   # k3s
+helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml   # Kubernetes
 
 # CLI
 uv tool install ./cli && z login && z

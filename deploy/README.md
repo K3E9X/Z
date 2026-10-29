@@ -86,13 +86,17 @@ Details (values, migrations, network policies, gVisor, secrets): `deploy/helm/z/
 2. Install:
 
 ```bash
+# Both targets: create the release namespace and label it first. Not --create-namespace: Helm would create it
+# without the Pod Security label, and the chart cannot own the namespace that holds its release record.
+kubectl create namespace z
+kubectl label namespace z pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest
+
 # k3s: Traefik, local-path, embedded Postgres (passwords generated and kept), migrations in an init container
-helm upgrade --install z deploy/helm/z -n z --create-namespace \
+helm upgrade --install z deploy/helm/z -n z \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
 
 # Kubernetes: ingress-nginx, external Postgres. Create the roles z / z_app / litellm, the databases z and
 # litellm and the vector extension first (SQL in deploy/helm/z/README.md), then the DSN Secret:
-kubectl create namespace z
 kubectl -n z create secret generic z-db \
   --from-literal=DATABASE_URL='postgresql://z_app:...@pg:5432/z' \
   --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg:5432/z' \
