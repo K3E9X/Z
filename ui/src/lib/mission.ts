@@ -35,6 +35,7 @@ export function progress(m: Mission): { done: number; total: number } {
 
 export function nowLine(m: Mission): { text: string; tone: 'wait' | 'mono' | 'plain' } {
   if (m.status === 'waiting') {
+    if (m.waiting_reason === 'approval' && m.pending_actions === 0) return { text: 'Running the approved writes', tone: 'plain' }
     return {
       text: m.waiting_reason === 'question' ? 'Waiting for your answer' : 'Waiting for approval',
       tone: 'wait',

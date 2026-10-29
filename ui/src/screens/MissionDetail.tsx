@@ -599,10 +599,16 @@ export function MissionDetail() {
         </div>
         {m.error && <div className="text-meta text-err">{m.error}</div>}
         {attention.length > 0 && <Attention jobs={attention} agents={agents} />}
-        {m.status === 'waiting' && m.waiting_reason && (
-          <Link to="/review" search={{ kind: m.waiting_reason === 'question' ? 'questions' : 'writes' }} className="self-start text-meta text-wait">
-            {m.waiting_reason === 'question' ? 'A question is waiting for you' : `${plural(m.pending_actions ?? 1, 'write')} waiting for your approval`} →
-          </Link>
+        {m.status === 'waiting' && m.waiting_reason === 'approval' && m.pending_actions === 0 ? (
+          // Every write is decided; the mission waits for the executor to report back.
+          <span className="text-meta text-text-3">Every write is decided; waiting for the results from the executor.</span>
+        ) : (
+          m.status === 'waiting' &&
+          m.waiting_reason && (
+            <Link to="/review" search={{ kind: m.waiting_reason === 'question' ? 'questions' : 'writes' }} className="self-start text-meta text-wait">
+              {m.waiting_reason === 'question' ? 'A question is waiting for you' : `${plural(m.pending_actions ?? 1, 'write')} waiting for your approval`} →
+            </Link>
+          )
         )}
       </div>
       <div className="flex min-h-0 flex-1">
