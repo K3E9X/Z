@@ -493,7 +493,8 @@ class Runner:
             report_id = self.artifacts.try_upload(
                 ArtifactKind.report, REPORT_FILE, report_path.read_bytes(), "text/markdown"
             )
-        if self.spec.workspace.mode == WorkspaceMode.git_clone:
+        if self.spec.workspace.mode in {WorkspaceMode.git_clone, WorkspaceMode.files}:
+            # what the agent changed in the staged workspace (a repository, or the files of the mission)
             patch = self._workspace_patch(workspace)
             if patch:
                 self.artifacts.try_upload(ArtifactKind.patch, PATCH_NAME, patch, "text/x-diff")
