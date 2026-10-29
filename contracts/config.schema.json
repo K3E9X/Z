@@ -20,8 +20,8 @@
         "forward": {
           "type": "object", "additionalProperties": false,
           "properties": {
-            "syslog": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string" }, "format": { "enum": ["rfc5424"] } } },
-            "https": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string" } } }
+            "syslog": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string", "description": "tls://host:port" }, "format": { "enum": ["rfc5424"] }, "hostname": { "type": "string" }, "from_now": { "type": "boolean", "description": "A new destination starts at the current head (default) or replays the whole log (false)" } } },
+            "https": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" }, "url": { "type": "string" }, "token_ref": { "type": "string", "description": "Secret reference (env:, file:, vault:, kubernetes:) of a bearer token" }, "from_now": { "type": "boolean" } } }
           }
         }
       }
