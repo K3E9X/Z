@@ -1,5 +1,6 @@
 """End to end on the compose stack (marker e2e): z-server all -> z-socket-proxy -> runner container ->
-LiteLLM -> fake LLM. Start the stack first (see compose.e2e.yml), then: uv run pytest -m e2e tests/e2e."""
+LiteLLM -> fake LLM. Start the stack first (see compose.e2e.yml), then: uv run pytest -m e2e tests/e2e.
+Without a stack the tests skip, except in CI (CI or Z_E2E_REQUIRED set), where they fail."""
 
 from __future__ import annotations
 
@@ -42,7 +43,10 @@ def step(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 def api() -> httpx.Client:
     try:
         httpx.get(f"{Z}/readyz", timeout=3).raise_for_status()
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        # in CI the stack was started by the job: an unreachable z-server is a failure, not a reason to skip
+        if os.environ.get("CI") or os.environ.get("Z_E2E_REQUIRED"):
+            pytest.fail(f"compose stack not ready at {Z}/readyz: {exc}")
         pytest.skip("compose stack not running")
     return httpx.Client(base_url=f"{Z}/api/v1", timeout=30)
 
