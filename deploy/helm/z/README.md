@@ -161,8 +161,8 @@ the migrations ran).
   `litellmEgress` has a rule with an `ipBlock` CIDR and ports (the inferX gateway), and `0.0.0.0/0` / `::/0`
   are refused there (invariant 1: LiteLLM is the only path to models and reaches nothing else).
 - z-server egress (`networkPolicy.serverEgress`, on; cannot be disabled in production): DNS, LiteLLM, the
-  embedded Postgres, z-browser and the egress proxy (pod selectors, rendered by the chart), the Kubernetes API
-  (`serverEgress.kubernetesApi`, default any address on TCP 6443: narrow it to your control-plane IPs, use
+  embedded Postgres and z-browser (pod selectors, rendered by the chart; not the egress proxy, which only
+  runners use), the Kubernetes API (`serverEgress.kubernetesApi`, default any address on TCP 6443: narrow it to your control-plane IPs, use
   443 on most managed clusters; on Cilium `ipBlock` does not match node IPs unless
   `policy-cidr-match-mode=nodes`), the external Postgres (`networkPolicy.databaseEgress`, required when
   `postgres.embedded: false`), and `serverEgress.allow`: GitLab (OIDC issuer and connector), the tool APIs of

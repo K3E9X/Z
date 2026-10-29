@@ -364,8 +364,8 @@ networkPolicy:
   # External Postgres (postgres.embedded=false): egress rules to the database, added to z-server and LiteLLM.
   databaseEgress: []       # [{to: [{ipBlock: {cidr: 10.30.0.10/32}}], ports: [{port: 5432, protocol: TCP}]}]
   # z-server egress. The chart always allows DNS and the chart pods z-server calls (LiteLLM, the embedded
-  # Postgres, z-browser, the egress proxy); everything outside the release is listed here. Cannot be
-  # disabled when env=production.
+  # Postgres, z-browser; not the egress proxy, which only runners use); everything outside the release is
+  # listed here. Cannot be disabled when env=production.
   serverEgress:
     enabled: true
     # The Kubernetes API (the executor creates runner Jobs and Secrets). NetworkPolicy matches the API server

@@ -51,14 +51,8 @@ spec:
       ports:
         - { protocol: TCP, port: {{ .Values.browser.port }} }
     {{- end }}
-    {{- if .Values.egressProxy.enabled }}
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 14 }}
-      ports:
-        - { protocol: TCP, port: {{ .Values.egressProxy.port }} }
-    {{- end }}
+    {{- /* no rule to the egress proxy: z-server only hands its URL to runners and tool sandboxes, and the
+      proxy admits the runner namespace only */}}
     {{- with $se.kubernetesApi }}
     # Kubernetes API (the executor starts runner Jobs): the API server endpoints, as the CNI sees them
     {{- toYaml . | nindent 4 }}
