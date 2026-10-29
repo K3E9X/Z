@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -25,12 +26,14 @@ from z_server import audit, events
 from z_server.db.models import Agent, AgentVersion, Job, Mission, Playbook, ProposedAction, Question, Team
 from z_server.errors import Problem
 from z_server.ids import new_id
+from z_server.llm.litellm import LlmKeyError
 from z_server.llm.routing import allowed_aliases
 from z_server.missions.expressions import ExpressionError, truthy
 from z_server.missions.templates import TemplateFailure, render, render_value
 from z_server.rbac import Principal
 from z_server.state import AppState
 
+log = logging.getLogger("z.missions")
 ACTIVE_ACTION = ("pending", "approved", "applying")
 DEFAULT_TIMEOUT_S = 7200
 STEP_REF_OUTPUTS = ".outputs"
@@ -205,17 +208,25 @@ async def _issue_key(db: AsyncSession, state: AppState, mission: Mission) -> Non
     from z_server.llm.inference import routing_config
 
     aliases = allowed_aliases(await routing_config(db, state.config), DataClass(mission.data_class))
-    key = await state.llm_keys.create(
-        alias=f"mission-{mission.id}",
-        models=aliases,
-        metadata={
-            "mission": mission.id,
-            "data_class": mission.data_class,
-            "team": mission.team_id,
-            "playbook": mission.playbook_name,
-        },
-        duration_s=int(mission.budget.get("timeout_s", DEFAULT_TIMEOUT_S)) + 3600,
-    )
+    if not aliases:
+        raise Problem(
+            "unavailable",
+            f"no enabled model may receive {mission.data_class} data: check providers and the routing policy",
+        )
+    try:
+        key = await state.llm_keys.create(
+            alias=f"mission-{mission.id}",
+            models=aliases,
+            metadata={
+                "mission": mission.id,
+                "data_class": mission.data_class,
+                "team": mission.team_id,
+                "playbook": mission.playbook_name,
+            },
+            duration_s=int(mission.budget.get("timeout_s", DEFAULT_TIMEOUT_S)) + 3600,
+        )
+    except LlmKeyError as exc:
+        raise Problem("unavailable", f"the model gateway could not create the mission key: {exc}") from exc
     mission.llm_key_alias = key.alias
     mission.llm_key_enc = state.sealer.seal(key.key, f"llm-key:{mission.id}")
     mission.deadline_at = utcnow() + timedelta(seconds=int(mission.budget.get("timeout_s", DEFAULT_TIMEOUT_S)))
@@ -410,6 +421,8 @@ async def finish(
     if mission.llm_key_enc:
         try:
             await state.llm_keys.delete(mission_key(state, mission))
+        except LlmKeyError:
+            log.warning("could not delete the key of mission %s; it expires with its duration", mission.id)
         finally:
             mission.llm_key_enc = None
     await audit.record(

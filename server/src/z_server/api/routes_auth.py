@@ -259,7 +259,22 @@ async def auth_cli_exchange(ctx: CtxDep, body: m.CliExchangeRequest) -> Response
         ip=ctx.ip,
         user_agent=ctx.request.headers.get("user-agent"),
     )
-    await ctx.audit("auth.cli_token_issued", "session", session.id, after={"device": session.device})
+    # the route is public: the actor is the user who just signed in, not the anonymous caller
+    await audit.record(
+        ctx.db,
+        audit.Actor(
+            user.username,
+            ip=ctx.ip,
+            user_agent=ctx.request.headers.get("user-agent"),
+            session_id=session.id,
+            request_id=ctx.request_id,
+        ),
+        "auth.cli_token_issued",
+        "session",
+        session.id,
+        after={"device": session.device},
+    )
+    ctx.audited = True
     return JSONResponse(
         m.CliToken(token=token, expires_at=session.expires_at, user=await user_out(ctx.db, ctx.state, user)).dump(),
         status_code=200,

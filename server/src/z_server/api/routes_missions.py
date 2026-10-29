@@ -17,7 +17,7 @@ from z_common.models.manifests import MissionPlan, PlanStep
 from z_server import artifacts, events
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.paging import page
-from z_server.api.routes_catalog import _playbook
+from z_server.api.routes_catalog import _playbook, find_agent
 from z_server.api.routes_internal import artifact_out, job_out
 from z_server.db.models import Artifact, Job, JobMessage, Mission, ProposedAction, Question, Team, User
 from z_server.errors import Problem
@@ -144,7 +144,8 @@ async def _create(ctx: Ctx, body: m.MissionCreate, *, playbook_ref: str | None =
             raise Problem(
                 "validation", "a free-form mission with several agents needs a plan (POST /missions/draft-plan)"
             )
-        plan = MissionPlan(steps=[PlanStep(id="main", agent=body.agents[0].removeprefix("@"), prompt=body.prompt)])
+        agent = await find_agent(ctx, body.agents[0])  # a handle (@atlas) or a name
+        plan = MissionPlan(steps=[PlanStep(id="main", agent=agent.name, prompt=body.prompt)])
     if playbook is None and not body.prompt and plan is not None and not body.title:
         raise Problem("validation", "a mission without a playbook needs a prompt or a title")
     request = service.MissionRequest(
