@@ -26,8 +26,11 @@ events, the configuration, the delivery guarantees or what content may leave Z i
    targets are retried with exponential backoff (30 s to 1 h, 6 attempts), and each target's last success and
    last error are shown read-only in the API and the Admin → Notifications tab. Generic webhooks are signed:
    `X-Z-Signature: sha256=HMAC(key, X-Z-Timestamp + "." + body)`.
-6. Personal notification preferences (per user) are out of scope for v1.1; the bell in the app lists what
-   waits for the signed-in user.
+6. **Personal email** (`GET/PUT /me/notifications`, Settings → Notifications): each person chooses which events
+   about their *own* missions they get by email (questions, needs attention, approvals waiting, outcome),
+   through the admins' SMTP server. Content is sent only up to C1, otherwise the email links to Z; the address
+   comes from the sign-in profile and is never shown in the admins' delivery state. Budget, connector and
+   break-glass alerts stay admin targets. The bell in the app lists what waits for the signed-in user.
 
 ## Consequences
 - One delivery path for every alert the spec mentions; new kinds are one enqueue call plus a message format.

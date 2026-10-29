@@ -39,7 +39,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | doing (Microsoft 365 mail, calendar, chats, transcripts and file metadata; small file uploads to OneDrive/SharePoint with raw text bodies; Google Workspace and Slack/Mattermost as tool connectors later) |
 | Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies, follow-up approval cards linking to Z; ADR 0015, 0017) |
 | Personal (delegated) connections | done (OAuth PKCE per user, read and write grants apart) |
-| Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications; ADR 0023; personal preferences later) |
+| Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications, personal email about one's own missions in Settings; ADR 0023) |
 | kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | done (kind smoke install, ExternalSecret template, gVisor how-to in the chart README, Z metrics on /metrics and the "Z overview" Grafana dashboard done) |
 
 ## v2 — later
