@@ -1,0 +1,117 @@
+{{- if eq (include "z.migrateMode" .) "hook" }}
+# `z-server migrate` (Alembic) before the new pods start, with the owner role. Needs the database and
+# database.existingSecret to exist before install (external Postgres).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "z.server.fullname" . }}-migrate
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrate.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrate.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "migrate") | nindent 8 }}
+        z.io/postgres-client: "true"
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" 10001) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: migrate
+          image: {{ include "z.image" (dict "image" .Values.server.image "root" .) }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          args: ["migrate"]
+          env:
+            {{- include "z.dbEnv" (dict "root" . "role" "migrate" "name" "DATABASE_URL") | nindent 12 }}
+            - name: Z_DB_APP_ROLE
+              value: {{ .Values.database.appRole | quote }}
+            - name: Z_EMBEDDING_DIM
+              value: {{ .Values.database.embeddingDim | quote }}
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}
+{{- if .Values.seed.enabled }}
+---
+# `z-server seed` loads the packs baked into the image into the catalog (idempotent, audited).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "z.server.fullname" . }}-seed
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "seed") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.seed.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.seed.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "seed") | nindent 8 }}
+        z.io/postgres-client: "true"
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" 10001) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: seed
+          image: {{ include "z.image" (dict "image" .Values.server.image "root" .) }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          args:
+            - seed
+            - --packs
+            - {{ .Values.seed.packs | quote }}
+            {{- with .Values.seed.only }}
+            - --only
+            {{- range . }}
+            - {{ . | quote }}
+            {{- end }}
+            {{- end }}
+          env:
+            {{- include "z.serverEnv" . | nindent 12 }}
+          {{- with .Values.server.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/z
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "z.fullname" . }}-config
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}

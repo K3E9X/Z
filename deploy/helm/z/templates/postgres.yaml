@@ -1,0 +1,155 @@
+{{- if .Values.postgres.embedded }}
+{{- $fullname := include "z.postgres.fullname" . }}
+{{- $pg := .Values.postgres }}
+# Embedded Postgres 16 + pgvector (team server / dev). One instance, no replication: back it up (README).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-init
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "postgres") | nindent 4 }}
+data:
+  # Runs once, on an empty data directory (docker-entrypoint-initdb.d). Roles: `z` owns the Z database and
+  # runs migrations only; `{{ .Values.database.appRole }}` is the server (migrations revoke UPDATE/DELETE on the
+  # audit tables); `litellm` owns the LiteLLM database and nothing else.
+  10-z.sh: |
+    #!/bin/sh
+    set -eu
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+      -v app_role="$Z_APP_DB_ROLE" -v app_pw="$Z_APP_DB_PASSWORD" -v litellm_pw="$LITELLM_DB_PASSWORD" <<'SQL'
+    CREATE ROLE :"app_role" LOGIN PASSWORD :'app_pw';
+    CREATE ROLE litellm LOGIN PASSWORD :'litellm_pw';
+    CREATE DATABASE z OWNER z;
+    CREATE DATABASE litellm OWNER litellm;
+    REVOKE ALL ON DATABASE z FROM PUBLIC;
+    REVOKE ALL ON DATABASE litellm FROM PUBLIC;
+    GRANT CONNECT ON DATABASE z TO :"app_role";
+    SQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname z -c "CREATE EXTENSION IF NOT EXISTS vector;"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "postgres") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "postgres") | nindent 4 }}
+spec:
+  serviceName: {{ $fullname }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 8 }}
+      annotations:
+        checksum/init: {{ .Values.database.appRole | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" $pg.runAsUser) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: postgres
+          image: {{ include "z.image" (dict "image" $pg.image "root" .) }}
+          imagePullPolicy: {{ $pg.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              value: z
+            - name: POSTGRES_DB
+              value: postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "z.dbSecretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: Z_APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "z.dbSecretName" . }}
+                  key: Z_APP_DB_PASSWORD
+            - name: LITELLM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "z.dbSecretName" . }}
+                  key: LITELLM_DB_PASSWORD
+            - name: Z_APP_DB_ROLE
+              value: {{ .Values.database.appRole | quote }}
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "z", "-d", "postgres", "-h", "127.0.0.1"]
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "z", "-d", "postgres", "-h", "127.0.0.1"]
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "z", "-d", "postgres", "-h", "127.0.0.1"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml $pg.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: init
+          configMap:
+            name: {{ $fullname }}-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "z.selectorLabels" (dict "root" . "component" "postgres") | nindent 10 }}
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $pg.storage.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $pg.storage.size }}
+{{- end }}
