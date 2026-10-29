@@ -30,7 +30,7 @@ Classes are configurable; defaults:
 | C2 | Confidential (customer data, infrastructure details) | internal only |
 | C3 | Restricted (secrets, credentials, regulated) | internal only, and never stored in memory |
 
-How a call gets its class: the highest of (mission class set by the user or playbook, default `C2`; connector `data_class` of every tool result in context; judge classification of staged inputs). The class only goes up during a mission.
+How a call gets its class: the highest of (mission class set by the user or playbook, default `C2`; connector `data_class` of every tool result in context; judge classification of staged inputs: a delivered file that holds credentials, such as private keys, tokens of known formats or credentials in URLs, makes the mission C3 before the agent sees it). The class only goes up during a mission.
 
 **Enforcement is in the key, not in the runner.** z-server creates each mission's LiteLLM virtual key with an explicit `models` allowlist computed from the class: C2/C3 → internal aliases only; C0/C1 → internal plus the external aliases whose provider allows that class. When the gateway returns a result that raises the class, z-server immediately updates the key's allowlist (or rotates the key) before the next model call. The runner never sends or chooses the class, so a manipulated job cannot widen it. A LiteLLM custom callback that re-checks `metadata.data_class` is optional defence in depth (B6 writes it, B8 mounts it).
 
@@ -73,4 +73,4 @@ Also: `GET /v1/models` and `/model/info` on the gateway, queried when the Infere
   The chart ships a "Z overview" Grafana dashboard (`metrics.grafanaDashboard.enabled`).
 
 ## 7. Cost model
-Internal tokens have no invoice, but GPU time is not free. `config/z.yaml` is meant to set an internal cost per 1M input/output tokens per alias (`inference.internal_cost_per_mtok`) so budgets and analytics can show a comparable cost, and external providers their real price. Not built yet: the key is accepted but not read, and Analytics reports cost as `null`.
+Internal tokens have no invoice, but GPU time is not free. `config/z.yaml` is meant to set an internal cost per 1M input/output tokens per alias (`inference.internal_cost_per_mtok`) so usage and analytics show a comparable cost (`cost` on each usage series and on Analytics tokens by team; `null` when no model of the series is priced). External providers' prices are not configured there yet, and budgets count tokens, not cost.

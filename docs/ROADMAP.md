@@ -11,7 +11,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Missions, plans, fan-out, scheduler, resume | B1 | done (draft-plan with the planner model, sessions, save-as-playbook; take-over as a web editor over the checkpointed workspace with restart from the edited checkpoint, ADR 0019) |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email, browser connectors with reviewed flows replayed by z-browser and recording by demonstration (ADR 0016), GraphQL and read-only PostgreSQL connectors (ADR 0020), cli connectors in tool containers (ADR 0025), GraphQL import by introspection, rest drafts from API docs, Mattermost and Slack tool connectors (ADR 0026) done; remaining catalog templates of docs/05 §7 are added when a team needs them) |
-| CLI: subcommands, headless, interactive session | B4 | doing (headless, interactive session, saved sessions `z -c`, `z --resume`, `z --session` done; `z skills diff|rollback`, `z playbooks save-from` and `z connectors import|record-browser` of docs/10 §3 not built, though their API routes exist) |
+| CLI: subcommands, headless, interactive session | B4 | doing (headless, interactive session, saved sessions `z -c`, `z --resume`, `z --session` done; `z skills rollback` done; `z skills diff`, `z playbooks save-from` and `z connectors import|record-browser` of docs/10 §3 not built, though their API routes exist) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | done (every screen of docs/09, plus admin, take-over, browser recorder, notifications) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | done (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals derived from mission events and action edits (see v1.1 below for the kinds never emitted), eval runs on real missions, learner proposals with eval gates, shadow replay, apply/try, memory retrieval in job specs) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | done (seeded and lint-clean; every seed agent has ≥ 10 eval cases and every skill ≥ 5 (docs/08 §6), with injection, missing-fact and write-scope cases; the linter enforces rooted check paths and warns below the minimums; not yet run against the real inferX models) |
@@ -28,7 +28,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 ## v1.1 — complete (BUILD P1)
 | Item | Status |
 |---|---|
-| Learning loop: signals, proposals, shadow replay, apply/rollback | doing (ADR 0014; proposals, shadow replay and apply done; signals `action_edited`, `action_rejected`, `question_answered`, `repair`, `failure`, `guardrail_hit`, `connector_error` emitted, `feedback`, `mission_reassigned`, `retry` and cancel-with-reason never emitted; rollback exists for skills (`POST /skills/{id}/rollback`) and memory facts (deactivate/restore on `/memory/{id}`), not for agents or playbooks) |
+| Learning loop: signals, proposals, shadow replay, apply/rollback | doing (ADR 0014; proposals, shadow replay and apply done; signals `action_edited`, `action_rejected`, `question_answered`, `repair`, `failure`, `guardrail_hit`, `connector_error`, `retry` (a person retried a job) and `feedback` (a mission cancelled with a written reason) emitted; `mission_reassigned` and thumbs/comment feedback not built; rollback exists for skills (`POST /skills/{id}/rollback`) and memory facts (deactivate/restore on `/memory/{id}`), not for agents or playbooks) |
 | Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | done (GraphQL, PostgreSQL, browser with recording, cli tools in one-shot sandbox containers (ADR 0025), connector builder and inbound webhooks) |
 | `z top`, sessions, `z mcp serve`, themes | done (`/mcp` on z-server and `z mcp serve` share one tool table, ADR 0022) |
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | done |
@@ -44,9 +44,8 @@ Build order (decided with the user): base first, then one verified slice at a ti
 
 ## Known gaps
 Not built yet, although the spec describes them:
-- Judge classification of staged workspace inputs and uploads: the mission data class is raised only from connector results.
+- Judge classification of staged inputs beyond credentials: a file holding credentials raises the mission to C3; regulated or personal data is not detected.
 - Synthetic tool-call probe and `tool_call_parse_error_rate` (the Inference screen shows the field, nothing fills it; `inference.probes` is not read).
-- `inference.internal_cost_per_mtok`: not read, so cost in Analytics is `null` for internal models.
 - E-mail digests (`notifications.digest`), and answering an agent question by replying to a Z mail (cards link to Z instead).
 - Budgets with an objective scope (scopes are org, team, user, playbook and agent).
 - Objectives widget on Mission control (the Objectives screen exists).
@@ -60,7 +59,7 @@ Not built yet, although the spec describes them:
 - ZAP scan: passive, unauthenticated, web app only.
 - TUI tests are Textual pilot tests, not snapshot tests.
 - Observability: OpenTelemetry traces, JSON logs and Langfuse export (docs/02 §3).
-- CLI: `z skills diff|rollback`, `z playbooks save-from`, `z connectors import|record-browser`.
+- CLI: `z skills diff` (versions carry no content in the API), `z playbooks save-from`, `z connectors import|record-browser`.
 
 ## v2 — later
 - Admin-enabled `auto_reversible` autonomy for specific low-risk operations (comments, labels), never destructive, always audited.
