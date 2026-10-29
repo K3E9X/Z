@@ -64,6 +64,25 @@ describe('openStream', () => {
     h.close()
   })
 
+  it('stops for good on 204 (an ended mission with nothing left to send)', async () => {
+    const states: StreamState[] = []
+    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })))
+    openStream({
+      path: '/missions/m/events',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onMessage: () => undefined,
+      onState: (s) => states.push(s),
+      lastEventId: '42',
+      maxDelayMs: 5,
+    })
+    await vi.waitFor(() => {
+      expect(states).toContain('closed')
+    })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(states).not.toContain('reconnecting')
+  })
+
   it('stops with "unavailable" when the route is not served (404 Not Found)', async () => {
     const states: StreamState[] = []
     const fetchImpl = vi.fn(() =>

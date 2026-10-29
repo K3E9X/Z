@@ -153,6 +153,12 @@ export function openStream(opts: StreamOptions): StreamHandle {
       schedule()
       return
     }
+    if (res.status === 204) {
+      // the server has nothing more to send (an ended mission, every event already received): stop for good
+      closed = true
+      setState('closed')
+      return
+    }
     if (!res.ok) {
       let body: unknown
       try {

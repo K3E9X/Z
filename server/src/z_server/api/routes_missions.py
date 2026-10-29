@@ -517,13 +517,23 @@ def _after(after_seq: int | None, last_event_id: str | None) -> int:
 SSE_HEADERS = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
 
 
+async def _ended(ctx: Ctx, mission: Mission, after: int, job_id: str | None) -> bool:
+    """The mission has ended and nothing is left after `after`: answer 204 so the client stops reconnecting."""
+    if not MissionStatus(mission.status).terminal or after == 0:
+        return False
+    return not await events.since(ctx.db, mission.id, after, job_id=job_id, limit=1)
+
+
 @router.operation("streamMissionEvents")
 async def stream_mission_events(
     ctx: CtxDep, id: str, after_seq: int | None = None, last_event_id: Annotated[str | None, Header()] = None
-) -> StreamingResponse:
+) -> Response:
     mission = await get_mission(ctx, id)
+    after = _after(after_seq, last_event_id)
+    if await _ended(ctx, mission, after, None):
+        return Response(status_code=204)
     return StreamingResponse(
-        _stream(ctx.state, mission.id, _after(after_seq, last_event_id), None),
+        _stream(ctx.state, mission.id, after, None),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
@@ -532,10 +542,13 @@ async def stream_mission_events(
 @router.operation("streamJobEvents")
 async def stream_job_events(
     ctx: CtxDep, id: str, last_event_id: Annotated[str | None, Header()] = None
-) -> StreamingResponse:
+) -> Response:
     job, mission = await get_job(ctx, id)
+    after = _after(None, last_event_id)
+    if await _ended(ctx, mission, after, job.id):
+        return Response(status_code=204)
     return StreamingResponse(
-        _stream(ctx.state, mission.id, _after(None, last_event_id), job.id),
+        _stream(ctx.state, mission.id, after, job.id),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )

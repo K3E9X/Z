@@ -186,6 +186,9 @@ def test_event_stream_replays_and_resumes(
     with app.stream("GET", f"/api/v1/missions/{mission_id}/events", headers={"Last-Event-ID": str(seqs[-2])}) as resp:
         resumed = [b for b in "".join(resp.iter_text()).split("\n\n") if b.startswith("id: ")]
     assert [int(b.split("\n")[0][4:]) for b in resumed] == [seqs[-1]]
+    # the mission has ended and everything was sent: 204, the client stops reconnecting
+    ended = app.get(f"/api/v1/missions/{mission_id}/events", headers={"Last-Event-ID": str(seqs[-1])})
+    assert ended.status_code == 204
 
 
 # ---------------------------------------------------------------- guardrails

@@ -133,6 +133,8 @@ def stream(
         error: CliError | None = None
         try:
             with api.stream("GET", path, headers=headers) as response:
+                if response.status_code == 204:  # nothing more will come (an ended mission)
+                    return
                 state.connected = True
                 for message in parse(response.iter_lines()):
                     if message.retry_ms is not None:
@@ -181,6 +183,8 @@ async def astream(
         error: CliError | None = None
         try:
             async with api.stream("GET", path, headers=headers) as response:
+                if response.status_code == 204:  # nothing more will come (an ended mission)
+                    return
                 state.connected = True
                 parser = Parser()
                 async for line in response.aiter_lines():
