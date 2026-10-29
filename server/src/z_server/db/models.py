@@ -351,6 +351,7 @@ class Mission(Base, Timestamps):
     team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"))
     session_id: Mapped[str | None] = mapped_column(String(40))
     trigger_id: Mapped[str | None] = mapped_column(String(40))
+    eval_run_id: Mapped[str | None] = mapped_column(String(40), index=True)  # writes captured, never applied
     budget: Mapped[dict[str, Any]] = mapped_column(default=dict)
     tokens_in: Mapped[int] = mapped_column(BigInteger, default=0)
     tokens_out: Mapped[int] = mapped_column(BigInteger, default=0)
@@ -658,6 +659,7 @@ class Proposal(Base, Timestamps):
     cost_delta: Mapped[float | None]
     shadow: Mapped[dict[str, Any] | None]
     status: Mapped[str] = mapped_column(String(12), default="observed")
+    candidate: Mapped[dict[str, Any] | None]  # what applying writes: skill text, fact, rule or playbook manifest
     decided_by: Mapped[str | None] = mapped_column(String(255))
     decided_at: Mapped[datetime | None]
 
@@ -675,6 +677,8 @@ class EvalRun(Base):
     created_by: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     ended_at: Mapped[datetime | None]
+    overrides: Mapped[dict[str, Any] | None]  # {"skills": {name: content}} for a proposal under evaluation
+    proposal_id: Mapped[str | None] = mapped_column(String(40))
 
 
 # ---------------------------------------------------------------- inference, usage, budgets

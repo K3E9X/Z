@@ -17,9 +17,10 @@ import jsonschema
 from sqlalchemy import or_, select
 from z_common.models import api_missions as m
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import JobStatus, OperationClass
+from z_common.models.enums import JobStatus, OperationClass, SignalKind
 
-from z_server import events
+from z_server import events, signals
+from z_server.actions import prechecks
 from z_server.actions.previews import build as build_preview
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.routes_internal import action_out, question_out
@@ -28,6 +29,7 @@ from z_server.auth import identity
 from z_server.db.models import (
     ActionApproval,
     Agent,
+    Connector,
     Job,
     Mission,
     MissionSuggestion,
@@ -77,6 +79,11 @@ async def approve(ctx: Ctx, row: ProposedAction, mission: Mission, body: m.Appro
     _may_decide(ctx, mission)
     if row.status != "pending":
         raise Problem("conflict", f"action is {row.status}")
+    if (row.judge_verdict or {}).get("verdict") == "block":
+        raise Problem(
+            "conflict",
+            "the judge blocked this payload (injection signals): reject it, or edit it and approve the new version",
+        )
     user = ctx.user
     if row.four_eyes and mission.created_by == user.user_id:
         raise Problem("separation-of-duties", "four-eyes: the mission starter cannot approve its writes")
@@ -177,7 +184,8 @@ async def edit_action(ctx: CtxDep, id: str, body: m.EditRequest) -> m.ProposedAc
     if row.status != "pending":
         raise Problem("conflict", f"action is {row.status}")
     op = await ctx.db.get(Operation, row.operation)
-    if op is None:
+    connector = await ctx.db.get(Connector, op.connector_id) if op else None
+    if op is None or connector is None:
         raise Problem("conflict", "the operation of this action no longer exists")
     try:
         jsonschema.validate(body.payload, op.input_schema or {"type": "object"})
@@ -213,11 +221,28 @@ async def edit_action(ctx: CtxDep, id: str, body: m.EditRequest) -> m.ProposedAc
             row.mission_id, row.job_id, row.operation, {"edited_from": row.id, **body.payload}
         ),
         edited_from=row.id,
+        judge_verdict=await prechecks.run(
+            ctx.db, ctx.state, mission, connector, row.operation, body.payload, row.summary
+        ),
     )
     ctx.db.add(new)
     await ctx.db.flush()
     row.superseded_by = new.id
     await _set_status(ctx, row, "superseded")
+    await signals.emit(
+        ctx.db,
+        SignalKind.action_edited,
+        {
+            "action_id": row.id,
+            "operation": row.operation,
+            "before": row.payload,
+            "after": body.payload,
+            "by": ctx.user.username,
+        },
+        mission_id=row.mission_id,
+        job_id=row.job_id,
+        agent=row.agent,
+    )
     await events.append(
         ctx.db,
         row.mission_id,

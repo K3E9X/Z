@@ -17,7 +17,8 @@ from z_common.models.actions import BUILTIN_PAYLOADS
 from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, OperationClass
 from z_common.models.manifests import MissionPlan
 
-from z_server import artifacts, audit, events, memory, usage
+from z_server import artifacts, audit, events, judge_model, memory, usage
+from z_server.actions import prechecks
 from z_server.actions.previews import build as build_preview
 from z_server.api.internal import InternalRouter, JobCtx, JobCtxDep, _bearer, require_service
 from z_server.crypto import new_token, token_hash
@@ -340,6 +341,7 @@ async def propose_action(ctx: JobCtxDep, id: str, body: m.ActionIn) -> JSONRespo
 
         artifact_path = Path(patch.storage_path)
     destructive = op.op_class == OperationClass.destructive.value
+    verdict = await prechecks.run(ctx.db, ctx.state, mission, connector, op.id, body.payload, body.summary)
     row = ProposedAction(
         id=new_id("act"),
         mission_id=mission.id,
@@ -357,9 +359,14 @@ async def propose_action(ctx: JobCtxDep, id: str, body: m.ActionIn) -> JSONRespo
         required_approvals=2 if destructive else 1,
         four_eyes=mission.four_eyes,
         idempotency_key=key,
+        judge_verdict=verdict,
     )
     ctx.db.add(row)
     await ctx.db.flush()
+    if mission.eval_run_id:  # eval runs record what the agent would write, never apply it
+        from z_server import evals
+
+        await evals.capture(ctx.db, row)
     await events.append(
         ctx.db,
         mission.id,
@@ -452,6 +459,19 @@ async def ask_human(ctx: JobCtxDep, id: str, body: m.QuestionIn) -> mm.Question:
         agent=job.agent_name,
         step_id=job.step_id,
     )
+    if ctx.mission.eval_run_id:  # nobody answers eval runs: the case's expected answer, or "best judgement"
+        from z_server import evals
+
+        answer = await evals.auto_answer(ctx.db, ctx.mission, row)
+        await events.append(
+            ctx.db,
+            job.mission_id,
+            "question_answered",
+            {"question_id": row.id, "answer": answer, "answered_by": "z:eval"},
+            job_id=job.id,
+            agent=job.agent_name,
+        )
+        return question_out(row)
     await service.set_job_status(ctx.db, job, JobStatus.needs_attention, "question")
     await service.advance(ctx.db, ctx.state, ctx.mission)
     return question_out(row)
@@ -629,6 +649,7 @@ def job_out(job: Job) -> mm.Job:
 async def _staged(ctx: JobCtx) -> workspace.Staged:
     staged = await workspace.stage(ctx.db, ctx.mission, ctx.job, ctx.state)
     job = ctx.job
+    await judge_model.review_files(ctx.state, job.id, staged.files, (ctx.mission.created_by, ctx.mission.team_id or ""))
     for f in staged.files:
         if f.verdict.verdict != JudgeVerdict.clean:
             await events.append(

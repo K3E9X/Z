@@ -224,7 +224,7 @@ async def list_missions(
     created_by: str | None = None,
     q: str | None = None,
 ) -> dict[str, Any]:
-    stmt = visible(ctx, select(Mission))
+    stmt = visible(ctx, select(Mission)).where(Mission.eval_run_id.is_(None))  # eval cases live in their run
     if status:
         stmt = stmt.where(Mission.status.in_(status.split(",")))
     if playbook:

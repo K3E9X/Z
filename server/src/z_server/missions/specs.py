@@ -30,7 +30,7 @@ from z_common.models.manifests import AgentProfile, MissionPlan
 from z_common.packs.classify import glob_match
 
 from z_server.catalog import schemas
-from z_server.db.models import Connector, Job, Mission, Operation, Playbook, Skill
+from z_server.db.models import Connector, EvalRun, Job, Mission, Operation, Playbook, Skill
 from z_server.missions.service import agent_profile, mission_key
 from z_server.state import AppState
 
@@ -135,8 +135,16 @@ async def build(
     limits.max_steps = min(limits.max_steps, int(guard.get("max_steps_per_job", limits.max_steps)))
     limits.timeout_s = min(limits.timeout_s, int(guard.get("max_job_minutes", 10**6)) * 60)
     skill_rows = {s.name: s for s in (await db.execute(select(Skill).where(Skill.name.in_(profile.skills)))).scalars()}
+    candidate: dict[str, str] = {}
+    if mission.eval_run_id:  # a learning proposal under evaluation swaps in its candidate skill text
+        run = await db.get(EvalRun, mission.eval_run_id)
+        candidate = dict(((run.overrides if run else None) or {}).get("skills") or {})
     skills = [
-        SkillBundle(name=s.name, version=s.version, content=s.content)
+        SkillBundle(
+            name=s.name,
+            version=s.version,
+            content=candidate.get(name, s.content),
+        )
         for name in profile.skills
         if (s := skill_rows.get(name))
     ]
