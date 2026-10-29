@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import quote
 
+from z_common.redaction import Redactor
+
 from z_server.db.models import Connector, Operation, ProposedAction
 from z_server.gateway import adf, git
 from z_server.gateway import http as http_invoker
@@ -45,7 +47,8 @@ def action_label(action: ProposedAction) -> str:
 def _fail(inv: Invocation, what: str) -> None:
     if not inv.ok:
         detail = inv.body if isinstance(inv.body, dict | str) else None
-        raise WriteError(f"{what}: {inv.error}" + (f" {str(detail)[:500]}" if detail else ""))
+        message = f"{what}: {inv.error}" + (f" {str(detail)[:500]}" if detail else "")
+        raise WriteError(Redactor(inv.secrets).text(message))  # the action result and the audit quote it
 
 
 class JiraCloud:

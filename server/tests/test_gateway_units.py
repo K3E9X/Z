@@ -269,3 +269,13 @@ def test_path_parameters_cannot_be_dot_segments(value: str) -> None:
         prepare("https://jira.example.internal", "GET /rest/api/3/issue/{key}", {}, {"key": value})
     ok = prepare("https://jira.example.internal", "GET /rest/api/3/issue/{key}", {}, {"key": "a/../b"})
     assert ok.url.endswith("/issue/a%2F..%2Fb")
+
+
+def test_write_errors_are_redacted_before_they_reach_the_action_and_the_audit() -> None:
+    from z_server.gateway.core import Invocation
+    from z_server.gateway.writers import WriteError, _fail
+
+    inv = Invocation(False, 200, {"ok": False, "echo": "token rw-slack-123"}, 5, "z-write", ["rw-slack-123"], "bad")
+    with pytest.raises(WriteError) as caught:
+        _fail(inv, "post")
+    assert "rw-slack-123" not in str(caught.value) and "post: bad" in str(caught.value)

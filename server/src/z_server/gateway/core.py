@@ -302,6 +302,8 @@ class Gateway:
         if mission.llm_key_enc:
             known.append(service.mission_key(self.state, mission))
         redactor = Redactor(known)
+        if inv.error:  # it can quote the tool's answer (error_body messages): redacted like the body
+            inv.error = redactor.text(inv.error)
         if inv.files and isinstance(inv.body, dict):
             inv.body["screenshots"] = await self._store_files(job, mission, connector, inv.files)
         body = redactor.value(shape(inv.body))
