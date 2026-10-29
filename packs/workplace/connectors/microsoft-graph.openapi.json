@@ -120,9 +120,11 @@
                 "properties": {
                   "comment": {
                     "type": "string",
-                    "description": "The reply text"
+                    "description": "The reply text",
+                    "maxLength": 100000
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -139,12 +141,15 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "additionalProperties": false,
                 "required": [
                   "message"
                 ],
+                "description": "No Bcc, reply-to, extra headers or attachments: the reviewer sees every recipient in the mail preview.",
                 "properties": {
                   "message": {
                     "type": "object",
+                    "additionalProperties": false,
                     "required": [
                       "subject",
                       "body",
@@ -152,10 +157,17 @@
                     ],
                     "properties": {
                       "subject": {
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300,
+                        "pattern": "^[^\\r\\n]*$"
                       },
                       "body": {
                         "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "content"
+                        ],
                         "properties": {
                           "contentType": {
                             "type": "string",
@@ -165,7 +177,8 @@
                             ]
                           },
                           "content": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 100000
                           }
                         }
                       },
@@ -173,17 +186,66 @@
                         "type": "array",
                         "items": {
                           "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "emailAddress"
+                          ],
                           "properties": {
                             "emailAddress": {
                               "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "address"
+                              ],
                               "properties": {
                                 "address": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 320,
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200,
+                                  "pattern": "^[^\\r\\n]*$"
                                 }
                               }
                             }
                           }
-                        }
+                        },
+                        "minItems": 1,
+                        "maxItems": 50
+                      },
+                      "ccRecipients": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "emailAddress"
+                          ],
+                          "properties": {
+                            "emailAddress": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "address"
+                              ],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "maxLength": 320,
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200,
+                                  "pattern": "^[^\\r\\n]*$"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "maxItems": 50
                       }
                     }
                   },
@@ -249,6 +311,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "additionalProperties": false,
                 "required": [
                   "subject",
                   "start",
@@ -256,45 +319,113 @@
                 ],
                 "properties": {
                   "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
                   },
                   "body": {
                     "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
                     "properties": {
                       "contentType": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "Text",
+                          "HTML"
+                        ]
                       },
                       "content": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 100000
                       }
                     }
                   },
                   "start": {
                     "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
                     "properties": {
                       "dateTime": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 40
                       },
                       "timeZone": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 64
                       }
                     }
                   },
                   "end": {
                     "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
                     "properties": {
                       "dateTime": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 40
                       },
                       "timeZone": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "location": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "maxLength": 500
                       }
                     }
                   },
                   "attendees": {
                     "type": "array",
+                    "maxItems": 100,
                     "items": {
-                      "type": "object"
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "emailAddress"
+                      ],
+                      "properties": {
+                        "emailAddress": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "address"
+                          ],
+                          "properties": {
+                            "address": {
+                              "type": "string",
+                              "maxLength": 320,
+                              "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                            },
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "pattern": "^[^\\r\\n]*$"
+                            }
+                          }
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "required",
+                            "optional"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -353,19 +484,27 @@
                 "properties": {
                   "body": {
                     "type": "object",
+                    "additionalProperties": false,
                     "required": [
                       "content"
                     ],
                     "properties": {
                       "contentType": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "html"
+                        ]
                       },
                       "content": {
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 28000
                       }
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }

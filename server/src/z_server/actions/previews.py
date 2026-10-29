@@ -12,6 +12,7 @@ from z_common.models.actions import (
     DiffFile,
     DiffPreview,
     EventPreview,
+    FilePreview,
     IssuePreview,
     IssueUpdatePreview,
     JsonPreview,
@@ -96,6 +97,10 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
         return ChatMessagePreview(
             kind="chat_message", platform="mattermost", target=target, text=str(body.get("message", ""))
         ).dump()
+    if operation.startswith("m365."):
+        built = _m365(operation, payload)
+        if built is not None:
+            return built
     if operation == "gchat.messages.create":
         body = payload.get("body") or {}
         thread = (body.get("thread") or {}).get("name")
@@ -138,3 +143,60 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
             or None,
         ).dump()
     return JsonPreview(kind="json", data=payload).dump()
+
+
+def _addresses(recipients: Any) -> list[str]:
+    return [str((r.get("emailAddress") or {}).get("address", "")) for r in recipients or [] if isinstance(r, dict)]
+
+
+def _m365(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Microsoft Graph payloads (the workplace pack's subset) shown as what they do."""
+    raw_body = payload.get("body")
+    body: dict[str, Any] = raw_body if isinstance(raw_body, dict) else {}
+    if operation == "m365.mail.send":
+        message = body.get("message") or {}
+        return MailPreview(
+            kind="mail",
+            to=_addresses(message.get("toRecipients")),
+            cc=_addresses(message.get("ccRecipients")) or None,
+            subject=str(message.get("subject", "")),
+            body=str((message.get("body") or {}).get("content", "")),
+        ).dump()
+    if operation == "m365.mail.reply":
+        return CommentPreview(
+            kind="comment", target=f"Reply to mail {payload.get('message_id', '')}", body=str(body.get("comment", ""))
+        ).dump()
+    if operation == "m365.calendar.events.create":
+
+        def when(value: Any) -> str:
+            v = value if isinstance(value, dict) else {}
+            return " ".join(str(x) for x in (v.get("dateTime"), v.get("timeZone")) if x)
+
+        attendees = [str((a.get("emailAddress") or {}).get("address", "")) for a in body.get("attendees") or []]
+        text = (body.get("body") or {}).get("content")
+        notice = "(Outlook sends an invitation to every attendee)" if attendees else None
+        return EventPreview(
+            kind="event",
+            title=str(body.get("subject", "")),
+            start=when(body.get("start")),
+            end=when(body.get("end")),
+            attendees=attendees or None,
+            location=(body.get("location") or {}).get("displayName"),
+            body="\n\n".join(x for x in (text, notice) if x) or None,
+        ).dump()
+    if operation == "m365.teams.messages.post":
+        return ChatMessagePreview(
+            kind="chat_message",
+            platform="teams",
+            target=f"chat {payload.get('chat_id', '')}",
+            text=str((body.get("body") or {}).get("content", "")),
+        ).dump()
+    if operation == "m365.files.upload":
+        raw = payload.get("body")
+        return FilePreview(
+            kind="file",
+            name=str(payload.get("filename", "")),
+            size=len(raw.encode()) if isinstance(raw, str) else None,
+            destination=f"OneDrive folder {payload.get('parent_id', '')}",
+        ).dump()
+    return None
