@@ -61,3 +61,20 @@ def test_rule_cannot_lower_and_glob_does_not_cover_writes() -> None:
     floor, cls, exposed = decide(manifest, "accounts.create", "POST")
     assert cls == OperationClass.write and exposed is False  # glob ignored for a write
     assert decide(manifest, "accounts.list", "GET")[2] is True
+
+
+def test_connector_names_prefix_operation_ids() -> None:
+    from z_common.connectors.operations import name_problems
+
+    assert name_problems({"name": "gchat"}) == []
+    assert "no '-'" in name_problems({"name": "google-chat"})[0]
+
+
+def test_google_connectors_are_delegated_only() -> None:
+    from z_common.connectors.oauth import connector_problems, provider
+
+    google = {"oauth": {"provider": "google"}, "auth": {"read": {"user": {"flow": "authorization_code_pkce"}}}}
+    assert provider(google) == "google" and connector_problems(google) == []
+    service = {**google, "auth": {"write": {"service": {"flow": "client_credentials", "app": "write_app"}}}}
+    assert "no client credentials grant" in connector_problems(service)[0]
+    assert provider({"oauth": {"tenant_id": "t"}}) == "microsoft" and provider({}) is None

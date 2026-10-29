@@ -183,3 +183,12 @@ def builtin_schema(operation_id: str) -> dict[str, Any] | None:
 
     model = BUILTIN_PAYLOADS.get(operation_id)
     return model.model_json_schema(by_alias=True) if model is not None else None
+
+
+def name_problems(manifest: dict[str, Any]) -> list[str]:
+    """A connector name is a slug, but it also prefixes every operation id (`<connector>.<operation>`), whose
+    segments allow letters, digits and `_` only."""
+    name = str(manifest.get("name") or "")
+    if "-" in name:
+        return [f"name {name!r}: no '-' in a connector name, its operation ids are {name}.<operation>"]
+    return []

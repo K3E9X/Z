@@ -10,6 +10,7 @@ from typing import Any
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from z_common.connectors import browser, cli, graphql_import, queries
+from z_common.connectors import oauth as oauth_checks
 from z_common.contracts import validator as contract_validator
 from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
@@ -249,7 +250,7 @@ async def _validated_manifest(ctx: Ctx, manifest: dict[str, Any]) -> dict[str, A
         for e in contract_validator("connector.schema.json").iter_errors(manifest)
     ]
     problems += browser.connector_problems(manifest) + queries.connector_problems(manifest)
-    problems += cli.connector_problems(manifest)
+    problems += cli.connector_problems(manifest) + oauth_checks.connector_problems(manifest)
     if manifest.get("kind") == "cli":
         allowed = (ctx.state.config.get("executor") or {}).get("tool_images") or []
         image = (manifest.get("cli") or {}).get("image")

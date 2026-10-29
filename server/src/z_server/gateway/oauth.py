@@ -8,7 +8,9 @@
 - Service tokens (client credentials) are cached in memory until shortly before they expire. Without
   configured scopes, the app-only scope is `<API origin>/.default` (the Microsoft identity platform convention).
 - Endpoints come from the connector's `oauth.authorize_url` / `token_url`, or from `oauth.tenant_id` for the
-  Microsoft identity platform.
+  Microsoft identity platform, or are Google's for `oauth.provider: google`.
+- A refresh token is asked for with the `offline_access` scope, except on Google (no such scope: `access_type=offline`
+  and `prompt=consent`, so a second consent still returns one; ADR 0028).
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from urllib.parse import urlencode, urlparse
 
 import httpx
 from sqlalchemy import select
+from z_common.connectors.oauth import GOOGLE_AUTHORIZE_URL, GOOGLE_TOKEN_URL, provider
 
 from z_server.db.models import Connector, Credential, PersonalConnection
 from z_server.gateway.secrets import SecretError, SecretResolver
@@ -42,6 +45,8 @@ class OAuthError(RuntimeError):
 def endpoints(manifest: dict[str, Any]) -> tuple[str, str]:
     cfg = manifest.get("oauth") or {}
     authorize, token = cfg.get("authorize_url"), cfg.get("token_url")
+    if provider(manifest) == "google":
+        authorize, token = authorize or GOOGLE_AUTHORIZE_URL, token or GOOGLE_TOKEN_URL
     if (not authorize or not token) and cfg.get("tenant_id"):
         tenant = str(cfg["tenant_id"])
         authorize = authorize or MICROSOFT.format(tenant=tenant, endpoint="authorize")
@@ -88,6 +93,11 @@ def scopes_for(manifest: dict[str, Any], purpose: str) -> list[str]:
     return [str(s) for s in f.get("scopes") or []]
 
 
+def _scope(manifest: dict[str, Any], purpose: str) -> str:
+    wanted = scopes_for(manifest, purpose)
+    return " ".join(wanted if provider(manifest) == "google" else [*wanted, "offline_access"])
+
+
 def authorize_url(manifest: dict[str, Any], purpose: str, state: str, challenge: str, redirect_uri: str) -> str:
     f = flow(manifest, purpose, "user")
     if f is None or f.get("flow") != "authorization_code_pkce":
@@ -98,12 +108,15 @@ def authorize_url(manifest: dict[str, Any], purpose: str, state: str, challenge:
         "client_id": client_id,
         "response_type": "code",
         "redirect_uri": redirect_uri,
-        "scope": " ".join([*scopes_for(manifest, purpose), "offline_access"]),
+        "scope": _scope(manifest, purpose),
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
         "prompt": "select_account",
     }
+    if provider(manifest) == "google":
+        # never include_granted_scopes: the read and write grants must not merge into one token
+        query |= {"access_type": "offline", "prompt": "select_account consent"}
     return f"{authorize}?{urlencode(query)}"
 
 
@@ -140,8 +153,9 @@ async def exchange(
         "redirect_uri": redirect_uri,
         "client_id": client_id,
         "code_verifier": verifier,
-        "scope": " ".join([*scopes_for(manifest, purpose), "offline_access"]),
     }
+    if provider(manifest) != "google":  # Google takes the scopes from the consent, not the exchange
+        form["scope"] = _scope(manifest, purpose)
     if secret:
         form["client_secret"] = secret
     return await _token_request(http, endpoints(manifest)[1], form)
@@ -153,8 +167,8 @@ async def refresh(
     f = flow(manifest, purpose, "user") or {}
     client_id, secret = await _client(resolver, manifest, str(f.get("app")))
     form = {"grant_type": "refresh_token", "refresh_token": refresh_token, "client_id": client_id}
-    if scopes := scopes_for(manifest, purpose):
-        form["scope"] = " ".join([*scopes, "offline_access"])
+    if scopes_for(manifest, purpose) and provider(manifest) != "google":
+        form["scope"] = _scope(manifest, purpose)
     if secret:
         form["client_secret"] = secret
     return await _token_request(http, endpoints(manifest)[1], form)
