@@ -26,6 +26,7 @@ from z_server.auth import identity
 from z_server.db.models import Playbook, Task, Trigger, User
 from z_server.errors import Problem
 from z_server.ids import new_id
+from z_server.llm import policy
 from z_server.missions import service
 from z_server.missions.templates import TemplateFailure, render_value
 from z_server.state import AppState
@@ -147,6 +148,7 @@ async def fire(
         if seen is not None:
             return Fired(seen, seen.mission_id, "already received")
     playbook = await db.get(Playbook, trigger.playbook_id) if trigger.playbook_id else None
+    routed_agent, routed_playbook = await policy.route(db, {**event, "source": SOURCE.get(trigger.kind, "webhook")})
     task = Task(
         id=new_id("tsk"),
         source=SOURCE.get(trigger.kind, "webhook"),
@@ -154,8 +156,8 @@ async def fire(
         title=_title(trigger, event),
         status="incoming",
         trigger_id=trigger.id,
-        suggested_playbook=playbook.name if playbook else None,
-        suggested_agent=(playbook.manifest.get("team") or [None])[0] if playbook else None,
+        suggested_playbook=playbook.name if playbook else routed_playbook,
+        suggested_agent=(playbook.manifest.get("team") or [None])[0] if playbook else routed_agent,
     )
     db.add(task)
     await db.flush()

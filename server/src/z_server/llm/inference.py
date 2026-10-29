@@ -58,8 +58,10 @@ async def providers(db: AsyncSession, config: dict[str, Any]) -> list[dict[str, 
 
 
 async def routing_config(db: AsyncSession, config: dict[str, Any]) -> dict[str, Any]:
-    """The config with the effective provider list, for the routing policy (key allowlists)."""
-    return {**config, "providers": await providers(db, config)}
+    """The config with the effective provider list and routing policy, for the key allowlists."""
+    from z_server.llm import policy
+
+    return {**config, "providers": await providers(db, config), "routing_policy": await policy.effective(db, config)}
 
 
 async def _gateway(state: AppState) -> tuple[bool, int | None, str | None, dict[str, str], set[str]]:

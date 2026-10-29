@@ -112,8 +112,10 @@ async def create(db: AsyncSession, state: AppState, user: Principal, request: Mi
             "validation", "a free-form mission needs a plan (draft one with POST /missions/draft-plan) or an @agent"
         )
     await _check_plan_agents(db, plan)
+    from z_server.llm import policy
+
     config = state.config
-    default_class = DataClass(config.get("routing_policy", {}).get("default_mission_class", "C2"))
+    default_class = DataClass((await policy.effective(db, config)).get("default_mission_class", "C2"))
     data_class = request.data_class or (
         DataClass(manifest["data_class"]) if manifest and manifest.get("data_class") else default_class
     )
