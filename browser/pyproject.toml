@@ -1,0 +1,23 @@
+[project]
+name = "z-browser"
+version = "0.1.0"
+description = "Z browser worker: replays reviewed browser flows gateway-side (Playwright + Chromium)"
+requires-python = ">=3.12"
+dependencies = [
+  "z-common",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.9",
+  # matches the Chromium build of the runtime image (deploy/images/z-browser)
+  "playwright==1.63.0",
+]
+
+[project.scripts]
+z-browser = "z_browser.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/z_browser"]

@@ -36,13 +36,14 @@ exclude-newer = "7 days"
 exclude-newer-package = { litellm = "14 days" }
 
 [tool.uv.workspace]
-members = ["packages/z-common", "server", "runner", "cli"]
+members = ["packages/z-common", "server", "runner", "cli", "browser"]
 
 [tool.uv.sources]
 z-common = { workspace = true }
 z-server = { workspace = true }
 z-runner = { workspace = true }
 z-cli = { workspace = true }
+z-browser = { workspace = true }
 
 [tool.ruff]
 line-length = 120
@@ -63,7 +64,7 @@ python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
-mypy_path = ["packages/z-common/src", "server/src", "runner/src", "cli/src"]
+mypy_path = ["packages/z-common/src", "server/src", "runner/src", "cli/src", "browser/src"]
 explicit_package_bases = true
 exclude = ["/tests/", "^tests/", "alembic/versions"]
 
@@ -72,7 +73,7 @@ module = ["testcontainers.*", "docker.*", "kubernetes.*", "openhands.*", "sse_st
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["packages/z-common/tests", "server/tests", "runner/tests", "cli/tests", "tests/unit"]
+testpaths = ["packages/z-common/tests", "server/tests", "runner/tests", "cli/tests", "browser/tests", "tests/unit"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-q --strict-markers --import-mode=importlib"
