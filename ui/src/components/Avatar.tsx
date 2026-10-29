@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useAgents } from '@/api/queries'
+import { usePrefs } from '@/lib/prefs'
 import type { Agent, Avatar as AvatarT } from '@/api/types'
 import { initials as toInitials } from '@/lib/format'
 
@@ -15,7 +16,9 @@ export function Avatar({
   size?: number
   className?: string
 }) {
+  const { effectiveTheme } = usePrefs()
   const text = (avatar?.initials ?? toInitials(name)).slice(0, 2)
+  const color = avatar?.color && isSafeColor(avatar.color) ? readable(avatar.color, effectiveTheme === 'day') : undefined
   return (
     <span
       aria-hidden="true"
@@ -24,12 +27,26 @@ export function Avatar({
         width: size,
         height: size,
         fontSize: Math.max(9.5, Math.round(size * 0.4)),
-        color: avatar?.color && isSafeColor(avatar.color) ? avatar.color : undefined,
+        color,
       }}
     >
       {text}
     </span>
   )
+}
+
+/** Keep the chosen color unless it would vanish on the theme background (WCAG contrast). */
+export function readable(hex: string, light: boolean): string | undefined {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6)
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(full.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  const lum = 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0)
+  // Panels are ~0.93 luminance in day and ~0.01 in the dark themes; require 4.5:1 (small text, WCAG AA).
+  const contrast = light ? (0.93 + 0.05) / (lum + 0.05) : (lum + 0.05) / (0.012 + 0.05)
+  return contrast >= 4.5 ? `#${full}` : undefined
 }
 
 /** Only plain hex colors from manifests reach a style property. */
