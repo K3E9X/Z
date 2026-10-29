@@ -312,26 +312,33 @@ export function Learning() {
             {isNotServed(proposals.error) ? (
               <NotServed what="Proposals" endpoint="GET /proposals" compact className="py-3" />
             ) : (
-              list
-                .filter((p) => p.id !== selected?.id)
-                .slice(0, 12)
-                .map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => void navigate({ to: '/learning', search: { proposal: p.id } })}
-                    className="flex flex-col gap-1 border-b border-line py-3.5 text-left"
-                  >
-                    <span className="flex justify-between text-meta text-text-3">
-                      <span>
-                        {KIND[p.kind] ?? p.kind} · {agents.label(p.target.split('@')[0])}
+              <>
+                {list.filter((p) => p.id !== selected?.id).length === 0 && (
+                  <p className="m-0 py-3 text-meta text-text-3">Nothing else to review.</p>
+                )}
+                {list
+                  .filter((p) => p.id !== selected?.id)
+                  .slice(0, 12)
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => void navigate({ to: '/learning', search: { proposal: p.id } })}
+                      className="flex flex-col gap-1 border-b border-line py-3.5 text-left"
+                    >
+                      <span className="flex justify-between text-meta text-text-3">
+                        <span>
+                          {KIND[p.kind] ?? p.kind} · {agents.label(p.target.split('@')[0])}
+                        </span>
+                        <span className={STATUS[p.status]?.tone}>{STATUS[p.status]?.label ?? p.status}</span>
                       </span>
-                      <span className={STATUS[p.status]?.tone}>{STATUS[p.status]?.label ?? p.status}</span>
-                    </span>
-                    <span className="font-medium">{p.title}</span>
-                    {p.rationale && <span className="line-clamp-2 text-meta text-text-2">{p.rationale}</span>}
-                  </button>
-                ))
+                      <span className="font-medium">{p.title}</span>
+                      {p.rationale && (
+                        <span className="line-clamp-2 text-meta text-text-2">{p.rationale}</span>
+                      )}
+                    </button>
+                  ))}
+              </>
             )}
           </section>
           <section aria-labelledby="signals" className="flex flex-col">
@@ -340,16 +347,22 @@ export function Learning() {
             </h2>
             <QueryState query={signals} what="Signals" endpoint="GET /signals" compact>
               {() =>
-                (signals.data?.items ?? []).slice(0, 10).map((s) => (
-                  <div key={s.id} className="grid grid-cols-[52px_1fr] gap-3 border-b border-line py-3">
-                    <span className="font-mono text-sm text-text-3">{clock(s.ts)}</span>
-                    <span>
-                      {SIGNAL[s.kind] ?? s.kind}
-                      {signalDetail(s) && <span className="text-text-2"> · {signalDetail(s)}</span>}
-                      {s.agent && <span className="text-text-3"> · {agents.label(s.agent)}</span>}
-                    </span>
-                  </div>
-                ))
+                (signals.data?.items ?? []).length === 0 ? (
+                  <p className="m-0 py-3 text-meta text-text-3">
+                    No signal yet. Rejections, edits, retries and guardrail hits show up here.
+                  </p>
+                ) : (
+                  (signals.data?.items ?? []).slice(0, 10).map((s) => (
+                    <div key={s.id} className="grid grid-cols-[52px_1fr] gap-3 border-b border-line py-3">
+                      <span className="font-mono text-sm text-text-3">{clock(s.ts)}</span>
+                      <span>
+                        {SIGNAL[s.kind] ?? s.kind}
+                        {signalDetail(s) && <span className="text-text-2"> · {signalDetail(s)}</span>}
+                        {s.agent && <span className="text-text-3"> · {agents.label(s.agent)}</span>}
+                      </span>
+                    </div>
+                  ))
+                )
               }
             </QueryState>
           </section>
