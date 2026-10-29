@@ -13,6 +13,7 @@ and FastAPI only (all in the LiteLLM image).
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from fastapi import HTTPException
@@ -37,16 +38,16 @@ def data_class_of(user_api_key_dict: Any) -> str:
     return str(metadata.get("data_class") or "C2")
 
 
-class ZInferenceGuard(CustomLogger):  # type: ignore[misc]  # LiteLLM's base class is untyped
-    async def async_post_call_success_hook(self, data: dict[str, Any], user_api_key_dict: Any, response: Any) -> Any:
+class ZInferenceGuard(CustomLogger):
+    def _check(self, model: Any, user_api_key_dict: Any, response: Any) -> None:
         via = fallback_of(response)
         if via is None:
-            return response
+            return
         data_class = data_class_of(user_api_key_dict)
         mission = (getattr(user_api_key_dict, "metadata", None) or {}).get("mission")
         log.warning(
             "inferX served model %s through the external fallback %s (key data class %s, mission %s)",
-            data.get("model"),
+            model,
             via,
             data_class,
             mission,
@@ -60,7 +61,18 @@ class ZInferenceGuard(CustomLogger):  # type: ignore[misc]  # LiteLLM's base cla
                     "(ADR 0024): the inferX project must not use an external fallback for the models Z calls"
                 ),
             )
+
+    async def async_post_call_success_hook(self, data: dict[str, Any], user_api_key_dict: Any, response: Any) -> Any:
+        self._check(data.get("model"), user_api_key_dict, response)
         return response
+
+    async def async_post_call_streaming_iterator_hook(
+        self, user_api_key_dict: Any, response: Any, request_data: dict[str, Any]
+    ) -> AsyncGenerator[Any, None]:
+        # the stream carries the provider's headers before its first chunk: refuse before anything is sent on
+        self._check(request_data.get("model"), user_api_key_dict, response)
+        async for item in response:
+            yield item
 
 
 guard = ZInferenceGuard()

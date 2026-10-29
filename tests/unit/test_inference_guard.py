@@ -53,3 +53,31 @@ def test_fallback_answers_pass_for_c1_but_are_logged(caplog: pytest.LogCaptureFi
         out = run(load().guard, {"data_class": "C1", "mission": "msn_1"}, {"LLM_PROVIDER-X-INFERX-FALLBACK": "genapi"})
     assert out is not None
     assert "external fallback genapi" in caplog.text and "msn_1" in caplog.text
+
+
+class Stream:
+    """A LiteLLM stream: provider headers on the wrapper, then chunks."""
+
+    def __init__(self, headers: dict[str, str]) -> None:
+        self._hidden_params = {"additional_headers": headers}
+
+    def __aiter__(self) -> Any:
+        async def chunks() -> Any:
+            for c in ("a", "b"):
+                yield c
+
+        return chunks()
+
+
+def test_streamed_fallback_answers_are_refused_before_the_first_chunk() -> None:
+    guard = load().guard
+
+    async def consume(metadata: dict[str, Any], headers: dict[str, str]) -> list[str]:
+        key = SimpleNamespace(metadata=metadata)
+        return [c async for c in guard.async_post_call_streaming_iterator_hook(key, Stream(headers), {"model": "m"})]
+
+    assert asyncio.run(consume({"data_class": "C3"}, {})) == ["a", "b"]
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(consume({"data_class": "C2"}, {"llm_provider-x-inferx-fallback": "genapi"}))
+    assert refused.value.status_code == 403
+    assert asyncio.run(consume({"data_class": "C1"}, {"llm_provider-x-inferx-fallback": "genapi"})) == ["a", "b"]
