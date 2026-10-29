@@ -93,7 +93,9 @@ jobs:
             --set secrets.externalSecret.enabled=true --set secrets.externalSecret.secretStoreRef.name=store \
             --set 'secrets.externalSecret.dataFrom[0].extract.key=z/platform' \
             --set runners.runtimeClass.create=true --set runners.runtimeClassName=gvisor \
+            --set metrics.grafanaDashboard.enabled=true \
             > rendered-optional.yaml
+          grep -q 'name: z-grafana-dashboard' rendered-optional.yaml
           kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" rendered-optional.yaml
       - name: Refused combinations fail the render
         run: |

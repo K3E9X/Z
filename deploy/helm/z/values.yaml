@@ -354,6 +354,11 @@ metrics:
     interval: 30s
     scrapeTimeout: 10s
     labels: {}
+  # "Z overview" Grafana dashboard as a ConfigMap for the Grafana sidecar (dashboards/z-overview.json).
+  grafanaDashboard:
+    enabled: false
+    labels:
+      grafana_dashboard: "1"
 
 # --------------------------------------------------------------------------------------------------- config
 config:

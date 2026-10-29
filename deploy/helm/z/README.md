@@ -138,6 +138,14 @@ runners:
   runtimeClass: { create: true, name: gvisor, handler: runsc }
 ```
 
+## Metrics and dashboard
+z-server serves Prometheus metrics on `/metrics` with the bearer token `Z_METRICS_TOKEN` from the Secret
+(`metrics.serviceMonitor.enabled` renders a ServiceMonitor that sends it; allow the Prometheus namespace in
+`networkPolicy.metricsFrom`). The Z values (tokens, missions, jobs, review queue, connector reachability,
+undelivered notifications, docs/06 §5) come from the database, so every replica reports the same numbers.
+`metrics.grafanaDashboard.enabled` renders the "Z overview" dashboard (`dashboards/z-overview.json`) as a ConfigMap
+labelled for the Grafana sidecar (`grafana_dashboard: "1"`, change it in `metrics.grafanaDashboard.labels`).
+
 ## Secrets
 
 | Secret | Keys | Source |
