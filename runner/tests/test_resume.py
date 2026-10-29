@@ -170,3 +170,26 @@ def test_checkpoint_with_a_redacted_quoted_header_still_resumes(harness: Harness
 
     run = _resume(harness, spec, job, tools, tmp_path)
     assert run.completion["status"] == "succeeded", run.completion
+
+
+def test_resume_does_not_count_past_usage_again(harness: Harness, tmp_path: Path) -> None:
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("read", {"path": "notes.md"}),
+                tool_call("read", {"path": "notes.md", "offset": 2}),
+                write_result(GOOD_SUMMARY),
+                finish("ok"),
+            ]
+        }
+    )
+    tools = {"local": ["read", "edit"], "builtins": [], "gateway": []}
+    spec, job = _interrupted_at(harness, tools, 2, tmp_path)
+    checkpoint = job.checkpoints[-1]
+    assert len(job.events_of("usage")) == 2
+
+    run = _resume(harness, spec, job, tools, tmp_path)
+    usage = run.events("usage")
+    assert len(usage) == 2  # only the two model calls made after the resume
+    assert run.completion["tokens_in"] == checkpoint["tokens_in"] + sum(u["tokens_in"] for u in usage)
+    assert run.completion["tokens_out"] == checkpoint["tokens_out"] + sum(u["tokens_out"] for u in usage)

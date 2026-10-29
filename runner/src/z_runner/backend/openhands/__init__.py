@@ -186,7 +186,11 @@ class OpenHandsBackend:
             # base_state.json keeps the directory of the pod that wrote it; point the state at this one.
             with conversation.state:
                 conversation.state.persistence_dir = str(root / conversation.id.hex)
+            # The SDK copies the restored metrics into the agent's LLM only when the agent gets ready (first run()
+            # or send_message()), so the responses already counted are read from the restored state itself.
             self._seen_responses = {u.response_id for u in conversation.agent.llm.metrics.token_usages}
+            for metrics in conversation.conversation_stats.usage_to_metrics.values():
+                self._seen_responses.update(u.response_id for u in metrics.token_usages)
             if conversation.state.execution_status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION:
                 # A resumed job never executes an action that waited for confirmation: no decision is carried by
                 # the job spec, so the safe default is to reject it (the agent is told and can ask a human).
