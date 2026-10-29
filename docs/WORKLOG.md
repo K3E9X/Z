@@ -62,6 +62,8 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   only in the tool's environment, image pinned by digest and allowlisted in `executor.tool_images`; Docker runs
   through the socket proxy's tool profile (uid 65534, verified on real Docker), Kubernetes as a Job with a per-run
   Secret. The connector builder drafts them (`POST /connectors/import` source `cli`).
+- GraphQL import by introspection (ADR 0020 §5): one document per query field (read) and per mutation (at least a
+  write: read verbs are dropped from mutation ids), scalar leaves two levels deep, typed variables.
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).

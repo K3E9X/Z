@@ -21,8 +21,14 @@ read-only queries declared in YAML, never free SQL from the agent) connector kin
    back. Database connectors have no writes. Use a database role with read rights on views only.
 4. **Review is bound to the document.** A changed query changes the operation's source: the operation loses its
    exposure until reviewed again (as for browser flows).
+5. **Import by introspection (connector builder).** From the endpoint (introspection query sent without
+   credentials) or a pasted introspection result (JSON; SDL is not parsed), the builder drafts one operation
+   per query field (`<field>.query`, a read) and per mutation field (`mutations.<field>`, whose id never carries
+   a read verb, so a mutation is at least a write; destructive verbs stay destructive). Documents select scalar
+   and enum fields two object levels deep, skip fields that need arguments and guess no fragments; arguments
+   become typed variables. Subscriptions are never drafted. Nothing is exposed until an admin reviews it.
 
 ## Consequences
 - Agents can read inventories, CMDBs and reporting databases without any route to free SQL or to mutations.
-- MySQL/ClickHouse drivers and GraphQL import by introspection are left for later; `cli` connectors stay
-  unserved until they get their own sandbox (running tools inside z-server is refused).
+- MySQL/ClickHouse drivers are left for later. `cli` connectors got their own sandbox in ADR 0025 (running
+  tools inside z-server stays refused).
