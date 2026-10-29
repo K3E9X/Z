@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JobStatus, MissionStatus
 from z_common.redaction import Redactor
 
+from z_server import usage
 from z_server.crypto import new_token, token_hash
 from z_server.db.models import Job, Mission
 from z_server.executors import Executor, ExecutorError
@@ -112,9 +113,17 @@ async def claim(state: AppState, worker: str) -> list[tuple[str, dict[str, str]]
                 .with_for_update(of=[Job, Mission], skip_locked=True)  # both rows, never waited for
             )
         ).all()
+        org_monthly = int((state.config.get("budgets") or {}).get("org_monthly_tokens") or 0) or None
+        spent: dict[str, tuple[str, str] | None] = {}
         for job, mission in candidates:
             if free <= 0:
                 break
+            if mission.id not in spent:  # docs/06 §6: a hard budget spent mid-mission stops new jobs
+                over = spent[mission.id] = await usage.over_budget(db, mission, now, org_monthly)
+                if over is not None and not MissionStatus(mission.status).terminal:
+                    await service.finish(db, state, mission, MissionStatus.budget_exceeded, over[1])
+            if spent[mission.id] is not None:
+                continue
             step_cap = _fanout_limits(mission).get(job.step_id, mission_cap)
             if per_mission[mission.id] >= mission_cap or per_step[(mission.id, job.step_id)] >= step_cap:
                 continue

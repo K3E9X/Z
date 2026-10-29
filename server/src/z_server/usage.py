@@ -182,24 +182,58 @@ def scopes_for(mission: Mission) -> list[str]:
         out.append(f"team:{mission.team_id}")
     if mission.playbook_name:
         out.append(f"playbook:{mission.playbook_name}")
+    agents = {str(s["agent"]) for s in (mission.plan or {}).get("steps", []) if isinstance(s, dict) and s.get("agent")}
+    out.extend(f"agent:{a}" for a in sorted(agents))
     return out
 
 
-async def check_start(db: AsyncSession, mission: Mission, at: datetime, config_org_monthly: int | None = None) -> None:
-    """Hard budgets block a start once spent (budget-exceeded); soft ones only alert."""
-    wanted = scopes_for(mission)
-    budgets = list((await db.execute(select(Budget).where(Budget.scope.in_(wanted)))).scalars())
-    if config_org_monthly and not any(b.scope == "org" and b.period == "month" for b in budgets):
+async def hard_budgets(db: AsyncSession, mission: Mission, config_org_monthly: int | None = None) -> list[Budget]:
+    """The hard budgets that apply to a mission: budget rows of its scopes, the org total of config/z.yaml and
+    the team's monthly budget (Admin → Teams), unless a budget row of the same scope and period replaces them."""
+    budgets = list((await db.execute(select(Budget).where(Budget.scope.in_(scopes_for(mission))))).scalars())
+
+    def has(scope: str) -> bool:
+        return any(b.scope == scope and b.period == "month" for b in budgets)
+
+    if config_org_monthly and not has("org"):
         budgets.append(
             Budget(id="cfg-org", scope="org", limit=config_org_monthly, period="month", alert_at=0.8, hard=True)
         )
-    for budget in budgets:
-        if not budget.hard or budget.period == "mission":
-            continue
+    team = await db.get(Team, mission.team_id) if mission.team_id else None
+    if team is not None and team.monthly_token_budget and not has(f"team:{team.id}"):
+        budgets.append(
+            Budget(
+                id="team-" + team.id,
+                scope=f"team:{team.id}",
+                limit=int(team.monthly_token_budget),
+                period="month",
+                alert_at=0.8,
+                hard=True,
+            )
+        )
+    return [b for b in budgets if b.hard]
+
+
+async def over_budget(
+    db: AsyncSession, mission: Mission, at: datetime, config_org_monthly: int | None = None
+) -> tuple[str, str] | None:
+    """(scope, why) when the mission may not start more work (a hard budget of one of its scopes is spent)."""
+    for budget in await hard_budgets(db, mission, config_org_monthly):
+        if budget.period == "mission":
+            continue  # applied as the mission's own token cap (check_start)
         spent = await used(db, budget.scope, budget.period, at)
         if spent >= budget.limit:
-            raise Problem(
-                "budget-exceeded",
-                f"{budget.scope} has used {spent} of its {budget.limit} tokens this {budget.period}",
-                scope=budget.scope,
-            )
+            return budget.scope, f"{budget.scope} has used {spent} of its {budget.limit} tokens this {budget.period}"
+    return None
+
+
+async def check_start(db: AsyncSession, mission: Mission, at: datetime, config_org_monthly: int | None = None) -> None:
+    """Hard budgets block a start once spent (budget-exceeded); soft ones only alert. A per-mission budget of
+    one of its scopes caps the mission's own `max_tokens`. The scheduler checks again before every job."""
+    for budget in await hard_budgets(db, mission, config_org_monthly):
+        if budget.period == "mission":
+            cap = int((mission.budget or {}).get("max_tokens") or 0)
+            mission.budget = {**(mission.budget or {}), "max_tokens": min(cap, budget.limit) if cap else budget.limit}
+    over = await over_budget(db, mission, at, config_org_monthly)
+    if over:
+        raise Problem("budget-exceeded", over[1], scope=over[0])

@@ -164,6 +164,38 @@ def test_hard_budgets_block_new_missions(app: TestClient, jars: dict[str, dict[s
     assert app.put("/api/v1/budgets", json=[], headers=h).status_code == 403
 
 
+def test_team_budget_and_mid_mission_budget_stop(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
+    """docs/06 §6: the team monthly budget of Admin → Teams is hard, the scheduler checks budgets before every
+    job (not only at the start), and a per-mission budget caps each mission of its scope."""
+    from z_server.db.models import Mission, Team
+
+    h = as_user(app, jars, "bob")
+    first = mission_with_usage(app, h, (3000, 0))
+    team_id = run_db(app, lambda db: db.get(Mission, first)).team_id
+    assert team_id
+    queued = app.post("/api/v1/missions", json={"playbook": "summarize-file", "inputs": {"file": "b.md"}}, headers=h)
+    assert queued.status_code == 201, queued.text
+    run_db(app, lambda db: db.execute(update(Team).where(Team.id == team_id).values(monthly_token_budget=2000)))
+    assert dispatch(app, RecordingExecutor()) == []  # the queued job does not start
+    stopped = app.get(f"/api/v1/missions/{queued.json()['id']}").json()
+    assert stopped["status"] == "budget_exceeded", stopped["status"]
+    blocked = app.post("/api/v1/missions", json={"playbook": "summarize-file", "inputs": {"file": "c.md"}}, headers=h)
+    assert blocked.status_code == 402 and blocked.json()["scope"] == f"team:{team_id}", blocked.text
+
+    run_db(app, lambda db: db.execute(update(Team).where(Team.id == team_id).values(monthly_token_budget=None)))
+    a = as_user(app, jars, "alice")
+    put = app.put(
+        "/api/v1/budgets",
+        json=[{"scope": "playbook:summarize-file", "limit": 500, "period": "mission", "hard": True}],
+        headers=a,
+    )
+    assert put.status_code == 200, put.text
+    h = as_user(app, jars, "bob")
+    capped = app.post("/api/v1/missions", json={"playbook": "summarize-file", "inputs": {"file": "d.md"}}, headers=h)
+    assert capped.status_code == 201, capped.text
+    assert run_db(app, lambda db: db.get(Mission, capped.json()["id"])).budget["max_tokens"] == 500
+
+
 def test_providers_and_external_c2_refusal(app: TestClient, jars: dict[str, dict[str, str]]) -> None:
     a = as_user(app, jars, "alice")
     names = {p["name"] for p in app.get("/api/v1/providers").json()}
