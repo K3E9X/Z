@@ -286,6 +286,46 @@ async def retry_job(db: AsyncSession, state: AppState, mission: Mission, job: Jo
     await advance(db, state, mission)
 
 
+async def raise_data_class(
+    db: AsyncSession,
+    state: AppState,
+    mission: Mission,
+    to: DataClass,
+    cause: str,
+    detail: str | None = None,
+    job: Job | None = None,
+    actor: str = "service:gateway",
+) -> bool:
+    """Invariant 10: the class only goes up, and the mission key allowlist shrinks before anything else moves.
+    Raises LlmKeyError when the key cannot be restricted (the caller must then withhold the result)."""
+    current = DataClass(mission.data_class)
+    if to.rank <= current.rank:
+        return False
+    if mission.llm_key_enc:
+        await state.llm_keys.set_models(mission_key(state, mission), allowed_aliases(state.config, to))
+    mission.data_class = to.value
+    await events.append(
+        db,
+        mission.id,
+        "data_class",
+        {"from": current.value, "to": to.value, "cause": cause, "detail": detail},
+        job_id=job.id if job else None,
+        agent=job.agent_name if job else None,
+        step_id=job.step_id if job else None,
+    )
+    await audit.record(
+        db,
+        audit.Actor(actor),
+        "mission.data_class_raised",
+        "mission",
+        mission.id,
+        team=mission.team_id,
+        before={"data_class": current.value},
+        after={"data_class": to.value, "cause": cause},
+    )
+    return True
+
+
 def mission_key(state: AppState, mission: Mission) -> str:
     if not mission.llm_key_enc:
         raise Problem("conflict", "mission has no model key")

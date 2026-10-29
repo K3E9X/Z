@@ -14,7 +14,7 @@ from sqlalchemy import select
 from z_common.models import api_internal as m
 from z_common.models import api_missions as mm
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import ActionStatus, DataClass, JobStatus, JudgeVerdict, OperationClass
+from z_common.models.enums import ActionStatus, JobStatus, JudgeVerdict, OperationClass
 from z_common.models.manifests import MissionPlan
 
 from z_server import artifacts, audit, events, memory
@@ -37,7 +37,6 @@ from z_server.db.models import (
 from z_server.errors import Problem
 from z_server.ids import new_id
 from z_server.llm.litellm import LlmKeyError
-from z_server.llm.routing import allowed_aliases
 from z_server.missions import service, specs, workspace
 from z_server.missions.service import utcnow
 from z_server.state import AppState
@@ -571,6 +570,8 @@ async def complete_job(ctx: JobCtxDep, id: str, body: m.JobComplete) -> mm.Job:
     job.steps_done = max(job.steps_done, body.steps)
     if body.error:
         job.error = {"class": body.error.class_, "message": body.error.message[:2000]}
+    elif status == JobStatus.succeeded:
+        job.error = None  # a retried job that finally succeeded keeps no stale error
     await service.set_job_status(ctx.db, job, status, reason)
     await service.advance(ctx.db, ctx.state, mission)
     return job_out(job)
@@ -654,36 +655,10 @@ async def raise_data_class(request: Request, id: str, body: m.DataClassRaise) ->
         mission = await db.get(Mission, job.mission_id, with_for_update=True) if job else None
         if job is None or mission is None:
             raise Problem("not-found")
-        current = DataClass(mission.data_class)
-        if body.to.rank <= current.rank:
-            return Response(status_code=204)
-        if mission.llm_key_enc:
-            try:
-                await state.llm_keys.set_models(
-                    service.mission_key(state, mission), allowed_aliases(state.config, body.to)
-                )
-            except LlmKeyError as exc:
-                raise Problem(
-                    "unavailable", "could not restrict the mission model key; the result must not be delivered"
-                ) from exc
-        mission.data_class = body.to.value
-        await events.append(
-            db,
-            mission.id,
-            "data_class",
-            {"from": current.value, "to": body.to.value, "cause": body.cause, "detail": body.detail},
-            job_id=job.id,
-            agent=job.agent_name,
-            step_id=job.step_id,
-        )
-        await audit.record(
-            db,
-            audit.Actor("service:gateway"),
-            "mission.data_class_raised",
-            "mission",
-            mission.id,
-            team=mission.team_id,
-            before={"data_class": current.value},
-            after={"data_class": body.to.value, "cause": body.cause},
-        )
+        try:
+            await service.raise_data_class(db, state, mission, body.to, body.cause, body.detail, job)
+        except LlmKeyError as exc:
+            raise Problem(
+                "unavailable", "could not restrict the mission model key; the result must not be delivered"
+            ) from exc
     return Response(status_code=204)
