@@ -28,7 +28,9 @@ while getopts p:t:o: opt; do
   esac
 done
 shift $((OPTIND - 1))
-[ -n "$prefix" ] && [ -n "$tag" ] && [ "$#" -gt 0 ] || die "usage: $0 -p REGISTRY/PREFIX -t TAG [-o FILE] IMAGE..."
+if [ -z "$prefix" ] || [ -z "$tag" ] || [ "$#" -eq 0 ]; then
+  die "usage: $0 -p REGISTRY/PREFIX -t TAG [-o FILE] IMAGE..."
+fi
 command -v cosign >/dev/null 2>&1 || die "cosign not found (ci/scripts/install-scanners.sh cosign)"
 
 if [ -n "${COSIGN_PUBLIC_KEY:-}" ] && [ -n "${COSIGN_CERT_IDENTITY_REGEXP:-}" ]; then
