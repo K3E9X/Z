@@ -1016,7 +1016,7 @@ schemas = {
     "ConnectorPatch": obj({"manifest": ext("connector.schema.json"), "enabled": B}),
     "ConnectorImport": obj(
         {
-            "source": {"type": "string", "enum": ["openapi", "graphql", "mcp", "docs", "browser"]},
+            "source": {"type": "string", "enum": ["openapi", "graphql", "mcp", "docs", "browser", "cli"]},
             "name": ext(C + "Slug"),
             "display_name": S,
             "base_url": S,
@@ -1026,10 +1026,14 @@ schemas = {
             "docs": S,
             "flows": {"type": "object", "additionalProperties": ext("connector.schema.json#/$defs/BrowserFlow")},
             "declared": arr(ext("connector.schema.json#/$defs/DeclaredOperation")),
+            "cli": ext("connector.schema.json#/properties/cli"),
             "data_class": ext(C + "DataClass"),
         },
         ["source", "name"],
-        desc="browser: `flows` and the `declared` operations that name them (docs/05 §1).",
+        desc=(
+            "browser: `flows` and the `declared` operations that name them. cli: `cli` (the digest-pinned tool "
+            "image and its environment) and the `declared` operations with their `command` (docs/05 §1, ADR 0025)."
+        ),
     ),
     "ConnectorDraft": obj(
         {"manifest": ext("connector.schema.json"), "operations": arr(ref("Operation")), "warnings": arr(S)},

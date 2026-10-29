@@ -8112,6 +8112,7 @@ components:
           - mcp
           - docs
           - browser
+          - cli
         name:
           $ref: common.schema.json#/$defs/Slug
         display_name: *id001
@@ -8132,13 +8133,16 @@ components:
           type: array
           items:
             $ref: connector.schema.json#/$defs/DeclaredOperation
+        cli:
+          $ref: connector.schema.json#/properties/cli
         data_class:
           $ref: common.schema.json#/$defs/DataClass
       required:
       - source
       - name
       additionalProperties: false
-      description: 'browser: `flows` and the `declared` operations that name them (docs/05 §1).'
+      description: 'browser: `flows` and the `declared` operations that name them. cli: `cli` (the digest-pinned tool image and its environment) and the `declared` operations with their `command` (docs/05
+        §1, ADR 0025).'
     ConnectorDraft:
       type: object
       properties:

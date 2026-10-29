@@ -3476,10 +3476,10 @@ export interface components {
             manifest?: components["schemas"]["connector.schema"];
             enabled?: boolean;
         };
-        /** @description browser: `flows` and the `declared` operations that name them (docs/05 §1). */
+        /** @description browser: `flows` and the `declared` operations that name them. cli: `cli` (the digest-pinned tool image and its environment) and the `declared` operations with their `command` (docs/05 §1, ADR 0025). */
         ConnectorImport: {
             /** @enum {string} */
-            source: "openapi" | "graphql" | "mcp" | "docs" | "browser";
+            source: "openapi" | "graphql" | "mcp" | "docs" | "browser" | "cli";
             name: components["schemas"]["Slug"];
             display_name?: string;
             base_url?: string;
@@ -3491,6 +3491,7 @@ export interface components {
                 [key: string]: components["schemas"]["BrowserFlow"];
             };
             declared?: components["schemas"]["DeclaredOperation"][];
+            cli?: components["schemas"]["cli"];
             data_class?: components["schemas"]["DataClass"];
         };
         ConnectorDraft: {
@@ -5191,6 +5192,21 @@ export interface components {
                     interval_s?: number;
                 };
             };
+        };
+        /** @description cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` replaces the image CMD (it follows the ENTRYPOINT when the image has one), with {{args.<name>}} placeholders; no shell. */
+        cli: {
+            /** @description Tool image pinned by digest; must also be listed in executor.tool_images. */
+            image: string;
+            /** @description Literals, or {{auth.secret}}, {{auth.username}}, {{auth.password}} from the read or write credential. */
+            env?: {
+                [key: string]: string;
+            };
+            timeout_s?: number;
+            /**
+             * @description json: stdout is parsed as JSON.
+             * @enum {string}
+             */
+            output?: "text" | "json";
         };
         /** @enum {string} */
         ChannelKind: "teams" | "slack" | "mattermost" | "email";
