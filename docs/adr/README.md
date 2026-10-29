@@ -20,3 +20,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0016 — Browser connectors: reviewed flows replayed by z-browser](0016-browser-flows.md)
 - [0017 — Chat follow-ups: approval cards link to Z, content capped by data class](0017-channel-follow-ups.md)
 - [0018 — CI pipelines as built](0018-ci-pipelines.md)
+- [0019 — Take-over works on the checkpoint, not inside the runner](0019-take-over.md)

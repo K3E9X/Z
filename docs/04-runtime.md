@@ -89,7 +89,7 @@ The judge is advisory except where this spec says it blocks. It is evaluated lik
 ## 7. Interacting with a running agent
 - **Guide the agent**: a message from the user is injected at the next step.
 - **Pause / resume**: stop after the current step, keep the checkpoint.
-- **Take over**: pause, open the workspace in a web terminal or editor (read-only by default), let the user edit, then resume.
+- **Take over**: pause, open the workspace in a web terminal or editor (read-only by default), let the user edit, then resume. v1 is a web editor over the workspace rebuilt from the staged inputs and the checkpoint; edits restart the job from the edited checkpoint (ADR 0019).
 - **Answer a question**: `ask_human` blocks the job until answered in Review, the CLI or mobile.
 - **Stop**: cancel with a reason (becomes a learning signal).
 
