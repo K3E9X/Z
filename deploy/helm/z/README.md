@@ -121,7 +121,7 @@ The password never reaches the log (and so never your log stack): the log line o
 ```bash
 # which pod wrote it (--prefix prints [pod/<pod>/server] in front of the line)
 kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -c server \
-  --prefix --tail=-1 | grep "password written to"
+  --prefix --tail=-1 | grep "secret written to"
 kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
 ```
 

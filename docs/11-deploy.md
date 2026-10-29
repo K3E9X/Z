@@ -53,7 +53,7 @@ helm upgrade --install z deploy/helm/z -n z \
 # (Z_BOOTSTRAP_SECRET_FILE=/run/z-secrets/bootstrap), never to the log; the log line names the file and,
 # with --prefix, the pod that wrote it
 kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -c server \
-  --prefix --tail=-1 | grep "password written to"
+  --prefix --tail=-1 | grep "secret written to"
 kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
 
 # Kubernetes

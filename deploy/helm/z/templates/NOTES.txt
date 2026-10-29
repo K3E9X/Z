@@ -9,7 +9,7 @@ First connection (docs/12 §1): at its first start z-server creates the bootstra
 writes its one-time password (valid 24 h) to a memory-backed file of the pod that created it, never to the
 log. The log line only names the file; --prefix shows which pod wrote it:
 
-  kubectl -n {{ $ns }} logs -l {{ $sel }} -c server --prefix --tail=-1 | grep "password written to"
+  kubectl -n {{ $ns }} logs -l {{ $sel }} -c server --prefix --tail=-1 | grep "secret written to"
 
 Read the file in the pod named in front of that line ([pod/<pod>/server]):
 
@@ -26,7 +26,7 @@ file of the pod you exec into:
 {{- if dig "auth" "breakglass" "enabled" false .Values.config.z }}
 
 Break-glass (Z_BREAKGLASS=true): its one-time password and TOTP URI are written to {{ $dir }}/breakglass of the
-pod that created them, the same way (grep the log for "written to", then kubectl exec <pod> -c server -- cat).
+pod that created them, the same way (grep the log for "secret written to", then kubectl exec <pod> -c server -- cat).
 {{- end }}
 {{- /* production renders only with every image pinned by digest (z.validateDigests) */}}
 {{- $missing := list }}

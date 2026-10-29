@@ -92,9 +92,17 @@ kubectl -n z create secret generic z-db \
 helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
 ```
 
-3. One-time password of the bootstrap admin, printed by z-server at its first start:
-   `kubectl -n z logs deploy/z-server | grep bootstrap`. Then follow "First connection" below
-   (re-enable: `kubectl -n z exec deploy/z-server -- z-server bootstrap --reset`).
+3. One-time password of the bootstrap admin `z-bootstrap`: on Kubernetes z-server never logs it. It writes it to
+   a memory-backed file of the pod that created it (`/run/z-secrets/bootstrap`) and logs only where it is:
+
+   ```bash
+   kubectl -n z logs -l app.kubernetes.io/instance=z,app.kubernetes.io/component=server -c server \
+     --prefix --tail=-1 | grep "secret written to"        # [pod/<pod>/server] ... secret written to ...
+   kubectl -n z exec <pod> -c server -- cat /run/z-secrets/bootstrap
+   ```
+
+   Then follow "First connection" below. A new password (the file goes with the pod): "First connection" in
+   `deploy/helm/z/README.md` (`z-server bootstrap --reset`, then `cat` the file again).
 
 - Runner pods start in the namespace `z-runners` (Pod Security `restricted`, quota, default-deny network
   policies: runners reach only z-server, LiteLLM and DNS). NetworkPolicy is enforced by k3s out of the box; on
@@ -104,7 +112,8 @@ helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f 
   values files.
 
 ## First connection
-1. Sign in at `/signin` with `z-bootstrap` and the one-time password from the logs (valid 24 h, shown once).
+1. Sign in at `/signin` with `z-bootstrap` and its one-time password (valid 24 h, shown once): on Compose in
+   `docker compose logs z-server`, on Kubernetes in the file named by the log (above).
 2. Admin → Sign-in: GitLab issuer URL, client id and secret (the GitLab OAuth app, scopes `openid profile email`,
    redirect URI `https://<z-host>/api/v1/auth/callback` and `http://127.0.0.1:8765/callback` for the CLI fallback).
    "Test" checks discovery and JWKS.
