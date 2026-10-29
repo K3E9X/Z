@@ -185,7 +185,7 @@ async def start_shadow(
 ) -> EvalRun | None:
     """Shadow replay (docs/08 §4.2): the candidate replays the prompts of the agent's latest succeeded real
     missions (reads are real, writes captured) and the judge compares each answer with the one accepted then."""
-    rows = (
+    found = (
         await db.execute(
             select(Job, Mission)
             .join(Mission, Mission.id == Job.mission_id)
@@ -197,9 +197,16 @@ async def start_shadow(
                 Mission.status == "succeeded",
             )
             .order_by(Job.ended_at.desc())
-            .limit(limit)
+            .limit(limit * 10)
         )
     ).all()
+    # only missions the person starting the replay may read (missions:read is team-scoped): a replay copies the
+    # prompt into a new mission and the accepted answer into the rubric
+    rows = [
+        (job, mission)
+        for job, mission in found
+        if mission.created_by == user.user_id or user.can("missions:read", mission.team_id)
+    ][:limit]
     if not rows:
         return None
     run = EvalRun(
@@ -229,7 +236,18 @@ async def start_shadow(
             }
         )
         entries += await _launch(
-            db, state, user, run, agent, agent.pack, [case], model, [], run.target, list(mission.connectors or [])
+            db,
+            state,
+            user,
+            run,
+            agent,
+            agent.pack,
+            [case],
+            model,
+            [],
+            run.target,
+            list(mission.connectors or []),
+            data_class=DataClass(mission.data_class),  # the replay handles the same data: its class, never lower
         )
     run.cases = entries
     await audit.record(
@@ -302,6 +320,7 @@ async def _launch(
     writes: list[str],
     target: str,
     connectors: list[str] | None = None,
+    data_class: DataClass | None = None,
 ) -> list[dict[str, Any]]:
     """One mission per case for `agent` with `model`, attached to `run` (writes captured, never applied)."""
     entries = []
@@ -332,7 +351,7 @@ async def _launch(
                 inputs={},
                 plan=plan,
                 connectors=sorted(set(connectors or []) | agent_connectors(agent)),
-                data_class=None,
+                data_class=data_class,
                 autonomy=None,
                 plan_first=False,
                 budget={"timeout_s": case.timeout_s} if case.timeout_s else {},

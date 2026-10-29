@@ -27,7 +27,7 @@ from typing import Any
 import yaml
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from z_common.models.enums import JudgeVerdict, ProposalKind, ProposalStatus
+from z_common.models.enums import DataClass, JudgeVerdict, ProposalKind, ProposalStatus
 
 from z_server import audit, evals, judge
 from z_server.auth import identity
@@ -497,8 +497,14 @@ async def try_on_mission(db: AsyncSession, state: AppState, proposal: Proposal, 
     for sig_id in reversed(proposal.evidence or []):
         sig = await db.get(Signal, sig_id)
         if sig and sig.mission_id:
-            recent = await db.get(Mission, sig.mission_id)
-            if recent is not None and recent.prompt:
+            found = await db.get(Mission, sig.mission_id)
+            # only a mission the person may read: its prompt is copied into the try mission
+            if (
+                found is not None
+                and found.prompt
+                and (found.created_by == user.user_id or user.can("missions:read", found.team_id))
+            ):
+                recent = found
                 break
     prompt = (recent.prompt if recent else None) or f"Show how you apply the skill {proposal.target}."
     run = EvalRun(
@@ -533,7 +539,7 @@ async def try_on_mission(db: AsyncSession, state: AppState, proposal: Proposal, 
             inputs={},
             plan=MissionPlan.model_validate({"steps": [plan_step]}),
             connectors=list(recent.connectors) if recent else [],
-            data_class=None,
+            data_class=DataClass(recent.data_class) if recent else None,  # the same data: its class, never lower
             autonomy=None,
             plan_first=False,
             budget={},

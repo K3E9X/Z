@@ -414,7 +414,9 @@ def test_shadow_replay_of_recent_missions(app: TestClient, llm: FakeLLM, jars: d
 
     # a real mission of the summarizer succeeded earlier: its prompt and accepted answer are the reference
     made = app.post(
-        "/api/v1/missions", json={"prompt": "Summarise notes.md", "agents": ["summarizer"]}, headers=csrf(app)
+        "/api/v1/missions",
+        json={"prompt": "Summarise notes.md", "agents": ["summarizer"], "data_class": "C3"},
+        headers=csrf(app),
     )
     assert made.status_code == 201, made.text
     play_all(app, lambda spec: GOOD)
@@ -430,3 +432,14 @@ def test_shadow_replay_of_recent_missions(app: TestClient, llm: FakeLLM, jars: d
     call(app, learning.tick)
     proposal = app.get(f"/api/v1/proposals/{pid}").json()
     assert proposal["status"] == "ready" and proposal["shadow"] == {"missions": 1, "matched": 1}, proposal
+
+    # the replay handles the same data as the source mission: same data class, never the default
+    async def replay_classes(st: Any) -> list[str]:
+        from sqlalchemy import select
+        from z_server.db.models import Mission
+
+        async with st.sessions() as db:
+            rows = await db.execute(select(Mission.data_class).where(Mission.title.like("Eval agent:summarizer%")))
+            return [c for (c,) in rows.all()]
+
+    assert "C3" in call(app, replay_classes)
