@@ -5,6 +5,7 @@
 import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query'
 import { api, unwrap } from './client'
 import { isApiError } from './problem'
+import type { Job } from './types'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,11 +129,31 @@ export function useMission(id: string) {
   })
 }
 
+/** Page size of GET /missions/{id}/jobs (the contract's maximum) and a safety cap on pages followed. */
+export const JOBS_PAGE = 200
+const JOBS_MAX_PAGES = 25
+
+/** Every job of a mission: pages of 200 following next_cursor (bounded), merged into one list. */
+export async function fetchMissionJobs(id: string) {
+  const items: Job[] = []
+  let cursor: string | undefined
+  for (let page = 0; page < JOBS_MAX_PAGES; page += 1) {
+    const res = await unwrap(
+      api.GET('/missions/{id}/jobs', {
+        params: { path: { id }, query: { limit: JOBS_PAGE, ...(cursor ? { cursor } : {}) } },
+      }),
+    )
+    items.push(...res.items)
+    if (!res.next_cursor) return { items, next_cursor: null }
+    cursor = res.next_cursor
+  }
+  return { items, next_cursor: cursor ?? null }
+}
+
 export function useMissionJobs(id: string, opts: { live?: boolean } = {}) {
   return useQuery({
     queryKey: qk.missionJobs(id),
-    queryFn: () =>
-      unwrap(api.GET('/missions/{id}/jobs', { params: { path: { id }, query: { limit: 500 } } })),
+    queryFn: () => fetchMissionJobs(id),
     refetchInterval: opts.live ? 5_000 : false,
   })
 }
