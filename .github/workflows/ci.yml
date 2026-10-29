@@ -13,7 +13,7 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
 
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"

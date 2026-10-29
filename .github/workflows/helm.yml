@@ -17,7 +17,7 @@ permissions:
   contents: read
 concurrency:
   group: helm-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
 
 env:
   HELM_VERSION: v3.22.1
