@@ -88,9 +88,14 @@ def _path(value: Any, dotted: str) -> Any:
 
 
 def gitlab_view(event: dict[str, Any]) -> dict[str, Any]:
-    """Shortcuts for GitLab webhook filters: kind, action, labels (names), project."""
+    """Shortcuts for GitLab webhook filters: kind, action, labels (names), project, assignee (usernames of the
+    issue or merge request assignees, `assignees` in GitLab's issue and MR events, `assignee` in older ones)."""
     attrs = event.get("object_attributes") or {}
+    people = [a for a in event.get("assignees") or [] if isinstance(a, dict)]
+    if isinstance(event.get("assignee"), dict):
+        people.append(event["assignee"])
     return {
+        "assignee": [p.get("username") for p in people if p.get("username")],
         "kind": event.get("object_kind") or event.get("event_type"),
         "action": attrs.get("action"),
         "label": [lbl.get("title") for lbl in event.get("labels") or [] if isinstance(lbl, dict)],
