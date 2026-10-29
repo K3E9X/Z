@@ -66,14 +66,14 @@ jobs:
         run: |
           set -euo pipefail
           for v in k3s k8s; do
-            helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml"
+            helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml
           done
       - name: Render and validate (kubeconform -strict)
         run: |
           set -euo pipefail
           for v in k3s k8s; do
             echo "::group::$v"
-            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "rendered-$v.yaml"
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml > "rendered-$v.yaml"
             kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
             echo "::endgroup::"
           done
@@ -81,14 +81,14 @@ jobs:
         run: |
           set -euo pipefail
           for v in k3s k8s; do
-            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" \
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml \
               --api-versions monitoring.coreos.com/v1 --set metrics.serviceMonitor.enabled=true \
               > "rendered-$v-monitoring.yaml"
             grep -q '^kind: ServiceMonitor' "rendered-$v-monitoring.yaml"
             kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" \
               "rendered-$v-monitoring.yaml"
           done
-          helm template z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml \
+          helm template z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f deploy/helm/z/ci/render-values.yaml \
             --set httpRoute.enabled=true --set 'httpRoute.parentRefs[0].name=gateway' \
             --set secrets.externalSecret.enabled=true --set secrets.externalSecret.secretStoreRef.name=store \
             --set 'secrets.externalSecret.dataFrom[0].extract.key=z/platform' \
@@ -100,10 +100,28 @@ jobs:
       - name: Refused combinations fail the render
         run: |
           set -uo pipefail
+          # ci/render-values.yaml stands for the site values (digests, the inferX CIDR): without them production refuses
+          K3S=(-f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml)
+          K8S=(-f deploy/helm/z/values-k8s.yaml -f deploy/helm/z/ci/render-values.yaml)
           refuse() { if helm template z deploy/helm/z -n z "$@" >/dev/null 2>&1; then echo "accepted: $*"; exit 1; fi; }
-          refuse -f deploy/helm/z/values-k3s.yaml --set containerSecurityContext.readOnlyRootFilesystem=false
-          refuse -f deploy/helm/z/values-k3s.yaml --set runners.podSecurity.level=baseline
-          refuse -f deploy/helm/z/values-k3s.yaml --set runners.image.tag=latest
-          refuse -f deploy/helm/z/values-k3s.yaml --set server.replicas=2
-          refuse -f deploy/helm/z/values-k8s.yaml --set database.existingSecret=
+          accept() { helm template z deploy/helm/z -n z "$@" >/dev/null || { echo "refused: $*"; exit 1; }; }
+          refuse "${K3S[@]}" --set containerSecurityContext.readOnlyRootFilesystem=false
+          refuse "${K3S[@]}" --set runners.podSecurity.level=baseline
+          refuse "${K3S[@]}" --set runners.image.tag=latest
+          refuse "${K3S[@]}" --set server.replicas=2
+          refuse "${K8S[@]}" --set database.existingSecret=
+          refuse -f deploy/helm/z/values-k3s.yaml   # production without site values
+          refuse -f deploy/helm/z/values-k8s.yaml
+          refuse "${K3S[@]}" --set networkPolicy.litellmEgress=null
+          refuse "${K3S[@]}" --set 'networkPolicy.litellmEgress[0].to[0].ipBlock.cidr=0.0.0.0/0'
+          refuse "${K8S[@]}" --set networkPolicy.databaseEgress=null
+          refuse "${K3S[@]}" --set env=prod
+          refuse "${K3S[@]}" --set networkPolicy.enabled=false
+          refuse "${K3S[@]}" --set runners.networkPolicy.enabled=false
+          refuse "${K3S[@]}" --skip-schema-validation --set networkPolicy.enabled=false
+          refuse "${K3S[@]}" --set server.image.digest=
+          refuse "${K3S[@]}" --set litellm.image.digest=
+          accept "${K3S[@]}"
+          accept "${K8S[@]}"
+          accept -f deploy/helm/z/values-k3s.yaml -f ci/kind/values-smoke.yaml
           echo "all refused"

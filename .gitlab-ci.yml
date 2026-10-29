@@ -203,7 +203,7 @@ security:repo:
     - |
       for v in k3s k8s; do
         trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile .exc/iac \
-          --helm-values "deploy/helm/z/values-$v.yaml" deploy/
+          --helm-values "deploy/helm/z/values-$v.yaml" --helm-values deploy/helm/z/ci/render-values.yaml deploy/
       done
 
 security:deps:
@@ -350,8 +350,8 @@ chart:check:
     - |
       set -e
       for v in k3s k8s; do
-        helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml"
-        helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "rendered-$v.yaml"
+        helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml
+        helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml > "rendered-$v.yaml"
         kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
         kube-score score --output-format ci "rendered-$v.yaml" || true   # report only (docs/13)
         kubescape scan framework nsa,cis-v1.10.0 "rendered-$v.yaml" --exceptions security/kubescape-exceptions.json --compliance-threshold 85

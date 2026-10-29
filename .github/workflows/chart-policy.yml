@@ -54,7 +54,7 @@ jobs:
       - name: Render
         run: |
           for v in k3s k8s; do
-            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "$RUNNER_TEMP/rendered-$v.yaml"
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml > "$RUNNER_TEMP/rendered-$v.yaml"
           done
       - name: kube-score (report only)
         run: |

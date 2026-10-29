@@ -194,6 +194,6 @@ jobs:
           for v in k3s k8s; do
             echo "::group::$v"
             trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile "$RUNNER_TEMP/exc/iac" \
-              --helm-values "deploy/helm/z/values-$v.yaml" deploy/
+              --helm-values "deploy/helm/z/values-$v.yaml" --helm-values deploy/helm/z/ci/render-values.yaml deploy/
             echo "::endgroup::"
           done
