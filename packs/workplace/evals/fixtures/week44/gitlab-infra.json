@@ -1,0 +1,35 @@
+{
+  "group": "infra",
+  "merged": [
+    {
+      "iid": 318,
+      "project": "infra/dns",
+      "title": "New resolver configuration"
+    },
+    {
+      "iid": 319,
+      "project": "infra/dns",
+      "title": "Query logging to syslog"
+    },
+    {
+      "iid": 1204,
+      "project": "infra/edge-proxy",
+      "title": "Renew certificates"
+    },
+    {
+      "iid": 1206,
+      "project": "infra/edge-proxy",
+      "title": "Harden TLS ciphers"
+    },
+    {
+      "iid": 77,
+      "project": "infra/bastion",
+      "title": "OpenSSH 9.9 upgrade"
+    },
+    {
+      "iid": 78,
+      "project": "infra/bastion",
+      "title": "Session recording retention"
+    }
+  ]
+}

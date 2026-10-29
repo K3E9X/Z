@@ -2,6 +2,7 @@
 name: research
 description: Research with sources.
 version: 1.0.0
+evals: evals/research.jsonl
 ---
 
 1. Search internal sources first, then the allowlisted web.

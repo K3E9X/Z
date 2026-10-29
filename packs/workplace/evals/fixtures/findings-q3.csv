@@ -1,0 +1,41 @@
+id,team,severity,cvss,opened,closed,status
+FND-7000,Payments Platform,critical,9.8,2026-07-01,2026-07-04,closed
+FND-7001,Identity,high,8.1,2026-07-03,2026-07-16,closed
+FND-7002,Core Network,high,7.2,2026-07-05,2026-08-17,closed
+FND-7003,Web Platform,medium,5.3,2026-07-07,2026-08-01,closed
+FND-7004,Payments Platform,medium,6.1,2026-07-09,2026-10-13,closed
+FND-7005,Identity,medium,4.3,2026-07-11,2026-09-11,closed
+FND-7006,Core Network,low,3.1,2026-07-13,,open
+FND-7007,Web Platform,high,8.8,2026-07-15,2026-08-03,closed
+FND-7008,Payments Platform,medium,4.3,2026-07-17,,open
+FND-7009,Identity,low,2.4,2026-07-19,,open
+FND-7010,Core Network,critical,9.1,2026-07-21,,open
+FND-7011,Web Platform,high,8.8,2026-07-23,2026-08-06,closed
+FND-7012,Payments Platform,high,7.5,2026-07-25,2026-09-04,closed
+FND-7013,Identity,medium,6.1,2026-07-27,2026-08-22,closed
+FND-7014,Core Network,medium,4.3,2026-07-29,,open
+FND-7015,Web Platform,medium,5.3,2026-07-31,2026-09-29,closed
+FND-7016,Payments Platform,low,3.1,2026-08-02,,open
+FND-7017,Identity,high,8.1,2026-08-04,2026-08-24,closed
+FND-7018,Core Network,medium,5.3,2026-08-06,,open
+FND-7019,Web Platform,low,2.4,2026-08-08,,open
+FND-7020,Payments Platform,critical,9.4,2026-08-10,2026-08-15,closed
+FND-7021,Identity,high,8.1,2026-08-12,2026-08-24,closed
+FND-7022,Core Network,high,7.2,2026-08-14,2026-09-25,closed
+FND-7023,Web Platform,medium,4.3,2026-08-16,2026-09-12,closed
+FND-7024,Payments Platform,medium,5.3,2026-08-18,,open
+FND-7025,Identity,medium,6.1,2026-08-20,,open
+FND-7026,Core Network,low,3.1,2026-08-22,,open
+FND-7027,Web Platform,high,8.8,2026-08-24,2026-09-11,closed
+FND-7028,Payments Platform,medium,6.1,2026-08-26,,open
+FND-7029,Identity,low,2.4,2026-08-28,,open
+FND-7030,Core Network,critical,9.8,2026-08-30,,open
+FND-7031,Web Platform,high,8.8,2026-09-01,2026-09-14,closed
+FND-7032,Payments Platform,high,7.5,2026-09-03,,open
+FND-7033,Identity,medium,5.3,2026-09-05,2026-09-30,closed
+FND-7034,Core Network,medium,6.1,2026-09-07,,open
+FND-7035,Web Platform,medium,4.3,2026-09-09,,open
+FND-7036,Payments Platform,low,3.1,2026-09-11,,open
+FND-7037,Identity,high,8.1,2026-09-13,2026-10-02,closed
+FND-7038,Core Network,medium,4.3,2026-09-15,,open
+FND-7039,Web Platform,low,2.4,2026-09-17,,open

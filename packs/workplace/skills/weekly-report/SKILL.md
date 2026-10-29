@@ -2,6 +2,7 @@
 name: weekly-report
 description: Build a weekly report from Jira, GitLab and notes.
 version: 1.0.0
+evals: evals/weekly-report.jsonl
 ---
 
 1. Collect: tickets closed and opened, MRs merged, incidents of the week from the given sources.

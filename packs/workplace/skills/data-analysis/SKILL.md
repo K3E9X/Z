@@ -2,6 +2,7 @@
 name: data-analysis
 description: Answer a question about a dataset with code.
 version: 1.0.0
+evals: evals/data-analysis.jsonl
 ---
 
 1. Load the file in the code sandbox; print shape, columns, types; check for missing values.
