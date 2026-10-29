@@ -103,8 +103,8 @@ class Ctx:
         self.audited = True
 
     def require(self, permission: str, team: str | None = None) -> None:
-        """Resource-level check (team-owned resources)."""
-        if not self.user.can(permission, team):
+        """Resource-level check: a team's resource, or an org-level one (team None) that needs an org-wide grant."""
+        if not self.user.can_on(permission, team):
             raise Problem(
                 "forbidden", f"missing {permission}" + (f" for team {team}" if team else ""), permission=permission
             )

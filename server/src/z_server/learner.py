@@ -502,7 +502,7 @@ async def try_on_mission(db: AsyncSession, state: AppState, proposal: Proposal, 
             if (
                 found is not None
                 and found.prompt
-                and (found.created_by == user.user_id or user.can("missions:read", found.team_id))
+                and (found.created_by == user.user_id or user.can_on("missions:read", found.team_id))
             ):
                 recent = found
                 break

@@ -45,7 +45,7 @@ def visible(ctx: Ctx, stmt: Select[Any]) -> Select[Any]:
 
 
 def can_see(ctx: Ctx, mission: Mission) -> bool:
-    return mission.created_by == ctx.user.user_id or ctx.user.can("missions:read", mission.team_id)
+    return mission.created_by == ctx.user.user_id or ctx.user.can_on("missions:read", mission.team_id)
 
 
 async def get_mission(ctx: Ctx, mission_id: str, *, lock: bool = False, control: str | None = None) -> Mission:

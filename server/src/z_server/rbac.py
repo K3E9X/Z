@@ -92,6 +92,16 @@ class Principal:
                 return True
         return False
 
+    def can_on(self, permission: str, team: str | None) -> bool:
+        """Resource-level check: a resource of `team`, or of no team (org-level), which only an org-wide grant
+        reaches. `can(permission, None)` means "at any scope" and must never decide access to a resource."""
+        accepted = {permission} | IMPLIES.get(permission, frozenset())
+        return any(
+            grant.permission in accepted
+            and (grant.scope == ORG or (team is not None and grant.scope == f"team:{team}"))
+            for grant in self.grants
+        )
+
     def has_org(self, permission: str) -> bool:
         return Grant(permission, ORG) in self.grants
 

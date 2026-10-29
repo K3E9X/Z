@@ -205,7 +205,7 @@ async def start_shadow(
     rows = [
         (job, mission)
         for job, mission in found
-        if mission.created_by == user.user_id or user.can("missions:read", mission.team_id)
+        if mission.created_by == user.user_id or user.can_on("missions:read", mission.team_id)
     ][:limit]
     if not rows:
         return None
