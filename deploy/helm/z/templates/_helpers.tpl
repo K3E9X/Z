@@ -24,6 +24,7 @@
 {{- define "z.server.fullname" -}}{{ include "z.component" (dict "root" . "name" "server") }}{{- end -}}
 {{- define "z.ui.fullname" -}}{{ include "z.component" (dict "root" . "name" "ui") }}{{- end -}}
 {{- define "z.litellm.fullname" -}}{{ include "z.component" (dict "root" . "name" "litellm") }}{{- end -}}
+{{- define "z.egress.fullname" -}}{{ include "z.component" (dict "root" . "name" "egress-proxy") }}{{- end -}}
 {{- define "z.postgres.fullname" -}}{{ include "z.component" (dict "root" . "name" "postgres") }}{{- end -}}
 
 {{/* ------------------------------------------------------------------ labels */}}
@@ -202,6 +203,10 @@ in the Secret. External: the DSN comes from database.existingSecret.
   value: {{ printf "http://%s.%s.svc:%v" (include "z.litellm.fullname" .) $ns .Values.litellm.port | quote }}
 - name: Z_RUNNER_LITELLM_URL
   value: {{ printf "http://%s.%s.svc:%v" (include "z.litellm.fullname" .) $ns .Values.litellm.port | quote }}
+{{- if .Values.egressProxy.enabled }}
+- name: EGRESS_PROXY_URL
+  value: {{ printf "http://%s.%s.svc:%v" (include "z.egress.fullname" .) $ns .Values.egressProxy.port | quote }}
+{{- end }}
 - name: Z_INTERNAL_URL
   value: {{ printf "http://%s.%s.svc:%v" (include "z.server.fullname" .) $ns .Values.server.port | quote }}
 - name: Z_EXECUTOR

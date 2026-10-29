@@ -177,6 +177,24 @@ ui:
   tolerations: []
   affinity: {}
 
+# ---------------------------------------------------------------------------------------------- egress proxy
+# The runners' only way out (docs/07): package mirrors from config.z.egress.mirrors (URLs or host names),
+# everything else denied. Off by default: runners then reach only Z and LiteLLM.
+egressProxy:
+  enabled: false
+  replicas: 1
+  image:
+    repository: ghcr.io/k3e9x/z-egress-proxy
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  port: 3128
+  # Where the mirrors are (NetworkPolicy egress of the proxy). Default: any address on 80/443.
+  egressTo: [{ ipBlock: { cidr: 0.0.0.0/0 } }]
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
 # --------------------------------------------------------------------------------------------------- LiteLLM
 litellm:
   replicas: 1

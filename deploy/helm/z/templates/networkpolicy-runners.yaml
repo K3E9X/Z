@@ -38,6 +38,10 @@ spec:
         - protocol: TCP
           port: {{ . }}
         {{- end }}
+        {{- if $.Values.egressProxy.enabled }}
+        - protocol: TCP
+          port: {{ $.Values.egressProxy.port }}
+        {{- end }}
       {{- end }}
     - to:
         - namespaceSelector:

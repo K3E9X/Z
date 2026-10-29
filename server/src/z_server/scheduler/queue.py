@@ -17,6 +17,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 from z_common.models.enums import JobStatus, MissionStatus
@@ -45,7 +46,23 @@ class TickReport:
 
 def runner_env(state: AppState, job: Job, bootstrap: str) -> dict[str, str]:
     # the contract's server is /api/v1: internal paths (/internal/jobs/...) are relative to it
-    return {"Z_SERVER_URL": f"{state.settings.internal_url}/api/v1", "Z_JOB_ID": job.id, "Z_JOB_TOKEN": bootstrap}
+    env = {"Z_SERVER_URL": f"{state.settings.internal_url}/api/v1", "Z_JOB_ID": job.id, "Z_JOB_TOKEN": bootstrap}
+    proxy = str((state.config.get("egress") or {}).get("proxy_url") or "")
+    if proxy:  # package mirrors only, through the egress proxy; Z and LiteLLM are reached directly
+        direct = {
+            urlparse(u).hostname
+            for u in (state.settings.internal_url, state.settings.runner_litellm_url or state.settings.litellm_url)
+        }
+        no_proxy = ",".join(sorted(h for h in direct if h))
+        env |= {
+            "HTTPS_PROXY": proxy,
+            "HTTP_PROXY": proxy,
+            "https_proxy": proxy,
+            "http_proxy": proxy,
+            "NO_PROXY": no_proxy,
+            "no_proxy": no_proxy,
+        }
+    return env
 
 
 def _fanout_limits(mission: Mission) -> dict[str, int]:

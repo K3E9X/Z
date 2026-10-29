@@ -1,0 +1,115 @@
+{{- if .Values.egressProxy.enabled }}
+{{- $fullname := include "z.egress.fullname" . }}
+{{- $hosts := list }}
+{{- range .Values.config.z.egress.mirrors }}
+{{- $u := urlParse (contains "://" . | ternary . (printf "https://%s" .)) }}
+{{- $hosts = append $hosts (regexReplaceAll ":.*$" $u.host "") }}
+{{- end }}
+{{- if not $hosts }}
+{{- fail "egressProxy.enabled needs config.z.egress.mirrors (the package mirrors runners may reach)" }}
+{{- end }}
+# Egress proxy (squid, uid 13): runners reach only the mirrors listed in config.z.egress.mirrors.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "egress-proxy") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 4 }}
+  ports:
+    - name: proxy
+      port: {{ .Values.egressProxy.port }}
+      targetPort: proxy
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "egress-proxy") | nindent 4 }}
+spec:
+  replicas: {{ .Values.egressProxy.replicas }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 8 }}
+        z.io/runner-reachable: "true"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" 13) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: proxy
+          image: {{ include "z.image" (dict "image" .Values.egressProxy.image "root" .) }}
+          imagePullPolicy: {{ .Values.egressProxy.image.pullPolicy }}
+          ports:
+            - name: proxy
+              containerPort: 3128
+              protocol: TCP
+          env:
+            - name: EGRESS_ALLOW
+              value: {{ join "," $hosts | quote }}
+          readinessProbe:
+            tcpSocket: { port: proxy }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: proxy }
+            periodSeconds: 20
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.egressProxy.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "egress-proxy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "egress-proxy") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.runners.namespace }}
+      ports:
+        - protocol: TCP
+          port: 3128
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.dns.podLabels | nindent 14 }}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        {{- toYaml .Values.egressProxy.egressTo | nindent 8 }}
+      ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 80 }
+{{- end }}

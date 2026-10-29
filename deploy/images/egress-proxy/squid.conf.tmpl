@@ -1,0 +1,22 @@
+# Generated at start from EGRESS_ALLOW. Only CONNECT/GET to allowlisted mirrors, HTTP(S) ports only.
+http_port 3128
+pid_filename /tmp/squid.pid
+cache deny all
+cache_mem 8 MB
+cache_log stdio:/dev/stderr
+access_log stdio:/dev/stdout
+coredump_dir /tmp
+via off
+forwarded_for delete
+httpd_suppress_version_string on
+pinger_enable off
+
+acl mirrors dstdomain @ALLOW@
+acl SSL_ports port 443
+acl Safe_ports port 80 443
+acl CONNECT method CONNECT
+
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow mirrors
+http_access deny all
