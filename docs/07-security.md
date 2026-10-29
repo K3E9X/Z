@@ -61,7 +61,7 @@ Full specification in `12-identity-access-and-admin.md` §4 (events, append-only
 ## 6. Data handling
 - Retention per class (default: events 180 days, artifacts 90 days, C3 artifacts 7 days), configurable.
 - Memory never stores C3. Memory facts show their source and approver.
-- Personal data in tool outputs is redacted from traces sent to optional external observability.
+- Z exports no traces today: there is no OpenTelemetry or Langfuse integration, and the runner removes the SDK's telemetry variables. Observability is Prometheus `/metrics` (aggregates, no content) and plain-text logs with secrets redacted. If external trace export is built later, personal data in tool outputs must be redacted from it (not built yet).
 
 ## 7. Security testing in CI
 - Unit tests for every guardrail and every policy branch (routing classes, approvals, exposure).

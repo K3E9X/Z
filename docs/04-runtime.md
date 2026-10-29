@@ -70,7 +70,7 @@ GLM and Qwen are good but less reliable at tool use than frontier models. The ru
 | Allowed tools only | The gateway lists only operations from the agent profile ∩ playbook step ∩ connector exposure |
 | Writes are proposals | Any `write` or `destructive` operation can only be called through `propose_action` |
 | Budgets | Tokens, steps, wall time per job and mission; hard stop with `budget_exceeded` |
-| Redaction | Secrets and tokens masked in events, artifacts and traces (pattern + known-secret matching) |
+| Redaction | Secrets and tokens masked in events, artifacts and logs (pattern + known-secret matching) |
 | Harness security | OpenHands security analyzer and confirmation on; a confirmation request becomes `needs_attention` (`guardrail_confirm`) |
 | Data class | The mission's class only goes up. When the gateway returns a result from a C2+ connector (or the judge classifies staged input as C2+), z-server raises the class and **restricts the job's LiteLLM virtual key to internal models**. The runner cannot set or lower the class |
 

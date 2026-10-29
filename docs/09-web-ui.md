@@ -70,7 +70,7 @@ Follow the same system:
 - Long lists virtualized (logs, 500+ jobs). Large artifacts lazy-loaded.
 
 ## 7. Stack and components
-React 19, Vite, TypeScript strict, TanStack Router + Query, Tailwind (tokens mapped from `design/tokens.css`), shadcn/ui primitives restyled to the tokens, cmdk, Monaco diff, react-markdown, generated API client, MSW mocks for development.
+React 19, Vite, TypeScript strict, TanStack Router + Query + Virtual, Tailwind 4 (tokens mapped from `design/tokens.css`), Z's own primitives in `ui/src/components` (no shadcn/ui or Radix), cmdk for the palette, the `diff` (jsdiff) library rendered by `DiffViewer` (no Monaco), react-markdown + remark-gfm, generated API client (`openapi-typescript` + `openapi-fetch`), MSW mocks for development.
 Shared components: `StatusMark`, `KpiStrip`, `DecisionRow`, `AgentTable`, `PlanChecklist`, `EventTimeline`, `ToolCallItem`, `DiffViewer`, `ActionReview`, `QuestionCard`, `SchemaForm`, `TokenMeter`, `ConnectorHealth`, `StackedBars`, `IconRail`, `Sidebar`, `CommandPalette`.
 
 ## 8. Accessibility

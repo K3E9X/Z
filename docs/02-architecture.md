@@ -34,7 +34,7 @@
              │ OpenHands SDK  │                                          browser, CLI, DB…
              └────────────────┘
 
- Postgres 16 + pgvector (databases `z` and `litellm`) · artifacts on volume/PVC or S3 · OTLP traces
+ Postgres 16 + pgvector (databases `z` and `litellm`) · artifacts on volume/PVC or S3 · Prometheus /metrics
 ```
 
 ### Why a single server codebase
@@ -70,8 +70,8 @@ Runners post events to `z-server`; the API fans them out over SSE (`Last-Event-I
 | Model gateway | LiteLLM proxy (aliases, virtual keys, budgets, spend logs, fallbacks) |
 | Tools | MCP (Python SDK) for the gateway; OpenAPI and GraphQL importers; Playwright for browser connectors |
 | CLI | Typer for subcommands, Textual for the interactive session and `z top`, Rich for output |
-| Web | React 19, Vite, TypeScript, TanStack Router + Query, Tailwind, shadcn/ui, cmdk, Monaco (diff), generated API client |
-| Observability | OpenTelemetry (traces, metrics), Prometheus `/metrics`, JSON logs, optional Langfuse |
+| Web | React 19, Vite, TypeScript, TanStack Router + Query + Virtual, Tailwind 4, own primitives (no component library), cmdk, `diff` (jsdiff) for diffs, react-markdown, generated API client (`openapi-typescript` + `openapi-fetch`) |
+| Observability | Prometheus `/metrics`; plain-text logs (`%(asctime)s %(levelname)s %(name)s %(message)s`, level from `Z_LOG_LEVEL`) with secrets redacted; mission timelines rebuilt from events. Not built yet: OpenTelemetry traces, JSON logs, optional Langfuse export (the runner strips the SDK's `OTEL_*` and Laminar variables so nothing is exported) |
 | Packaging | Multi-arch images (amd64, arm64) on GHCR, Helm chart, Compose file |
 
 ## 4. Decisions
