@@ -58,6 +58,14 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   candidates). Lesson: editing config/z.example.yaml during a test run broke 77 tests (the schema had no
   `judge` key) - change the contract first, never edit config while the suite runs.
 
+- B3 (cont.): personal OAuth connections (PKCE, sealed tokens, refresh, revoke) used by user-scope steps and
+  actions, app-only OAuth tokens, channels (Slack, Mattermost, Teams with Bot Framework JWT, email relay) with
+  identity mapping, judge scan, replies (ADR 0015). Merged the Helm chart (B8) and the web UI (B5). Fixed: OAuth
+  app secrets were not checked as references; connectors listed everyone's personal credentials; /metrics was
+  open to runners (now bearer token); the learner could run twice with two replicas (advisory lock); hmac
+  routes tried to read a Bot Connector JWT as a Z token. Lesson: after a worker restart dockerd can fail on a
+  stale containerd: `pkill -9 containerd; rm -f /var/run/docker.pid; nohup dockerd &`.
+
 Lessons / traps:
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
   `uv sync --all-packages`.

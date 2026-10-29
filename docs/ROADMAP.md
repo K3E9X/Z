@@ -10,7 +10,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Contracts frozen (`contracts-v1`) | A | done |
 | Missions, plans, fan-out, scheduler, resume | B1 | done (draft-plan with the planner model, sessions, save-as-playbook; take-over answers 503 until the P1 terminal) |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
-| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper done; personal OAuth, channels, browser pending) |
+| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email done; browser recording needs the z-browser worker) |
 | CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | doing (sub-agent) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | doing (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates and apply/try done; shadow replay, agent builder and memory retrieval in job specs pending) |
@@ -37,7 +37,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | `workplace` pack | todo |
 | Objectives and assignments (proactive agents) | done (API, z and connector metrics, suggestions in Review, read-only auto-start within budget, `report_objective` endpoint; web tab pending) |
 | Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | todo |
-| Channels: Teams bot, Slack, Mattermost, inbound email | todo |
+| Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies; approval cards pending; ADR 0015) |
 | Personal (delegated) connections | todo |
 | Notifications (Mattermost, Slack, email, webhook) | todo |
 | kind/k3d e2e, Grafana dashboard, ExternalSecrets, gVisor how-to | todo |
