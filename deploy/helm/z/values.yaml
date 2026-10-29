@@ -25,6 +25,11 @@ podSecurityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+  fsGroupChangePolicy: OnRootMismatch   # volume ownership fixed once, not on every start
+  # The default container type, stated explicitly (CIS 5.7.3); ignored on nodes without SELinux, and the
+  # runtime still gives each pod its own MCS level. PSA restricted allows only container_t-like types.
+  seLinuxOptions:
+    type: container_t
 
 # Applied to every container of the chart (invariant 13). Not configurable per component on purpose.
 containerSecurityContext:
@@ -36,6 +41,7 @@ containerSecurityContext:
     drop: [ALL]
   seccompProfile:
     type: RuntimeDefault
+  procMount: Default
 
 # --------------------------------------------------------------------------------------------------- z-server
 server:

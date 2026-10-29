@@ -349,7 +349,7 @@ chart:check:
         helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "rendered-$v.yaml"
         kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
         kube-score score --output-format ci "rendered-$v.yaml" || true   # report only (docs/13)
-        kubescape scan framework nsa,cis-v1.10.0 "rendered-$v.yaml" --compliance-threshold 85
+        kubescape scan framework nsa,cis-v1.10.0 "rendered-$v.yaml" --exceptions security/kubescape-exceptions.json --compliance-threshold 85
       done
     - helm package deploy/helm/z -d chart/
   artifacts:

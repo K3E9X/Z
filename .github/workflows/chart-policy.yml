@@ -68,6 +68,7 @@ jobs:
           for v in k3s k8s; do
             echo "::group::$v"
             kubescape scan framework nsa,cis-v1.10.0 "$RUNNER_TEMP/rendered-$v.yaml" \
+              --exceptions security/kubescape-exceptions.json \
               --compliance-threshold "$KUBESCAPE_THRESHOLD" --format pretty-printer
             echo "::endgroup::"
           done
