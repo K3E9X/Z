@@ -438,8 +438,25 @@ class GitLab:
         handler.handle()
         return out.getvalue()
 
+    @staticmethod
+    def drop_shallow(body: bytes) -> bytes:
+        """GitLab accepts pushes from shallow clones; dulwich's receive-pack does not parse their `shallow`
+        lines. Drop those pkt-lines from the command list (the pack after the flush is unchanged)."""
+        out, i = bytearray(), 0
+        while i + 4 <= len(body):
+            size = int(body[i : i + 4], 16)
+            if size == 0:
+                return bytes(out) + body[i:]
+            line = body[i : i + size]
+            if not line[4:].startswith(b"shallow "):
+                out += line
+            i += size
+        return bytes(out) + body[i:]
+
     def serve(self, p: dict[str, Any], service: str, body: bytes, kind: TokenKind) -> bytes:
         out = BytesIO()
+        if service == "git-receive-pack":
+            body = self.drop_shallow(body)
         proto = ReceivableProtocol(BytesIO(body).read, out.write)
         if service == "git-upload-pack":
             UploadPackHandler(DictBackend({"/": self.repo(p)}), ["/"], proto, stateless_rpc=True).handle()
@@ -586,6 +603,32 @@ def router(store: Store, gl: GitLab) -> APIRouter:
         project: str, request: Request, kind: Annotated[TokenKind, Depends(write)]
     ) -> dict[str, Any]:
         return gl.create_issue(project, await _body(request), kind)
+
+    @r.get(api + "/merge_requests/{iid}/notes", dependencies=[read])
+    def mr_notes(project: str, iid: int) -> list[dict[str, Any]]:
+        p = gl.project(project)
+        return [
+            n
+            for n in gl.data["notes"]
+            if n["project_id"] == p["id"] and n["noteable_type"] == "MergeRequest" and n["noteable_iid"] == iid
+        ]
+
+    @r.get(api + "/issues/{iid}/notes", dependencies=[read])
+    def issue_notes(project: str, iid: int) -> list[dict[str, Any]]:
+        p = gl.project(project)
+        return [
+            n
+            for n in gl.data["notes"]
+            if n["project_id"] == p["id"] and n["noteable_type"] == "Issue" and n["noteable_iid"] == iid
+        ]
+
+    @r.get("/api/v4/users", dependencies=[read])
+    def users(username: str = "") -> list[dict[str, Any]]:
+        people = [
+            {"id": 101, "username": "alice", "name": "Alice Martin"},
+            {"id": 102, "username": "bob", "name": "Bob Durand"},
+        ]
+        return [u for u in people if u["username"] == username]
 
     @r.post(api + "/merge_requests/{iid}/notes", status_code=201)
     async def mr_note(

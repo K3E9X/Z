@@ -15,8 +15,21 @@ from tests.fakes.fake_tools import FakeTools
 
 ROOT = Path(__file__).resolve().parents[3]
 CONNECTORS = {
-    "gitlab": ROOT / "packs/dev/connectors/gitlab.yaml",
     "confluence": ROOT / "packs/archi-isp/connectors/confluence.yaml",
+}
+# The GitLab pack connector uses the REST API v4; the fake also serves an MCP flavour for MCP connectors.
+GITLAB_MCP_TOOLS = {
+    "list_projects",
+    "get_project",
+    "get_file_contents",
+    "list_merge_requests",
+    "get_merge_request",
+    "get_merge_request_diffs",
+    "create_merge_request",
+    "create_issue",
+    "create_note",
+    "merge_merge_request",
+    "delete_branch",
 }
 # The Jira pack connector uses the Jira Cloud REST API v3; the fake also serves an MCP flavour for MCP connectors.
 JIRA_MCP_TOOLS = {
@@ -41,9 +54,10 @@ async def client(tools: FakeTools, tool: str, kind: str) -> AsyncIterator[Client
         yield session
 
 
-@pytest.mark.parametrize("tool", [*sorted(CONNECTORS), "jira"])
+@pytest.mark.parametrize("tool", [*sorted(CONNECTORS), "jira", "gitlab"])
 async def test_tools_match_operation_map(tools: FakeTools, tool: str) -> None:
-    expected = JIRA_MCP_TOOLS if tool == "jira" else set(yaml.safe_load(CONNECTORS[tool].read_text())["operation_map"])
+    fixed = {"jira": JIRA_MCP_TOOLS, "gitlab": GITLAB_MCP_TOOLS}
+    expected = fixed.get(tool) or set(yaml.safe_load(CONNECTORS[tool].read_text())["operation_map"])
     async with client(tools, tool, "read") as c:
         listed = (await c.list_tools()).tools
     assert {t.name for t in listed} == expected

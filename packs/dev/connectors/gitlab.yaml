@@ -1,34 +1,115 @@
+# GitLab (REST API v4, GitLab.com or self-managed). Project ids may be numeric or the full path
+# (group/project, url-encoded by the gateway). The same base URL serves git over HTTPS for the clone helper
+# (git_clone workspaces, read token) and the merge request helper (push of z/* branches, write token).
+# Tokens: two project or group access tokens: read_api + read_repository (read), api + write_repository (write).
 name: gitlab
-kind: mcp                       # or openapi with the GitLab REST spec
+kind: rest
 display_name: GitLab
-mcp: { transport: stdio, command: "<gitlab-mcp-server command>" }   # or { transport: http, url: ... }
-operation_map:                  # MCP tool name -> canonical operation id (03 §4)
-  list_projects: projects.list
-  get_project: projects.get
-  get_file_contents: files.get
-  list_merge_requests: merge_requests.list
-  get_merge_request: merge_requests.get
-  get_merge_request_diffs: merge_requests.diff
-  create_merge_request: merge_requests.create
-  create_issue: issues.create
-  create_note: notes.create
-  merge_merge_request: merge_requests.merge
-  delete_branch: branches.delete
+description: Projects, files, merge requests, issues and pipelines in GitLab.
+base_url: ${GITLAB_URL}          # https://gitlab.example.com (no trailing /api/v4)
 auth:
   read:  { type: bearer, secret: env:GITLAB_TOKEN_RO }
   write: { type: bearer, secret: env:GITLAB_TOKEN_RW }   # executor only, also used by the git push helper
+declared:
+  - id: projects.list
+    description: Projects the read token can see.
+    method: GET
+    path: /api/v4/projects
+    input_schema:
+      type: object
+      properties:
+        search: { type: string }
+        membership: { type: boolean, default: true }
+        per_page: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        page: { type: integer, minimum: 1 }
+  - id: projects.get
+    description: One project (id or full path such as infra/ops-scripts).
+    method: GET
+    path: /api/v4/projects/{id}
+    input_schema: { type: object, required: [id], properties: { id: { type: string } } }
+  - id: files.get
+    description: Raw content of a file at a ref.
+    method: GET
+    path: /api/v4/projects/{id}/repository/files/{file_path}/raw
+    input_schema:
+      type: object
+      required: [id, file_path]
+      properties:
+        id: { type: string }
+        file_path: { type: string, description: "Path in the repository, e.g. src/app.py" }
+        ref: { type: string, default: main }
+  - id: tree.list
+    description: Files and directories of a repository path.
+    method: GET
+    path: /api/v4/projects/{id}/repository/tree
+    input_schema:
+      type: object
+      required: [id]
+      properties: { id: { type: string }, path: { type: string }, ref: { type: string }, recursive: { type: boolean } }
+  - id: merge_requests.list
+    description: Merge requests of a project.
+    method: GET
+    path: /api/v4/projects/{id}/merge_requests
+    input_schema:
+      type: object
+      required: [id]
+      properties: { id: { type: string }, state: { type: string, enum: [opened, closed, merged, all], default: opened } }
+  - id: merge_requests.get
+    description: One merge request.
+    method: GET
+    path: /api/v4/projects/{id}/merge_requests/{iid}
+    input_schema: { type: object, required: [id, iid], properties: { id: { type: string }, iid: { type: integer } } }
+  - id: merge_requests.diff
+    description: The diffs of a merge request.
+    method: GET
+    path: /api/v4/projects/{id}/merge_requests/{iid}/diffs
+    input_schema: { type: object, required: [id, iid], properties: { id: { type: string }, iid: { type: integer } } }
+  - id: issues.list
+    description: Issues of a project.
+    method: GET
+    path: /api/v4/projects/{id}/issues
+    input_schema:
+      type: object
+      required: [id]
+      properties: { id: { type: string }, state: { type: string, enum: [opened, closed, all], default: opened }, search: { type: string } }
+  - id: merge_requests.create
+    description: Open a merge request from a patch produced by the agent (pushed to a z/* branch by the executor).
+    method: POST
+    path: /api/v4/projects/{project}/merge_requests
+  - id: issues.create
+    description: Create an issue.
+    method: POST
+    path: /api/v4/projects/{project}/issues
+  - id: notes.create
+    description: Comment on a merge request or an issue.
+    method: POST
+    path: /api/v4/projects/{project}/notes
+  - id: merge_requests.merge
+    description: Merge a merge request.
+    method: PUT
+    path: /api/v4/projects/{id}/merge_requests/{iid}/merge
+    input_schema: { type: object, required: [id, iid], properties: { id: { type: string }, iid: { type: integer } } }
+  - id: branches.delete
+    description: Delete a branch.
+    method: DELETE
+    path: /api/v4/projects/{id}/repository/branches/{branch}
+    input_schema: { type: object, required: [id, branch], properties: { id: { type: string }, branch: { type: string } } }
 operations:
   default_exposed: false        # pack rules are proposals; an admin confirms them at install
   rules:                        # explicit ids only for writes; globs allowed only for read
     - { match: "projects.list", class: read, exposed: true }
     - { match: "projects.get", class: read, exposed: true }
     - { match: "files.get", class: read, exposed: true }
+    - { match: "tree.list", class: read, exposed: true }
     - { match: "merge_requests.list", class: read, exposed: true }
     - { match: "merge_requests.get", class: read, exposed: true }
     - { match: "merge_requests.diff", class: read, exposed: true }
+    - { match: "issues.list", class: read, exposed: true }
     - { match: "merge_requests.create", class: write, exposed: true }
     - { match: "issues.create", class: write, exposed: true }
     - { match: "notes.create", class: write, exposed: true }
     - { match: "merge_requests.merge", class: destructive, exposed: false }
     - { match: "branches.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 600, per_mission_per_minute: 120 }
+health: { path: /api/v4/version }
 data_class: C2
