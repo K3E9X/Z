@@ -217,6 +217,12 @@ function OperationRow({ op, canManage }: { op: Operation; canManage: boolean }) 
   )
 }
 
+/** Where a recording starts: the start page of the connector's first flow, else its base URL. */
+function startPage(manifest: unknown): string {
+  const flows = (manifest as { flows?: Record<string, { start_url?: string }> } | null)?.flows ?? {}
+  return Object.values(flows).find((f) => f.start_url)?.start_url ?? ''
+}
+
 function Detail({ id }: { id: string }) {
   const c = useConnector(id)
   const ops = useOperations(id)
@@ -226,6 +232,8 @@ function Detail({ id }: { id: string }) {
   const stepUp = useStepUp()
   const [reviewing, setReviewing] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const navigate = useNavigate()
   const [result, setResult] = useState<ConnectorTestResult | null>(null)
   if (!c.data) return <Skeleton className="h-80" />
   const con = c.data
@@ -238,6 +246,21 @@ function Detail({ id }: { id: string }) {
     con.rate_limit && typeof con.rate_limit.per_minute === 'number'
       ? `${con.rate_limit.per_minute} requests / minute`
       : '—'
+  const record = async () => {
+    setRecording(true)
+    try {
+      const r = await unwrap(
+        api.POST('/connectors/record-browser', {
+          body: { connector: con.name, start_url: startPage(con.manifest), name: `${con.display_name} flow` },
+        }),
+      )
+      await navigate({ to: '/connectors/record/$id', params: { id: r.id } })
+    } catch (e) {
+      toast.error(e, 'Recording not started')
+    } finally {
+      setRecording(false)
+    }
+  }
   const test = async () => {
     setTesting(true)
     setResult(null)
@@ -366,6 +389,15 @@ function Detail({ id }: { id: string }) {
         {canManage && (
           <Button busy={testing} onClick={() => void test()}>
             Test connection
+          </Button>
+        )}
+        {canManage && con.kind === 'browser' && (
+          <Button
+            busy={recording}
+            onClick={() => void record()}
+            title="Drive a sandboxed browser signed in with the read account; each action becomes a flow step"
+          >
+            Record a flow
           </Button>
         )}
         <Link

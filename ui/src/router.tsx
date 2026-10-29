@@ -40,6 +40,12 @@ const takeOver = createRoute({
   component: lazyRouteComponent(() => import('./screens/TakeOver'), 'TakeOver'),
 })
 
+const browserRecorder = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/connectors/record/$id',
+  component: lazyRouteComponent(() => import('./screens/BrowserRecorder'), 'BrowserRecorder'),
+})
+
 const replay = createRoute({
   getParentRoute: () => rootRoute,
   path: '/missions/$id/replay',
@@ -184,6 +190,7 @@ const routeTree = rootRoute.addChildren([
   missionDetail,
   replay,
   takeOver,
+  browserRecorder,
   review,
   tasks,
   playbooks,

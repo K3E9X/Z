@@ -1324,6 +1324,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/connectors/recordings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** State of a browser recording */
+        get: operations["getBrowserRecording"];
+        put?: never;
+        post?: never;
+        /** Cancel a recording */
+        delete: operations["cancelBrowserRecording"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connectors/recordings/{id}/screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screenshot of the recorded page (password fields masked) */
+        get: operations["getBrowserRecordingScreen"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connectors/recordings/{id}/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Act on the recorded page and record the step */
+        post: operations["sendBrowserRecordingInput"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connectors/recordings/{id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a recording and get the draft flow
+         * @description Nothing is saved: add the flow and an operation naming it to the connector (PATCH /connectors/{id}); it goes through exposure review like any flow change.
+         */
+        post: operations["finishBrowserRecording"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/connectors/{id}/operations": {
         parameters: {
             query?: never;
@@ -3408,15 +3480,58 @@ export interface components {
                 exposed: boolean;
             }[];
         };
+        /** @description Record on a browser connector, signed in with its read (or write) account; the recording acts in the real application. */
         BrowserRecording: {
             connector: components["schemas"]["Slug"];
             start_url: string;
             name: string;
+            /**
+             * @default read
+             * @enum {string}
+             */
+            purpose?: "read" | "write";
         };
         BrowserRecordingSession: {
             id: components["schemas"]["Id"];
             viewer_url: string;
             expires_at: components["schemas"]["Timestamp"];
+        };
+        BrowserRecordingState: {
+            id: components["schemas"]["Id"];
+            connector: components["schemas"]["Slug"];
+            name: string;
+            /** @enum {string} */
+            purpose: "read" | "write";
+            url: string;
+            title: string;
+            steps: components["schemas"]["BrowserStep"][];
+            blocked_hosts: string[];
+            viewport: {
+                width: number;
+                height: number;
+            };
+            expires_at: components["schemas"]["Timestamp"];
+        };
+        /** @description x and y are in page pixels (viewport of the state). credential types the connector's username or password into the focused field and records {{auth.*}}; type with arg records {{args.<arg>}}. */
+        BrowserRecordingInput: {
+            /** @enum {string} */
+            kind: "click" | "type" | "credential" | "press" | "goto" | "extract" | "assert" | "screenshot" | "undo";
+            x?: number;
+            y?: number;
+            text?: string;
+            arg?: string;
+            /** @enum {string} */
+            field?: "username" | "password";
+            /** @enum {string} */
+            key?: "Enter" | "Tab" | "Escape" | "ArrowDown" | "ArrowUp" | "Space";
+            url?: string;
+            /** @enum {string} */
+            what?: "text" | "table" | "link";
+            name?: string;
+        };
+        BrowserRecordingDraft: {
+            flow: components["schemas"]["BrowserFlow"];
+            blocked_hosts: string[];
         };
         PersonalConnection: {
             id: components["schemas"]["Id"];
@@ -7975,6 +8090,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrowserRecordingSession"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getBrowserRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRecordingState"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancelBrowserRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getBrowserRecordingScreen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    sendBrowserRecordingInput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserRecordingInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRecordingState"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    finishBrowserRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRecordingDraft"];
                 };
             };
             /** @description Problem details */
