@@ -426,6 +426,7 @@ class Job(Base):
     model: Mapped[str] = mapped_column(String(64))
     tokens_in: Mapped[int] = mapped_column(BigInteger, default=0)
     tokens_out: Mapped[int] = mapped_column(BigInteger, default=0)
+    token_cap: Mapped[int | None] = mapped_column(BigInteger)  # a sub-agent's share of its parent's budget
     output: Mapped[dict[str, Any] | None]
     error: Mapped[dict[str, Any] | None]
     checkpoint: Mapped[bytes | None] = mapped_column(LargeBinary)

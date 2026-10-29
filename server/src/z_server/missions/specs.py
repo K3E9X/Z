@@ -168,6 +168,8 @@ async def build(
     limits = profile.limits.model_copy()
     limits.max_steps = min(limits.max_steps, int(guard.get("max_steps_per_job") or limits.max_steps))
     limits.timeout_s = min(limits.timeout_s, int(guard.get("max_job_minutes") or 10**6) * 60)
+    if job.token_cap:  # a sub-agent's share of its parent's budget
+        limits.max_tokens = min(limits.max_tokens, job.token_cap)
     skill_rows = {s.name: s for s in (await db.execute(select(Skill).where(Skill.name.in_(profile.skills)))).scalars()}
     candidate: dict[str, str] = {}
     if mission.eval_run_id:  # a learning proposal under evaluation swaps in its candidate skill text

@@ -392,3 +392,38 @@ def test_admin_guardrail_change_caps_the_next_job(
     [job_id] = dispatch(app, executor)
     spec = ScriptedRunner.for_job(app, executor, job_id).get_spec()
     assert spec["limits"]["max_steps"] == 7 and spec["limits"]["timeout_s"] <= 180, spec["limits"]
+
+
+# ------------------------------------------------------------------ 7. sub-agent budget share
+
+
+def test_subagent_gets_its_share_of_the_parent_budget(
+    app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
+) -> None:
+    h = as_user(app, jars, "bob")
+    plan = {"steps": [{"id": "lead", "agent": "orchestrator", "prompt": "Split the work"}]}
+    assert app.post("/api/v1/missions", json={"title": "O", "prompt": "O", "plan": plan}, headers=h).status_code == 201
+    [parent_id] = dispatch(app, executor)
+    parent = ScriptedRunner.for_job(app, executor, parent_id)
+    limit = parent.get_spec()["limits"]["max_tokens"]
+    parent.events(
+        {
+            "ts": utcnow().isoformat(),
+            "type": "usage",
+            "payload": {"model": "z-fast", "tokens_in": 1000, "tokens_out": 0},
+        }
+    )
+    spawned = parent.call("POST", "/subagents", json={"agent": "summarizer", "prompt": "Part 1", "budget_share": 0.1})
+    assert spawned.status_code == 201, spawned.text
+    child_id = spawned.json()["child_job_id"]
+    assert run(app, lambda db: db.get(Job, child_id)).token_cap == int((limit - 1000) * 0.1)
+    [started] = dispatch(app, executor)
+    assert started == child_id
+    child = ScriptedRunner.for_job(app, executor, child_id)
+    assert child.get_spec()["limits"]["max_tokens"] == int((limit - 1000) * 0.1)
+    over = {
+        "ts": utcnow().isoformat(),
+        "type": "usage",
+        "payload": {"model": "z-fast", "tokens_in": limit, "tokens_out": 0},
+    }
+    assert child.events(over)["state"] == "cancel"  # the server stops a child past its share

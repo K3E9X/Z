@@ -162,6 +162,8 @@ async def post_events(ctx: JobCtxDep, id: str, body: m.EventBatch) -> m.JobContr
     limit = int(mission.budget.get("max_tokens") or 0)
     if limit and mission.tokens_in + mission.tokens_out >= limit and job.control_state == "run":
         job.control_state, job.control_reason = "cancel", "mission token budget exhausted"
+    if job.token_cap and job.tokens_in + job.tokens_out >= job.token_cap and job.control_state == "run":
+        job.control_state, job.control_reason = "cancel", "sub-agent token share exhausted"
     return await control_for(ctx.db, job)
 
 
@@ -537,6 +539,16 @@ async def spawn_subagent(ctx: JobCtxDep, id: str, body: m.SubagentIn) -> m.Subag
     ).scalar_one_or_none()
     if agent is None:
         raise Problem("validation", f"unknown agent {body.agent}")
+    # docs/04 §2: the child may use `budget_share` of what the parent has left (all of it when unset)
+    limit = int((profile.get("limits") or {}).get("max_tokens") or 0)
+    if parent.token_cap:
+        limit = min(limit, parent.token_cap) if limit else parent.token_cap
+    cap = None
+    if limit:
+        remaining = limit - parent.tokens_in - parent.tokens_out
+        if remaining <= 0:
+            raise Problem("conflict", "this job has no token budget left for a sub-agent")
+        cap = max(1, int(remaining * (body.budget_share or 1.0)))
     child = Job(
         id=new_id("job"),
         mission_id=parent.mission_id,
@@ -550,6 +562,7 @@ async def spawn_subagent(ctx: JobCtxDep, id: str, body: m.SubagentIn) -> m.Subag
         status=JobStatus.queued.value,
         model=agent.profile["model"],
         deadline_at=parent.deadline_at,
+        token_cap=cap,
     )
     ctx.db.add(child)
     await ctx.db.flush()
