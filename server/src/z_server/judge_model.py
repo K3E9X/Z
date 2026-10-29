@@ -17,8 +17,7 @@ from typing import Any
 
 from z_common.models.enums import JudgeVerdict
 
-from z_server import judge, usage
-from z_server.db.models import Setting
+from z_server import guardrails, judge, usage
 from z_server.llm import chat
 from z_server.state import AppState
 
@@ -51,15 +50,9 @@ async def enabled(state: AppState) -> str | None:
     cfg = state.config.get("judge") or {}
     alias: str | None = str(cfg.get("model", "z-judge")) if cfg.get("model_stage", False) else None
     if alias:
-        guard = (state.config.get("guardrails") or {}).get("judge_injection_scan", True)
-        value = guard.get("value", True) if isinstance(guard, dict) else bool(guard)
-        locked = isinstance(guard, dict) and bool(guard.get("locked"))
-        if not locked:
-            async with state.sessions() as db:
-                row = await db.get(Setting, "guardrails")
-                if row is not None and "judge_injection_scan" in row.value:
-                    value = bool(row.value["judge_injection_scan"])
-        alias = alias if value else None
+        async with state.sessions() as db:
+            value = await guardrails.value(db, state.config, "judge_injection_scan", True)
+        alias = alias if bool(value) else None
     state.cache["judge_model"] = (time.monotonic() + CACHE_S, alias)
     return alias
 

@@ -10,6 +10,7 @@ from fastapi import Response
 from sqlalchemy import select
 from z_common.models import api_identity as m
 
+from z_server import guardrails as platform_guardrails
 from z_server import rbac
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.paging import page
@@ -32,7 +33,7 @@ from z_server.ids import new_id
 from z_server.state import AUTH_SETTINGS_KEY, SECRET_AAD
 
 router = ContractRouter()
-GUARDRAILS_KEY = "guardrails"
+GUARDRAILS_KEY = platform_guardrails.SETTING
 AUDIT_SETTINGS_KEY = "audit_settings"
 
 
@@ -608,17 +609,10 @@ GUARDRAIL_TEXT = {
 
 
 async def guardrails(ctx: Ctx) -> dict[str, dict[str, Any]]:
-    configured: dict[str, Any] = dict(ctx.state.config.get("guardrails", {}))
-    row = await ctx.db.get(Setting, GUARDRAILS_KEY)
-    overrides = row.value if row else {}
-    out = {}
-    for name, value in configured.items():
-        locked = bool(value.get("locked")) if isinstance(value, dict) else False
-        current = value.get("value") if isinstance(value, dict) else value
-        if not locked and name in overrides:
-            current = overrides[name]
-        out[name] = {"value": current, "locked": locked, "description": GUARDRAIL_TEXT.get(name, name)}
-    return out
+    return {
+        name: {"value": value, "locked": locked, "description": GUARDRAIL_TEXT.get(name, name)}
+        for name, (value, locked) in (await platform_guardrails.effective(ctx.db, ctx.state.config)).items()
+    }
 
 
 @router.operation("getGuardrails")

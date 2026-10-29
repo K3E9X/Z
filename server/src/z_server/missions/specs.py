@@ -31,6 +31,7 @@ from z_common.models.enums import Autonomy, OperationClass, WorkspaceMode
 from z_common.models.manifests import AgentProfile, MissionPlan
 from z_common.packs.classify import glob_match
 
+from z_server import guardrails
 from z_server.catalog import schemas
 from z_server.db.models import Connector, EvalRun, Job, Mission, Operation, Playbook, Skill
 from z_server.missions.service import agent_profile, mission_key
@@ -163,10 +164,10 @@ async def build(
 ) -> JobSpec:
     profile = AgentProfile.model_validate(await agent_profile(db, job))
     step = _step(mission, job.step_id)
-    guard = state.config.get("guardrails", {})
+    guard = {name: value for name, (value, _) in (await guardrails.effective(db, state.config)).items()}
     limits = profile.limits.model_copy()
-    limits.max_steps = min(limits.max_steps, int(guard.get("max_steps_per_job", limits.max_steps)))
-    limits.timeout_s = min(limits.timeout_s, int(guard.get("max_job_minutes", 10**6)) * 60)
+    limits.max_steps = min(limits.max_steps, int(guard.get("max_steps_per_job") or limits.max_steps))
+    limits.timeout_s = min(limits.timeout_s, int(guard.get("max_job_minutes") or 10**6) * 60)
     skill_rows = {s.name: s for s in (await db.execute(select(Skill).where(Skill.name.in_(profile.skills)))).scalars()}
     candidate: dict[str, str] = {}
     if mission.eval_run_id:  # a learning proposal under evaluation swaps in its candidate skill text

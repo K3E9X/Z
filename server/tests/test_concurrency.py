@@ -374,3 +374,21 @@ def test_executor_recovery_claims_a_stale_action_once(
     assert app.portal.call(action_executor.recover, state, None) == []  # type: ignore[union-attr]
     assert applied == [action_id]
 
+
+# ------------------------------------------------------------------ 6. admin guardrail changes reach jobs
+
+
+def test_admin_guardrail_change_caps_the_next_job(
+    app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
+) -> None:
+    a = as_user(app, jars, "alice")
+    changed = app.put(
+        "/api/v1/settings/guardrails",
+        json={"max_steps_per_job": {"value": 7, "locked": False}, "max_job_minutes": {"value": 3, "locked": False}},
+        headers=a,
+    )
+    assert changed.status_code == 200, changed.text
+    fanout(app, as_user(app, jars, "bob"))
+    [job_id] = dispatch(app, executor)
+    spec = ScriptedRunner.for_job(app, executor, job_id).get_spec()
+    assert spec["limits"]["max_steps"] == 7 and spec["limits"]["timeout_s"] <= 180, spec["limits"]
