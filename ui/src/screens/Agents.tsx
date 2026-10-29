@@ -9,18 +9,19 @@ import {
   useAgentVersions,
   useAssignments,
   useEvalRuns,
+  useMemoryFacts,
   useObjectives,
   useSkill,
   useSkills,
   useSkillVersions,
 } from '@/api/queries'
-import type { Agent, AgentProfile, Skill } from '@/api/types'
+import type { Agent, AgentProfile, MemoryFact, Skill } from '@/api/types'
 import { Avatar } from '@/components/Avatar'
 import { Dialog } from '@/components/Dialog'
 import { diffTexts, DiffViewer } from '@/components/DiffViewer'
 import { Icon } from '@/components/Icon'
 import { Markdown } from '@/components/Markdown'
-import { EmptyState, NotServed, QueryState } from '@/components/states'
+import { EmptyState, QueryState } from '@/components/states'
 import { Dot } from '@/components/StatusMark'
 import { useToast } from '@/components/toast'
 import { Button, DefList, Field, Input, Select, Skeleton, Tabs, Textarea } from '@/components/ui'
@@ -765,7 +766,8 @@ function ToolsTab({ agent }: { agent: Agent }) {
   )
 }
 
-function MemoryTab({ agent }: { agent: Agent }) {
+export function MemoryTab({ agent }: { agent: Agent }) {
+  const facts = useMemoryFacts(agent.name)
   return (
     <div className="flex max-w-[760px] flex-col gap-4 py-6">
       <DefList
@@ -775,15 +777,84 @@ function MemoryTab({ agent }: { agent: Agent }) {
           ['Facts per step', String(agent.memory?.top_k ?? 8)],
         ]}
       />
-      <NotServed
-        what="Browsing memory facts"
-        endpoint="a memory facts endpoint (none in contracts/openapi.yaml yet)"
-      />
+      <QueryState query={facts} what="Memory facts" endpoint="GET /memory">
+        {() =>
+          (facts.data?.items ?? []).length === 0 ? (
+            <EmptyState title="No memory facts yet">
+              Facts are approved through Learning; C3 content never enters memory.
+            </EmptyState>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {(facts.data?.items ?? []).map((f) => (
+                <MemoryFactRow key={f.id} fact={f} agent={agent.name} />
+              ))}
+            </ul>
+          )
+        }
+      </QueryState>
       <p className="m-0 text-meta text-text-3">
-        Facts are approved through Learning; C3 content never enters memory. Each fact shows its source and
-        approver.
+        Facts specific to this agent. A deactivated fact is kept for history and never retrieved; restore it
+        any time.
       </p>
     </div>
+  )
+}
+
+function MemoryFactRow({ fact, agent }: { fact: MemoryFact; agent: string }) {
+  const canApply = useCan('learning:apply')
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [reason, setReason] = useState('')
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const change = async () => {
+    setBusy(true)
+    try {
+      const path = fact.active ? '/memory/{id}/deactivate' : '/memory/{id}/restore'
+      await unwrap(api.POST(path, { params: { path: { id: fact.id } }, body: { reason } }))
+      toast.ok(fact.active ? 'Deactivated: the next jobs run without it' : 'Restored')
+      setOpen(false)
+      setReason('')
+      await qc.invalidateQueries({ queryKey: qk.memory(agent) })
+    } catch (e) {
+      toast.error(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <li className="flex flex-col gap-1.5 rounded-card border border-line px-4 py-3">
+      <div className={fact.active ? '' : 'text-text-3 line-through'}>{fact.text}</div>
+      <div className="flex flex-wrap items-center gap-2 text-meta text-text-3">
+        <span>v{fact.version}</span>
+        <span>· {fact.source}</span>
+        <span>· approved by {fact.approved_by}</span>
+        <span>· {relative(fact.created_at)}</span>
+        {!fact.active && <span>· inactive</span>}
+        {canApply && (
+          <Button size="xs" variant={fact.active ? 'danger' : 'secondary'} onClick={() => setOpen(true)}>
+            {fact.active ? 'Deactivate' : 'Restore'}
+          </Button>
+        )}
+      </div>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={fact.active ? 'Deactivate this fact' : 'Restore this fact'}
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="primary" busy={busy} disabled={!reason.trim()} onClick={() => void change()}>
+              {fact.active ? 'Deactivate' : 'Restore'}
+            </Button>
+          </>
+        }
+      >
+        <Field label="Reason (kept in the audit log)">
+          {(id) => <Textarea id={id} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />}
+        </Field>
+      </Dialog>
+    </li>
   )
 }
 

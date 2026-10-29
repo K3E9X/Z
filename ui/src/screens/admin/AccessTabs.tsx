@@ -89,8 +89,8 @@ export function TeamsTab() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="m-0 text-text-2">
-          Teams own agents, playbooks, budgets and connectors. Members come from GitLab groups (Group mapping)
-          and manual bindings.
+          Teams own agents, playbooks and budgets; connectors are shared by the platform. Members come from
+          GitLab groups (Group mapping) and manual bindings.
         </p>
         {canManage && (
           <Button size="sm" icon="plus" onClick={() => setEdit('new')}>

@@ -68,6 +68,7 @@ export const qk = {
   providers: ['providers'] as const,
   routing: ['routing-policy'] as const,
   signals: ['signals'] as const,
+  memory: (agent: string) => ['memory', agent] as const,
   proposals: (status?: string) => ['proposals', status ?? 'all'] as const,
   proposal: (id: string) => ['proposal', id] as const,
   evals: (target?: string) => ['evals', target ?? 'all'] as const,
@@ -433,6 +434,13 @@ export function useSignals() {
   return useQuery({
     queryKey: qk.signals,
     queryFn: () => unwrap(api.GET('/signals', { params: { query: { limit: 100 } } })),
+  })
+}
+
+export function useMemoryFacts(agent: string) {
+  return useQuery({
+    queryKey: qk.memory(agent),
+    queryFn: () => unwrap(api.GET('/memory', { params: { query: { agent, limit: 200 } } })),
   })
 }
 

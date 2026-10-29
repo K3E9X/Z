@@ -107,6 +107,7 @@ export type RoutingPolicy = S['RoutingPolicy']
 
 export type Signal = S['Signal']
 export type Proposal = S['Proposal']
+export type MemoryFact = S['MemoryFact']
 export type EvalRun = S['EvalRun']
 export type EvalScores = S['EvalScores']
 export type Analytics = S['Analytics']

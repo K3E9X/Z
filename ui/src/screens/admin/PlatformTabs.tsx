@@ -879,8 +879,8 @@ export function PlatformTab() {
           <NotServed what="The health summary" endpoint="GET /healthz through the UI origin" compact />
         )}
         <p className="m-0 text-meta text-text-3">
-          Maintenance mode and retention per data class are set in config/z.yaml; they are not exposed by the
-          API yet.
+          Retention per data class is set in config/z.yaml (retention.*) and applied hourly. There is no
+          maintenance mode yet.
         </p>
       </section>
       {adding && <ChannelDialog onClose={() => setAdding(false)} />}
