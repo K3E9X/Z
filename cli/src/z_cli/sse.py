@@ -19,7 +19,7 @@ from typing import Any
 import httpx
 
 from z_cli.client import Api, AsyncApi
-from z_cli.errors import ApiError, CliError, NotAvailable
+from z_cli.errors import ApiError, CliError, ExitCode, NotAvailable
 
 FATAL_STATUS = {400, 401, 402, 403, 404, 405, 422}
 
@@ -90,7 +90,7 @@ class Backoff:
     attempt: int = 0
 
     def next_delay(self) -> float:
-        delay = min(self.cap_s, self.base_s * float(2**self.attempt))
+        delay = min(self.cap_s, self.base_s * float(2 ** min(self.attempt, 16)))
         self.attempt += 1
         return max(self.min_s, delay * (0.5 + random.random() / 2))  # noqa: S311 - jitter, not crypto
 
@@ -106,7 +106,8 @@ class StreamState:
 
 
 def _fatal(exc: CliError) -> bool:
-    if isinstance(exc, NotAvailable):
+    """Retrying cannot fix auth, permission, missing or invalid requests."""
+    if isinstance(exc, NotAvailable) or exc.exit_code in {ExitCode.AUTH, ExitCode.USAGE}:
         return True
     return isinstance(exc, ApiError) and exc.status in FATAL_STATUS
 
