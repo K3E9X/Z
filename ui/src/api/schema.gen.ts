@@ -5049,6 +5049,21 @@ export interface components {
             rate_limit?: components["schemas"]["RateLimit"];
             health?: components["schemas"]["HealthProbe"];
             data_class?: components["schemas"]["DataClass"];
+            /** @description cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` replaces the image CMD (it follows the ENTRYPOINT when the image has one), with {{args.<name>}} placeholders; no shell. */
+            cli?: {
+                /** @description Tool image pinned by digest; must also be listed in executor.tool_images. */
+                image: string;
+                /** @description Literals, or {{auth.secret}}, {{auth.username}}, {{auth.password}} from the read or write credential. */
+                env?: {
+                    [key: string]: string;
+                };
+                timeout_s?: number;
+                /**
+                 * @description json: stdout is parsed as JSON.
+                 * @enum {string}
+                 */
+                output?: "text" | "json";
+            };
             /** @description webhook kind: inbound events. */
             webhook?: {
                 /** @enum {string} */
