@@ -219,12 +219,7 @@ async def _issue_key(db: AsyncSession, state: AppState, mission: Mission) -> Non
         key = await state.llm_keys.create(
             alias=f"mission-{mission.id}",
             models=aliases,
-            metadata={
-                "mission": mission.id,
-                "data_class": mission.data_class,
-                "team": mission.team_id,
-                "playbook": mission.playbook_name,
-            },
+            metadata=key_metadata(mission, DataClass(mission.data_class)),
             duration_s=int(mission.budget.get("timeout_s", DEFAULT_TIMEOUT_S)) + 3600,
         )
     except LlmKeyError as exc:
@@ -232,6 +227,16 @@ async def _issue_key(db: AsyncSession, state: AppState, mission: Mission) -> Non
     mission.llm_key_alias = key.alias
     mission.llm_key_enc = state.sealer.seal(key.key, f"llm-key:{mission.id}")
     mission.deadline_at = utcnow() + timedelta(seconds=int(mission.budget.get("timeout_s", DEFAULT_TIMEOUT_S)))
+
+
+def key_metadata(mission: Mission, data_class: DataClass) -> dict[str, Any]:
+    """Metadata of the mission's LiteLLM key: attribution, and the data class the inference guard checks."""
+    return {
+        "mission": mission.id,
+        "data_class": data_class.value,
+        "team": mission.team_id,
+        "playbook": mission.playbook_name,
+    }
 
 
 async def check_plan(db: AsyncSession, plan: MissionPlan) -> None:
@@ -325,7 +330,9 @@ async def raise_data_class(
         from z_server.llm.inference import routing_config
 
         await state.llm_keys.set_models(
-            mission_key(state, mission), allowed_aliases(await routing_config(db, state.config), to)
+            mission_key(state, mission),
+            allowed_aliases(await routing_config(db, state.config), to),
+            key_metadata(mission, to),  # the LiteLLM inference guard reads the data class here (ADR 0024)
         )
     mission.data_class = to.value
     await events.append(

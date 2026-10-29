@@ -26,7 +26,7 @@ class VirtualKey:
 class KeyAdmin(Protocol):
     async def create(self, alias: str, models: list[str], metadata: dict[str, Any], duration_s: int) -> VirtualKey: ...
 
-    async def set_models(self, key: str, models: list[str]) -> None: ...
+    async def set_models(self, key: str, models: list[str], metadata: dict[str, Any] | None = None) -> None: ...
 
     async def delete(self, key: str) -> None: ...
 
@@ -57,8 +57,12 @@ class LiteLLMKeyAdmin:
         )
         return VirtualKey(key=str(data["key"]), alias=alias, models=list(models))
 
-    async def set_models(self, key: str, models: list[str]) -> None:
-        await self._post("/key/update", {"key": key, "models": models})
+    async def set_models(self, key: str, models: list[str], metadata: dict[str, Any] | None = None) -> None:
+        """Restrict the key's models; `metadata` (the whole dict) replaces the key's metadata when given."""
+        body: dict[str, Any] = {"key": key, "models": models}
+        if metadata is not None:
+            body["metadata"] = metadata
+        await self._post("/key/update", body)
 
     async def delete(self, key: str) -> None:
         await self._post("/key/delete", {"keys": [key]})

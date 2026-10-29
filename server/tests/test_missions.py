@@ -606,6 +606,9 @@ def test_data_class_only_goes_up_and_shrinks_the_key(
     )
     assert raised.status_code == 204
     assert keys.calls[-1][0] == "set_models" and keys.calls[-1][1]["models"] == INTERNAL_ALIASES
+    # the key metadata follows the class: the LiteLLM inference guard reads it (ADR 0024)
+    assert keys.calls[-1][1]["metadata"]["data_class"] == "C2"
+    assert keys.calls[-1][1]["metadata"]["mission"] == created["id"]
     lower = app.post(url, json={"to": "C0", "cause": "judge"}, headers={"Authorization": f"Bearer {token}"})
     assert lower.status_code == 204
     assert app.get(f"/api/v1/missions/{created['id']}").json()["data_class"] == "C2"

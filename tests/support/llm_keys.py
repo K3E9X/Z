@@ -19,9 +19,9 @@ class RecordingKeyAdmin:
         self.calls.append(("create", {"alias": alias, "models": models, "metadata": metadata}))
         return key
 
-    async def set_models(self, key: str, models: list[str]) -> None:
+    async def set_models(self, key: str, models: list[str], metadata: dict[str, Any] | None = None) -> None:
         self.keys[key].models = list(models)
-        self.calls.append(("set_models", {"key": key, "models": models}))
+        self.calls.append(("set_models", {"key": key, "models": models, "metadata": metadata}))
 
     async def delete(self, key: str) -> None:
         self.keys.pop(key, None)
