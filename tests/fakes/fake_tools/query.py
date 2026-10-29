@@ -1,18 +1,20 @@
 """Tiny JQL / CQL subset: `field op value` clauses joined by AND / OR (AND binds tighter), ORDER BY ignored.
 
-Operators: =, !=, ~ (case-insensitive contains), !~, in (...), not in (...), is EMPTY, is not EMPTY.
+Operators: =, !=, ~ (case-insensitive contains), !~, in (...), not in (...), is EMPTY, is not EMPTY, and
+<, <=, >, >= on dates (values: `-30d`, `-4h`, `-2w`, `now()`, `"2026-10-01"` or an ISO timestamp).
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 Accessor = Callable[[str], list[str] | None]  # field -> values, None = unknown field
 
 _CLAUSE = re.compile(
     r"""^\s*(?P<field>[\w.]+)\s*
-        (?P<op>!=|!~|=|~|\bnot\s+in\b|\bin\b|\bis\s+not\b|\bis\b)\s*
+        (?P<op><=|>=|<|>|!=|!~|=|~|\bnot\s+in\b|\bin\b|\bis\s+not\b|\bis\b)\s*
         (?P<value>\([^)]*\)|"[^"]*"|'[^']*'|\S+)\s*$""",
     re.I | re.X,
 )
@@ -57,6 +59,18 @@ def _clause(clause: str, get: Accessor) -> bool:
     values = get(field)
     if values is None:
         raise QueryError(f"Field '{field}' does not exist or you do not have permission to view it.")
+    if op in ("<", "<=", ">", ">="):
+        bound = _when(_unquote(raw))
+        dates = [d for d in (_when(v) for v in values if v) if d is not None]
+        if bound is None:
+            raise QueryError(f"cannot read the date {raw!r}")
+        compare = {
+            "<": lambda a: a < bound,
+            "<=": lambda a: a <= bound,
+            ">": lambda a: a > bound,
+            ">=": lambda a: a >= bound,
+        }
+        return any(compare[op](d) for d in dates)
     have = [v.lower() for v in values]
     if op in ("is", "is not"):
         empty = not [v for v in have if v not in ("", "unresolved")]
@@ -71,6 +85,22 @@ def _clause(clause: str, get: Accessor) -> bool:
         return hit if op == "~" else not hit
     hit = target in have
     return hit if op == "=" else not hit
+
+
+def _when(value: str) -> datetime | None:
+    value = value.strip().lower()
+    now = datetime.now(UTC)
+    if value in ("now()", "now"):
+        return now
+    m = re.fullmatch(r"([-+]?\d+)([mhdw])", value)
+    if m:
+        unit = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks"}[m.group(2)]
+        return now + timedelta(**{unit: int(m.group(1))})
+    try:
+        parsed = datetime.fromisoformat(value.upper().replace("Z", "+00:00").replace(".000+0000", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def matches(query: str, get: Accessor) -> bool:

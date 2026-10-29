@@ -70,6 +70,9 @@ class Jira:
                 "text": [f["summary"], f.get("description") or "", *comments],
                 "resolution": [f["resolution"]["name"]] if f.get("resolution") else ["unresolved"],
                 "assignee": [f["assignee"]["displayName"]] if f.get("assignee") else [],
+                "created": [f.get("created") or ""],
+                "updated": [f.get("updated") or ""],
+                "duedate": [f["duedate"]] if f.get("duedate") else [],
             }
             return table.get(field)
 
