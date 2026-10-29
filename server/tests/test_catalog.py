@@ -252,7 +252,7 @@ def test_connectors_start_pending_review_with_nothing_exposed(admin: TestClient)
     ops = {o["id"]: o for o in admin.get("/api/v1/connectors/logos/operations").json()}
     assert (
         ops["logos.accounts.disable"]["class"] == "destructive"
-        and ops["logos.accounts.disable"]["proposed_exposed"] is True
+        and ops["logos.accounts.disable"]["proposed_exposed"] is False  # an admin enables it on purpose
     )
     assert ops["logos.accounts.delete"]["proposed_exposed"] is False
 
@@ -263,7 +263,7 @@ def test_exposure_review_and_class_floor(admin: TestClient) -> None:
     approved = admin.post(
         "/api/v1/connectors/logos/approve-exposure", json={"operations": decisions}, headers=csrf(admin)
     ).json()
-    assert approved["review_status"] == "approved" and approved["operations_exposed"] == 3
+    assert approved["review_status"] == "approved" and approved["operations_exposed"] == 2
     lower = admin.patch("/api/v1/operations/logos.accounts.disable", json={"class": "write"}, headers=csrf(admin))
     assert lower.status_code == 422
     raised = admin.patch("/api/v1/operations/logos.assets.get", json={"class": "write"}, headers=csrf(admin))

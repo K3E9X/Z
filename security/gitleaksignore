@@ -15,3 +15,5 @@ d73c5664f91e3fed6dcb984ad12a7848c17b8f91:runner/tests/test_job_security.py:aws-a
 d73c5664f91e3fed6dcb984ad12a7848c17b8f91:runner/tests/test_job_security.py:aws-access-token:214
 e983b9236abe00b771bb43bde5fcb080baa02549:contracts/examples/connector/invalid-secret-value.yaml:generic-api-key:4
 bb6343081f75144957a382a0213a75f996bf8374:server/tests/test_notifications.py:generic-api-key:187
+d881c075e5b25e1a15db68bdf08984ee6bfcc478:runner/tests/test_job_tools.py:generic-api-key:83
+d881c075e5b25e1a15db68bdf08984ee6bfcc478:runner/tests/test_job_tools.py:gitlab-pat:83

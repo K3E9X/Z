@@ -198,7 +198,7 @@ operations:
   rules:                            # first match wins; globs only for read
     - { match: "assets.get", class: read, exposed: true }
     - { match: "accounts.list", class: read, exposed: true }
-    - { match: "accounts.disable", class: destructive, exposed: true }
+    - { match: "accounts.disable", class: destructive, exposed: false }   # destructive: an admin enables it
     - { match: "accounts.delete", class: destructive, exposed: false }
 rate_limit: { per_minute: 60 }
 health: { operation: assets.get, params: { id: health }, interval_s: 60 }   # or { path: /health }
