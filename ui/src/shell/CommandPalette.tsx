@@ -8,11 +8,11 @@ import { Avatar } from '@/components/Avatar'
 import { Icon, ZMark, type IconName } from '@/components/Icon'
 import { Dot } from '@/components/StatusMark'
 import { useToast } from '@/components/toast'
-import { useCan } from '@/lib/auth'
+import { useCan, useOptionalMe } from '@/lib/auth'
 import { MOD } from '@/lib/hotkeys'
 import { THEME_LABELS, THEMES, usePrefs } from '@/lib/prefs'
 import { missionStatus } from '@/lib/status'
-import { NAV } from './nav'
+import { NAV, visibleNav } from './nav'
 
 /**
  * Word-based matching instead of cmdk's fuzzy default (which matched "crit" against any value holding
@@ -81,6 +81,7 @@ export function CommandPalette({
   const prefs = usePrefs()
   const toast = useToast()
   const qc = useQueryClient()
+  const me = useOptionalMe()
   const canStart = useCan('missions:start')
   const canControl = useCan('missions:control')
   const agents = useAgents()
@@ -295,7 +296,7 @@ export function CommandPalette({
               >
                 Switch theme
               </Item>
-              {NAV.map((n) => (
+              {visibleNav(NAV, me).map((n) => (
                 <Item
                   key={n.to}
                   value={`go to ${n.label}`}
