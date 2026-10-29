@@ -90,6 +90,12 @@ export function Replay() {
   const edit = lastOf('file_edit')
   const m = q.data?.mission
   const recent = upto.items.slice(-40)
+  const list = useRef<HTMLDivElement | null>(null)
+  // The activity column follows the scrubber: the newest item at this point stays in view.
+  useEffect(() => {
+    const el = list.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [idx, recent.length])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -172,7 +178,7 @@ export function Replay() {
                     <h2 className="m-0 text-ui font-medium">Activity</h2>
                     <span className="text-sm text-text-3">{upto.items.length} items so far</span>
                   </div>
-                  <div className="scrollbar-thin max-h-[560px] overflow-y-auto">
+                  <div ref={list} className="scrollbar-thin max-h-[560px] overflow-y-auto">
                     {recent.map((it) => (
                       <TimelineRow key={it.key} item={it} timeline={upto} agents={agents} showAgent />
                     ))}

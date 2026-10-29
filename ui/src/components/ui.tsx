@@ -171,7 +171,7 @@ export function Panel({
 export function PageTitle({ title, lead, right }: { title: string; lead?: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-6">
-      <div className="flex min-w-0 max-w-[720px] flex-col gap-2">
+      <div className="flex min-w-0 max-w-[720px] flex-[1_1_380px] flex-col gap-2">
         <h1 className="m-0 font-display-face text-display leading-[1.05]">{title}</h1>
         {lead && <p className="m-0 text-[15px] leading-[1.5] text-text-2">{lead}</p>}
       </div>

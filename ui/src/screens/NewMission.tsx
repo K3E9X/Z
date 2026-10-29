@@ -492,7 +492,7 @@ export function NewMission() {
           </label>
           <label className="flex items-center justify-between gap-3 whitespace-nowrap">
             Data class
-            <Select value={dataClass} onChange={(e) => setDataClass(e.target.value as DataClass)} className="h-7 w-[120px] font-mono text-sm" aria-label="Data class">
+            <Select value={dataClass} onChange={(e) => setDataClass(e.target.value as DataClass)} className="h-7 w-[172px] text-sm" aria-label="Data class">
               <option value="C0">C0 public</option>
               <option value="C1">C1 internal</option>
               <option value="C2">C2 confidential</option>

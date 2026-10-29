@@ -308,7 +308,7 @@ export function Inference() {
             </span>
           )}
         </div>
-      ) : (
+      ) : isNotServed(health.error) ? null /* said once, in the cluster panel below */ : (
         <QueryState query={health} what="inferX health" endpoint="GET /inference/health">
           {() => null}
         </QueryState>

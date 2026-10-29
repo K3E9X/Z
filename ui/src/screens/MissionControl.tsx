@@ -259,9 +259,9 @@ function Preview({ mission, agents, onLiveNow }: { mission: Mission; agents: Age
         <div className="px-[18px] py-3.5 text-meta text-text-3">The plan appears once the orchestrator drafts it.</div>
       )}
       {tail.length > 0 && (
-        <pre className="scrollbar-thin mx-[18px] overflow-x-auto rounded-btn border border-line bg-code px-3.5 py-3 font-mono text-xs leading-[1.7] text-text-2">
+        <pre aria-label="Recent output" className="mx-[18px] overflow-hidden rounded-btn border border-line bg-code px-3.5 py-3 font-mono text-xs leading-[1.7] text-text-2">
           {tail.map((l, i) => (
-            <div key={i} className={l.tone === 'err' ? 'text-err' : ''}>
+            <div key={i} title={l.text} className={`truncate ${l.tone === 'err' ? 'text-err' : ''}`}>
               {l.text}
             </div>
           ))}

@@ -33,7 +33,7 @@ export function NotServed({
     >
       <div className="flex items-center gap-2 font-medium">
         <Icon name="ban" size={14} className="text-text-3" />
-        {what} is not available on this server yet
+        {what}: not available on this server yet
       </div>
       <div className="text-meta text-text-3">
         This z-server does not serve <code className="font-mono text-text-2">{endpoint}</code>. The screen fills in as
