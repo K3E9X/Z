@@ -316,6 +316,15 @@ class KubernetesExecutor:
             started = await self._call("POST", f"/apis/batch/v1/namespaces/{ns}/jobs", json=job)
             if started.status_code not in (200, 201):
                 raise ExecutorError(f"tool job create refused ({started.status_code}): {started.text[:300]}")
+            uid = started.json().get("metadata", {}).get("uid")
+            if uid:  # if z-server dies before the cleanup below, the Secret still goes away with the Job's TTL
+                owner = {"apiVersion": "batch/v1", "kind": "Job", "name": name, "uid": uid, "blockOwnerDeletion": False}
+                await self._call(
+                    "PATCH",
+                    f"/api/v1/namespaces/{ns}/secrets/{name}",
+                    json={"metadata": {"ownerReferences": [owner]}},
+                    headers={"Content-Type": "application/merge-patch+json"},
+                )
             deadline = time.monotonic() + timeout_s
             pod_name, exit_code, timed_out = None, None, False
             while True:

@@ -155,4 +155,6 @@ def test_tool_run_keeps_credentials_in_a_secret_and_cleans_up() -> None:
     assert run.exit_code == 0 and json.loads(run.stdout) == {"items": []} and not run.timed_out
     deleted = [p for m, p in fake.calls if m == "DELETE"]
     assert any("/jobs/z-tool-" in p for p in deleted) and any("/secrets/z-tool-" in p for p in deleted)
+    # owned by its Job: if z-server dies before the cleanup, the Secret goes with the Job (TTL)
+    assert any(m == "PATCH" and "/secrets/z-tool-" in p for m, p in fake.calls)
     assert not [k for k in fake.objects if "z-tool-" in k]  # nothing left behind
