@@ -7,14 +7,25 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+import yaml
 
 pytestmark = pytest.mark.e2e
 Z = os.environ.get("Z_E2E_URL", "http://127.0.0.1:8000")  # z-server (the web app is z-ui on :8080)
 LLM = os.environ.get("Z_E2E_LLM_URL", "http://127.0.0.1:8090")
+LITELLM_CONFIG = Path(__file__).resolve().parents[2] / "config" / "litellm.yaml"  # mounted into the litellm container
+
+
+def configured_models() -> set[str]:
+    """The upstream model ids of the LiteLLM config the stack runs with (`openai/<id>` -> `<id>`)."""
+    data = yaml.safe_load(LITELLM_CONFIG.read_text(encoding="utf-8"))
+    return {str(m["litellm_params"]["model"]).removeprefix("openai/") for m in data["model_list"]}
+
+
 NOTES = b"# Release 2.4\n\nVersion 2.4 adds single sign-on. Password login is removed for staff.\n"
 SUMMARY = {
     "title": "Release 2.4 adds SSO",
@@ -108,4 +119,5 @@ def test_summarize_file_runs_in_a_hardened_runner(api: httpx.Client) -> None:
     assert {"tool_call", "tool_result", "usage", "file_edit"} <= types, types
     assert {a["name"] for a in replay["artifacts"]} >= {"notes.md", "result.json"}
     llm_requests = httpx.get(f"{LLM}/_fake/requests").json()
-    assert llm_requests and all(r["model"] in {"fake-glm", "fake-qwen"} for r in llm_requests)
+    # every model call went through LiteLLM to the inference endpoint, with a model of the configured list
+    assert llm_requests and {r["model"] for r in llm_requests} <= configured_models(), llm_requests
