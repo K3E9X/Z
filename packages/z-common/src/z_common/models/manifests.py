@@ -152,6 +152,19 @@ class PlaybookInputs(ZModel):
     schema_: Annotated[Json | None, Field(alias="schema")] = None
 
 
+def check_step_order(steps: list[Any]) -> None:
+    """Step ids are unique and `depends_on` names earlier steps only: the plan runs in order and has no cycle.
+    (JSON Schema cannot say this; the scheduler relies on it.)"""
+    seen: set[str] = set()
+    for step in steps:
+        if step.id in seen:
+            raise ValueError(f"duplicate step id {step.id!r}")
+        later = [d for d in step.depends_on if d not in seen]
+        if later:
+            raise ValueError(f"step {step.id!r} depends on {later}, which are not earlier steps")
+        seen.add(step.id)
+
+
 class Playbook(ZModel):
     """playbook.schema.json"""
 
@@ -170,6 +183,11 @@ class Playbook(ZModel):
     data_class: DataClass | None = None
     baseline_minutes: Annotated[int, Field(ge=0)] | None = None
 
+    @model_validator(mode="after")
+    def _ordered(self) -> Playbook:
+        check_step_order(self.steps)
+        return self
+
 
 class MissionPlan(ZModel):
     """mission-plan.schema.json"""
@@ -180,6 +198,11 @@ class MissionPlan(ZModel):
     writes: list[WriteOperationId] = Field(default_factory=list)
     size: Literal["small", "medium", "large"] | None = None
     estimated_tokens: Annotated[int, Field(ge=0)] | None = None
+
+    @model_validator(mode="after")
+    def _ordered(self) -> MissionPlan:
+        check_step_order(self.steps)
+        return self
 
 
 # ---------------------------------------------------------------- connector
