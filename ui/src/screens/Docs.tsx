@@ -1,5 +1,5 @@
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useMemo, useState, type MouseEvent } from 'react'
+import { Link, useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useDoc, useDocs } from '@/api/queries'
 import type { DocSummary } from '@/api/types'
 import { Markdown } from '@/components/Markdown'
@@ -31,13 +31,40 @@ export function Docs() {
     )
   }, [docs.data, filter])
 
-  // links between pages stay in the app; every other link keeps the safe new-tab behaviour of Markdown
+  const hash = useRouterState({ select: (s) => s.location.hash })
+
+  // Once the page is shown, bring its #anchor (from a link to /docs/page#section) into view.
+  useEffect(() => {
+    if (!hash || !page.data) return
+    document.getElementById(decodeURIComponent(hash))?.scrollIntoView({ block: 'start' })
+  }, [hash, page.data])
+
+  // links between pages stay in the app, #anchors scroll in place; every other link keeps the safe
+  // new-tab behaviour of Markdown
   const followInternal = (e: MouseEvent<HTMLDivElement>) => {
     const anchor = (e.target as HTMLElement).closest('a')
     const href = anchor?.getAttribute('href') ?? ''
+    if (href.startsWith('#')) {
+      e.preventDefault()
+      const id = decodeURIComponent(href.slice(1))
+      document.getElementById(id)?.scrollIntoView({ block: 'start' })
+      void navigate({
+        to: '/docs/$slug',
+        params: { slug: current },
+        hash: id,
+        replace: true,
+        resetScroll: false,
+      })
+      return
+    }
     if (!href.startsWith('/docs/')) return
     e.preventDefault()
-    void navigate({ to: '/docs/$slug', params: { slug: href.slice(6).split('#')[0] ?? START } })
+    const [target, section] = href.slice(6).split('#')
+    void navigate({
+      to: '/docs/$slug',
+      params: { slug: target || current },
+      ...(section ? { hash: section } : {}),
+    })
   }
 
   return (
@@ -81,7 +108,9 @@ export function Docs() {
             page.data && (
               <div className="flex flex-col gap-3">
                 <div className="font-mono text-meta text-text-3">{page.data.path}</div>
-                <Markdown className="max-w-[860px]">{page.data.markdown}</Markdown>
+                <Markdown className="max-w-[860px]" headingIds>
+                  {page.data.markdown}
+                </Markdown>
               </div>
             )
           }
