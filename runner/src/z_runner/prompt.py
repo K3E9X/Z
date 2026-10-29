@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 from z_common.models.api_internal import JobSpec, MemorySnippet, SkillBundle
 
+from z_runner.output import PATCH_FIELD, fills_patch
 from z_runner.redaction import Redactor
 from z_runner.tools import REPORT_FILE
 from z_runner.tools.base import ToolSet
@@ -132,6 +133,11 @@ def task_message(spec: JobSpec, staged: StagedInputs, output_file: str) -> str:
             "finish. It must validate against this JSON Schema:\n```json\n"
             + json.dumps(spec.output.schema_, indent=2, ensure_ascii=False)
             + "\n```"
+            + (
+                f"\nDo not set `{PATCH_FIELD}`: Z builds the patch of your workspace changes and fills it in."
+                if fills_patch(spec.output.schema_) and spec.workspace.mode.value in ("git_clone", "files")
+                else ""
+            )
         )
     return "\n\n".join(parts)
 

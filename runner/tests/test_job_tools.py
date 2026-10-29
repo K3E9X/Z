@@ -243,6 +243,56 @@ def test_git_clone_workspace_yields_a_patch_artifact(harness: Harness, tmp_path:
     assert (check / "CHANGELOG.md").read_text() == "1.1: bump\n"
 
 
+CHANGE_RESULT = json.loads((Path(__file__).resolve().parents[2] / "packs/dev/schemas/change-result.json").read_text())
+
+
+def test_the_runner_fills_patch_artifact_before_validating_the_output(harness: Harness) -> None:
+    result = {"repo": "noc/snmp-poller", "tests": "passed", "patch_artifact": "art_made_up"}
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("edit", {"command": "write", "path": "a.md", "content": "changed\n"}),
+                tool_call("edit", {"command": "write", "path": "result.json", "content": json.dumps(result)}),
+                finish(),
+            ]
+        }
+    )
+    files: dict[str, bytes | str] = {"a.md": "a\n"}
+    spec = harness.spec(tools=ALL_LOCAL, output={"schema": CHANGE_RESULT, "max_repair_attempts": 1})
+    job = harness.server.add_job(spec, archive=make_archive(files), manifest=make_manifest(files))
+    run = harness.run(spec, job)
+    assert run.completion["status"] == "succeeded", run.events("validation_error")
+    patches = [a for a in run.job.artifacts if a["kind"] == "patch"]
+    assert len(patches) == 1 and b"+changed" in patches[0]["content"]  # uploaded once, reused at completion
+    assert run.completion["output"] == {**result, "patch_artifact": patches[0]["id"]}
+    stored = next(a for a in run.job.artifacts if a["name"] == "result.json")
+    assert json.loads(stored["content"])["patch_artifact"] == patches[0]["id"]
+    task = json.dumps(harness.llm.requests()[0]["body"]["messages"])
+    assert "Do not set `patch_artifact`" in task
+
+
+def test_without_changes_patch_artifact_is_explained_to_the_agent(harness: Harness) -> None:
+    result = {"repo": "noc/snmp-poller", "tests": "not_run", "patch_artifact": "art_made_up"}
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("edit", {"command": "write", "path": "result.json", "content": json.dumps(result)}),
+                finish(),
+            ]
+        }
+    )
+    files: dict[str, bytes | str] = {"a.md": "a\n"}
+    spec = harness.spec(tools=ALL_LOCAL, output={"schema": CHANGE_RESULT, "max_repair_attempts": 0})
+    job = harness.server.add_job(spec, archive=make_archive(files), manifest=make_manifest(files))
+    run = harness.run(spec, job)
+    assert run.completion["status"] == "needs_attention"
+    assert run.completion["needs_attention_reason"] == "invalid_output"
+    errors = run.events("validation_error")[0]["errors"]
+    assert errors == [{"path": "patch_artifact", "message": errors[0]["message"]}]
+    assert "no change yet" in errors[0]["message"]
+    assert not [a for a in run.job.artifacts if a["kind"] == "patch"]
+
+
 def test_files_blocked_by_the_judge_are_not_deletions_in_the_patch(harness: Harness) -> None:
     harness.llm.add_rules(
         {"responses": [tool_call("edit", {"command": "write", "path": "a.md", "content": "changed\n"}), finish()]}

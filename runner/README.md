@@ -30,7 +30,10 @@ Z_SERVER_URL=http://z-api:8000 Z_JOB_ID=job-123 Z_JOB_TOKEN=<single-use bootstra
    removed, `flagged` files announced to the agent as untrusted). Skill resources go to `.z/skills/<name>/`.
 3. The agent runs step by step through `AgentBackend` (below). After every step: budgets, loop detection,
    escalation, output check, checkpoint, event flush, control.
-4. Completion: artifacts (`result.json`, `report.md`, `changes.patch` for `git_clone`), then `POST .../complete`.
+4. Completion: artifacts (`result.json`, `report.md`, `changes.patch` for `git_clone` and `files`), then
+   `POST .../complete`. When the output schema has a top-level `patch_artifact` property, the runner builds and
+   uploads `changes.patch` when the agent finishes, *before* validating the output, and sets `patch_artifact` to
+   its artifact id (the agent cannot know it; a value it wrote is replaced, and removed when there is no change).
 
 Control (`JobControl` from event and checkpoint posts, `GET .../control?wait_s=` while blocked):
 - **cancel**: stop before the next step, complete `cancelled`.

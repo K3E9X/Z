@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import httpx
 from z_common.models.api_internal import CheckpointIn, JobComplete, JobError
+from z_common.models.common import FieldError
 from z_common.models.enums import ArtifactKind, NeedsAttentionReason, WorkspaceMode
 
 from z_runner.artifacts import ArtifactStore
@@ -30,7 +31,7 @@ from z_runner.client import ApiError, InternalClient
 from z_runner.control import ControlHub
 from z_runner.events import EventBuffer
 from z_runner.guardrails import LoopDetector
-from z_runner.output import OutputSchemaError, check_output
+from z_runner.output import PATCH_FIELD, OutputSchemaError, check_output, fills_patch
 from z_runner.prompt import guide_message, repair_message, task_message
 from z_runner.redaction import Redactor
 from z_runner.tools import OUTPUT_FILE, REPORT_FILE, build_toolset
@@ -63,6 +64,7 @@ EXIT_COMPLETE_FAILED = 11
 EXIT_INTERRUPTED = 12
 
 PATCH_NAME = "changes.patch"
+PATCH_MODES = frozenset({WorkspaceMode.git_clone, WorkspaceMode.files})
 DOCUMENTS_DIR = "documents"  # where the documents tool writes (tools/documents.py)
 MAX_PATCH = 20 * 1024 * 1024
 
@@ -312,9 +314,23 @@ class Runner:
         if result.status == "finished":
             if spec.output is None:
                 return Outcome("succeeded")
-            check = check_output(self.workspace, OUTPUT_FILE, spec.output.schema_, result.final_message)
+            platform_fields = self._platform_fields()
+            check = check_output(
+                self.workspace, OUTPUT_FILE, spec.output.schema_, result.final_message, set_fields=platform_fields
+            )
             if check.ok:
                 return Outcome("succeeded", output=check.output)
+            if PATCH_FIELD in platform_fields and platform_fields[PATCH_FIELD] is None:
+                check.errors = [
+                    FieldError(
+                        path=PATCH_FIELD,
+                        message="Z sets this field from your changes to the workspace, and there is no change yet: "
+                        "make the change in the workspace, or explain in the report why none is possible",
+                    )
+                    if PATCH_FIELD in e.message or e.path == PATCH_FIELD
+                    else e
+                    for e in check.errors
+                ]
             self.sink.emit(
                 "validation_error",
                 {
@@ -333,6 +349,17 @@ class Runner:
             )
         self._maybe_escalate(backend)
         return None
+
+    def _platform_fields(self) -> dict[str, Any]:
+        """Output fields Z fills itself: `patch_artifact` (when the output schema has it and the workspace is a
+        repository or files) is the artifact id of the patch of the workspace, built and uploaded now, before the
+        output is validated; None when there is no change (an id the agent wrote is never kept)."""
+        spec = self.spec
+        if spec.output is None or not fills_patch(spec.output.schema_) or spec.workspace.mode not in PATCH_MODES:
+            return {}
+        patch = self._workspace_patch(self.workspace)
+        artifact = self.artifacts.try_upload(ArtifactKind.patch, PATCH_NAME, patch, "text/x-diff") if patch else None
+        return {PATCH_FIELD: artifact}
 
     def _maybe_escalate(self, backend: AgentBackend) -> None:
         spec = self.spec
@@ -493,8 +520,9 @@ class Runner:
             report_id = self.artifacts.try_upload(
                 ArtifactKind.report, REPORT_FILE, report_path.read_bytes(), "text/markdown"
             )
-        if self.spec.workspace.mode in {WorkspaceMode.git_clone, WorkspaceMode.files}:
-            # what the agent changed in the staged workspace (a repository, or the files of the mission)
+        if self.spec.workspace.mode in PATCH_MODES:
+            # what the agent changed in the staged workspace (a repository, or the files of the mission); the same
+            # content as a patch uploaded for the output's patch_artifact keeps the same artifact id
             patch = self._workspace_patch(workspace)
             if patch:
                 self.artifacts.try_upload(ArtifactKind.patch, PATCH_NAME, patch, "text/x-diff")
