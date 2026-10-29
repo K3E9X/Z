@@ -573,7 +573,8 @@ class Runner:
             log.exception("artifact upload failed")
         completion = JobComplete(
             status=outcome.status,
-            output=outcome.output,
+            # the output leaves the runner like any event or artifact (invariant 11)
+            output=self.redactor.value(outcome.output) if outcome.output is not None else None,
             report_artifact=report_id,
             needs_attention_reason=outcome.reason,
             error=outcome.error,

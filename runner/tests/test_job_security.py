@@ -238,6 +238,20 @@ def test_secrets_are_redacted_everywhere(harness: Harness) -> None:
     }
 
 
+def test_the_job_output_is_redacted(harness: Harness) -> None:
+    spec = harness.spec()
+    key = spec.llm.api_key
+    harness.llm.add_rules(
+        {"responses": [write_result({**GOOD_SUMMARY, "title": f"key {key} password=hunter2hunter2"}), finish()]}
+    )
+    run = harness.run(spec)
+    assert run.completion["status"] == "succeeded"
+    output = run.completion["output"]
+    assert output["title"] == "key [REDACTED] password=[REDACTED]"
+    result = next(a for a in run.job.artifacts if a["name"] == "result.json")
+    assert key.encode() not in result["content"]
+
+
 def test_flagged_inputs_are_labelled_untrusted(harness: Harness) -> None:
     harness.llm.add_rules(
         {"responses": [tool_call("read", {"path": "notes.md"}), write_result(GOOD_SUMMARY), finish()]}
