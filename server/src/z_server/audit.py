@@ -67,6 +67,9 @@ class Actor:
     request_id: str | None = None
 
 
+RESULTS = frozenset({"success", "denied", "error"})  # contracts: AuditEvent.result
+
+
 async def record(
     db: AsyncSession,
     actor: Actor,
@@ -80,6 +83,8 @@ async def record(
     before: Any = None,
     after: Any = None,
 ) -> AuditEvent:
+    if result not in RESULTS:
+        raise ValueError(f"audit result must be one of {sorted(RESULTS)}, not {result!r}")
     await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": LOCK_KEY})
     last = (await db.execute(select(AuditEvent.seq, AuditEvent.hash).order_by(AuditEvent.seq.desc()).limit(1))).first()
     seq, prev = (last[0] + 1, last[1]) if last else (1, GENESIS)
