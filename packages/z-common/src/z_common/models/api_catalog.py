@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
 from z_common.models.base import Handle, Id, ModelAlias, OperationId, SemVer, Slug, ZModel
 from z_common.models.common import Avatar, Limits, MemoryConfig, MissionBudget, Persona
@@ -22,6 +22,7 @@ from z_common.models.enums import (
 from z_common.models.manifests import (
     AgentProfile,
     BrowserFlow,
+    BrowserStep,
     ConnectorManifest,
     DeclaredOperation,
     McpServer,
@@ -273,3 +274,52 @@ class ConnectorDraft(ZModel):
     manifest: ConnectorManifest
     operations: list[Operation]
     warnings: list[str] = Field(default_factory=list)
+
+
+class BrowserRecording(ZModel):
+    connector: Slug
+    start_url: str
+    name: str
+    purpose: Literal["read", "write"] = "read"
+
+
+class BrowserRecordingSession(ZModel):
+    id: Id
+    viewer_url: str
+    expires_at: datetime
+
+
+class RecordingViewport(ZModel):
+    width: int
+    height: int
+
+
+class BrowserRecordingState(ZModel):
+    id: Id
+    connector: Slug
+    name: str
+    purpose: Literal["read", "write"]
+    url: str
+    title: str
+    steps: list[BrowserStep]
+    blocked_hosts: list[str]
+    viewport: RecordingViewport
+    expires_at: datetime
+
+
+class BrowserRecordingInput(ZModel):
+    kind: Literal["click", "type", "credential", "press", "goto", "extract", "assert", "screenshot", "undo"]
+    x: float | None = None
+    y: float | None = None
+    text: Annotated[str, StringConstraints(max_length=4000)] | None = None
+    arg: Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,40}$")] | None = None
+    field: Literal["username", "password"] | None = None
+    key: Literal["Enter", "Tab", "Escape", "ArrowDown", "ArrowUp", "Space"] | None = None
+    url: Annotated[str, StringConstraints(max_length=2000)] | None = None
+    what: Literal["text", "table", "link"] | None = None
+    name: Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,40}$")] | None = None
+
+
+class BrowserRecordingDraft(ZModel):
+    flow: BrowserFlow
+    blocked_hosts: list[str]

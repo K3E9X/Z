@@ -181,6 +181,11 @@ for _name in [
     "ConnectorTestResult",
     "ConnectorImport",
     "ConnectorDraft",
+    "BrowserRecording",
+    "BrowserRecordingSession",
+    "BrowserRecordingState",
+    "BrowserRecordingInput",
+    "BrowserRecordingDraft",
 ]:
     API_MODELS[_name] = getattr(api_catalog, _name)
 for _name in [
