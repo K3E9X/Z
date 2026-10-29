@@ -284,3 +284,37 @@ def test_mission_rows_keep_team_and_class(admin: TestClient) -> None:
             return [(r.kind, r.data_class) for r in (await db.execute(select(NotificationOutbox))).scalars()]
 
     assert _run(admin, rows) == [("mission_failed", "C1")]
+
+
+def test_people_get_email_about_their_own_missions_when_they_ask(
+    app: TestClient, oidc: FakeGitLabOIDC, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent: list[tuple[list[str], str, str]] = []
+    monkeypatch.setattr(
+        notifications, "_send_mail", lambda smtp, password, to, subject, text: sent.append((to, subject, text))
+    )
+    sign_in_as(app, oidc, "alice")
+    _configure(app, [], smtp={"host": "smtp.example.internal", "from": "z@example.internal"})
+    sign_in_as(app, oidc, "bob")
+    mine = app.get("/api/v1/me/notifications").json()
+    assert mine["email"] == {"enabled": False, "events": []} and mine["available"] is True and mine["address"]
+    bad = app.put(
+        "/api/v1/me/notifications", json={"email": {"enabled": True, "events": ["budget_alert"]}}, headers=csrf(app)
+    )
+    assert bad.status_code == 422  # budget alerts are for admin targets
+    saved = app.put(
+        "/api/v1/me/notifications",
+        json={"email": {"enabled": True, "events": ["question_asked"]}, "address": "ignored@x"},
+        headers=csrf(app),
+    )
+    assert saved.status_code == 200 and saved.json()["address"] == mine["address"]  # read-only
+    mission = _mission(app)  # C2, bob's
+    _emit(app, mission, "question", {"question_id": "q_1", "text": "Which tenant should I use?"})
+    _emit(app, mission, "status", {"entity": "mission", "from": "running", "to": "succeeded"})  # not chosen
+    _tick(app)
+    assert len(sent) == 1
+    to, subject, text = sent[0]
+    assert to == [mine["address"]] and subject == "[Z] An agent asks a question"
+    assert "Which tenant" not in text and "Details are in Z (data class C2)" in text  # content up to C1 only
+    sign_in_as(app, oidc, "alice")
+    assert "user:" not in str(app.get("/api/v1/admin/notifications").json())

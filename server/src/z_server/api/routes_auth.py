@@ -17,7 +17,7 @@ from z_server.api.views import session_out, token_out, user_out
 from z_server.auth import gitlab, identity, local
 from z_server.auth.oidc import OIDCClient, OIDCError
 from z_server.crypto import new_token, pkce_pair, token_hash
-from z_server.db.models import ApiToken, AuthSession, LoginState, User
+from z_server.db.models import ApiToken, AuthSession, LoginState, Setting, User
 from z_server.errors import Problem, problem_response
 from z_server.ids import new_id
 
@@ -439,3 +439,40 @@ async def revoke_my_token(ctx: CtxDep, id: str) -> Response:
     row.revoked_at = identity.now()
     await ctx.audit("auth.api_token_revoked", "api_token", id)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- my notifications (ADR 0023)
+
+
+async def _my_notifications(ctx: Ctx) -> m.MyNotifications:
+    from z_server import notifications
+
+    prefs = await notifications.personal_prefs(ctx.db, ctx.user.user_id)
+    user = await ctx.db.get(User, ctx.user.user_id)
+    smtp = (await notifications.settings(ctx.db))["smtp"]
+    return m.MyNotifications.model_validate(
+        {"email": prefs, "address": user.email if user else None, "available": bool(smtp)}
+    )
+
+
+@router.operation("getMyNotifications")
+async def get_my_notifications(ctx: CtxDep) -> m.MyNotifications:
+    return await _my_notifications(ctx)
+
+
+@router.operation("putMyNotifications")
+async def put_my_notifications(ctx: CtxDep, body: m.MyNotifications) -> m.MyNotifications:
+    from z_server import notifications
+
+    before = await notifications.personal_prefs(ctx.db, ctx.user.user_id)
+    after = body.email.model_dump(mode="json")
+    after["events"] = sorted(set(after["events"]))
+    key = notifications.PERSONAL_KEY + ctx.user.user_id
+    row = await ctx.db.get(Setting, key)
+    if row is None:
+        ctx.db.add(Setting(key=key, value=after, updated_by=ctx.user.username))
+    else:
+        row.value, row.updated_by = after, ctx.user.username
+    await ctx.db.flush()
+    await ctx.audit("me.notifications_changed", "user", ctx.user.user_id, before=before, after=after)
+    return await _my_notifications(ctx)

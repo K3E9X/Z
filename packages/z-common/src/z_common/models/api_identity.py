@@ -400,6 +400,24 @@ class SmtpSettings(ZModel):
     from_: Annotated[str, Field(alias="from")]
 
 
+PersonalNotificationKind = Literal[
+    "approval_requested", "question_asked", "needs_attention", "mission_succeeded", "mission_failed"
+]
+
+
+class MyEmailNotifications(ZModel):
+    enabled: bool
+    events: list[PersonalNotificationKind]
+
+
+class MyNotifications(ZModel):
+    """openapi MyNotifications: email about my own missions; address and available are read-only."""
+
+    email: MyEmailNotifications
+    address: str | None = None
+    available: bool | None = None
+
+
 class NotificationSettings(ZModel):
     targets: list[NotificationTarget]
     smtp: SmtpSettings | None = None

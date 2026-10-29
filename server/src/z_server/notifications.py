@@ -43,6 +43,11 @@ if TYPE_CHECKING:
 log = logging.getLogger("z.notifications")
 SETTINGS_KEY = "notifications"
 STATE_KEY = "notifications_state"
+PERSONAL_KEY = "notify_prefs:"  # + user id: email about one's own missions (GET/PUT /me/notifications)
+PERSONAL_KINDS = frozenset(
+    {"approval_requested", "question_asked", "needs_attention", "mission_succeeded", "mission_failed"}
+)
+PERSONAL_CONTENT_UP_TO = "C1"
 KINDS = (
     "approval_requested",
     "question_asked",
@@ -113,6 +118,36 @@ async def settings(db: AsyncSession) -> dict[str, Any]:
     row = await db.get(Setting, SETTINGS_KEY)
     value = dict(row.value) if row is not None else {}
     return {"targets": list(value.get("targets") or []), "smtp": value.get("smtp")}
+
+
+async def personal_prefs(db: AsyncSession, user_id: str) -> dict[str, Any]:
+    row = await db.get(Setting, PERSONAL_KEY + user_id)
+    value = dict(row.value) if row is not None else {}
+    return {"enabled": bool(value.get("enabled", False)), "events": list(value.get("events") or [])}
+
+
+async def _personal(db: AsyncSession, row: NotificationOutbox) -> tuple[str, dict[str, Any]] | None:
+    """(delivery id, email target) for the mission owner's own preferences, when they want this kind."""
+    from z_server.db.models import User
+
+    if row.mission_id is None or row.kind not in PERSONAL_KINDS:
+        return None
+    mission = await db.get(Mission, row.mission_id)
+    if mission is None or not mission.created_by:
+        return None
+    prefs = await personal_prefs(db, mission.created_by)
+    if not prefs["enabled"] or row.kind not in prefs["events"]:
+        return None
+    user = await db.get(User, mission.created_by)
+    if user is None or not user.email or "\n" in user.email or user.status != "active":
+        return None
+    return f"user:{user.id}", {
+        "id": f"user:{user.id}",
+        "kind": "email",
+        "to": [user.email],
+        "events": [row.kind],
+        "content_up_to": PERSONAL_CONTENT_UP_TO,
+    }
 
 
 async def delivery_state(db: AsyncSession) -> dict[str, Any]:
@@ -382,7 +417,11 @@ async def tick(state: AppState) -> dict[str, int]:
             report["rows"] += 1
             delivered = set(row.delivered or [])
             failed = False
-            for target in config["targets"]:
+            targets = list(config["targets"])
+            personal = await _personal(db, row) if config["smtp"] else None
+            if personal is not None:
+                targets.append(personal[1])
+            for target in targets:
                 if target["id"] in delivered or not matches(target, row):
                     continue
                 msg = await compose(db, state, row, target)
@@ -399,7 +438,8 @@ async def tick(state: AppState) -> dict[str, int]:
                     delivered.add(target["id"])
                     report["sent"] += 1
                     entry.update({"last_sent_at": now().isoformat(), "last_error": None})
-                status[target["id"]] = entry
+                if not str(target["id"]).startswith("user:"):  # admins see their targets, not people's mailboxes
+                    status[target["id"]] = entry
             row.delivered = sorted(delivered)
             row.attempts += 1
             if not failed or row.attempts >= MAX_ATTEMPTS:
