@@ -28,6 +28,7 @@ from z_server.api import (
     routes_channels,
     routes_connections,
     routes_connectors,
+    routes_docs,
     routes_intake,
     routes_internal,
     routes_learning,
@@ -67,6 +68,7 @@ ROUTERS = (
     routes_learning.router,
     routes_objectives.router,
     routes_sessions.router,
+    routes_docs.router,
 )
 
 

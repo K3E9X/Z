@@ -42,11 +42,17 @@ RUN --mount=type=secret,id=extra_ca \
 COPY --from=build /app/.venv /app/.venv
 COPY contracts /app/contracts
 COPY packs /app/packs
+# the documentation the web app shows (GET /docs): pages only, not the journal or the build plan
+COPY docs /app/docs
+COPY deploy/README.md /app/deploy/README.md
+COPY deploy/helm/z/README.md /app/deploy/helm/z/README.md
+COPY cli/README.md /app/cli/README.md
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     Z_CONTRACTS_DIR=/app/contracts \
     Z_PACKS=/app/packs \
+    Z_DOCS_ROOT=/app \
     Z_CONFIG=/etc/z/z.yaml \
     Z_ARTIFACTS_DIR=/data/artifacts
 WORKDIR /app
