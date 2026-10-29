@@ -173,6 +173,7 @@
         "oidcClientSecret": { "type": "string" },
         "inferenceApiKey": { "type": "string" },
         "metricsToken": { "type": "string" },
+        "browserToken": { "type": "string" },
         "externalSecret": {
           "type": "object",
           "properties": {

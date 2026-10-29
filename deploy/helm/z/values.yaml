@@ -195,6 +195,25 @@ egressProxy:
     requests: { cpu: 50m, memory: 64Mi }
     limits: { cpu: 500m, memory: 256Mi }
 
+# --------------------------------------------------------------------------------------------------- z-browser
+# Gateway-side browser worker for `browser` connectors (docs/05 §1): replays reviewed flows in Chromium. Only
+# z-server reaches it; it reaches only DNS and `egressTo` (the web apps of your browser connectors).
+browser:
+  enabled: false
+  replicas: 1
+  image:
+    repository: ghcr.io/k3e9x/z-browser
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  port: 8090
+  concurrency: 4           # flows at a time per replica (one Chromium context each)
+  egressTo: []             # e.g. [{ ipBlock: { cidr: 10.20.0.0/16 } }]; empty: no app is reachable
+  egressPorts: [443, 80]
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+
 # --------------------------------------------------------------------------------------------------- LiteLLM
 litellm:
   replicas: 1
@@ -254,7 +273,8 @@ database:
 
 # --------------------------------------------------------------------------------------------------- Secrets
 secrets:
-  # Name of an existing Secret with the keys Z_SECRET_KEY, LITELLM_MASTER_KEY, Z_METRICS_TOKEN and optionally
+  # Name of an existing Secret with the keys Z_SECRET_KEY, LITELLM_MASTER_KEY, Z_METRICS_TOKEN (and
+  # Z_BROWSER_TOKEN with browser.enabled) and optionally
   # OIDC_CLIENT_SECRET, INFERENCE_API_KEY. Empty: the chart creates `<fullname>-secrets` from the values below
   # (empty Z_SECRET_KEY / LITELLM_MASTER_KEY are generated once and kept across upgrades and uninstall).
   existingSecret: ""
@@ -263,6 +283,7 @@ secrets:
   oidcClientSecret: ""
   inferenceApiKey: ""
   metricsToken: ""         # bearer token for GET /metrics (empty: generated once and kept)
+  browserToken: ""         # z-server -> z-browser (empty: generated once and kept); key Z_BROWSER_TOKEN
   # External Secrets Operator: render an ExternalSecret that writes the Secret `<fullname>-secrets` instead.
   externalSecret:
     enabled: false

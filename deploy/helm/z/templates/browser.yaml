@@ -1,0 +1,123 @@
+{{- if .Values.browser.enabled }}
+{{- $fullname := include "z.browser.fullname" . }}
+# z-browser (docs/05 §1): replays reviewed browser flows for z-server. Only z-server reaches it; it reaches DNS
+# and browser.egressTo only. Every request a page makes is also checked against the connector's hosts.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "browser") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "z.selectorLabels" (dict "root" . "component" "browser") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.browser.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "browser") | nindent 4 }}
+spec:
+  replicas: {{ .Values.browser.replicas }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "browser") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "z.selectorLabels" (dict "root" . "component" "browser") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "z.podSecurityContext" (dict "root" . "uid" 10001) | nindent 8 }}
+      {{- include "z.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: browser
+          image: {{ include "z.image" (dict "image" .Values.browser.image "root" .) }}
+          imagePullPolicy: {{ .Values.browser.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.browser.port }}
+              protocol: TCP
+          env:
+            - name: Z_BROWSER_PORT
+              value: {{ .Values.browser.port | quote }}
+            - name: Z_BROWSER_CONCURRENCY
+              value: {{ .Values.browser.concurrency | quote }}
+            - name: Z_BROWSER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "z.secretName" . }}
+                  key: Z_BROWSER_TOKEN
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+          securityContext:
+            {{- include "z.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.browser.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "browser") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "z.selectorLabels" (dict "root" . "component" "browser") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "z.selectorLabels" (dict "root" . "component" "server") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.browser.port }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.dns.podLabels | nindent 14 }}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    {{- with .Values.browser.egressTo }}
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        {{- range $.Values.browser.egressPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+    {{- end }}
+{{- end }}

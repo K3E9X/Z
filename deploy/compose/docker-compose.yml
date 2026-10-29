@@ -1,5 +1,6 @@
 # Z on Docker Compose (docs/11 §1): postgres, litellm, z-server, z-ui (web on :8080), docker-socket-proxy.
-# Optional: egress-proxy (`--profile egress`) for package mirrors. z-browser comes later.
+# Optional: egress-proxy (`--profile egress`) for package mirrors; z-browser (`--profile browser`) for browser
+# connectors (set Z_BROWSER_URL=http://z-browser:8090 and Z_BROWSER_TOKEN in .env).
 #   cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
 #   docker compose -f deploy/compose/docker-compose.yml up -d
 name: z
@@ -94,6 +95,7 @@ services:
       LITELLM_URL: http://litellm:4000
       Z_CONFIG: /etc/z/z.yaml
       Z_RUNNER_IMAGE: ${Z_RUNNER_IMAGE:-z-runner:local}
+      Z_BROWSER_URL: ${Z_BROWSER_URL:-}
     volumes:
       - ../../config/z.yaml:/etc/z/z.yaml:ro
       - artifacts:/data/artifacts
@@ -118,6 +120,22 @@ services:
       EGRESS_ALLOW: ${Z_EGRESS_MIRRORS:-}   # the proxy refuses to start when empty
     tmpfs: ["/tmp:size=32m,uid=13,gid=13"]
     networks: [runners, egress]
+    <<: *hardening
+
+  z-browser:
+    # Replays reviewed browser flows for the gateway and the executor (docs/05 §1). Every request a page makes
+    # is checked against the connector's hosts; runners cannot reach it (not on the runners network).
+    profiles: [browser]
+    build:
+      context: ../..
+      dockerfile: deploy/images/z-browser/Dockerfile
+    image: z-browser:local
+    environment:
+      Z_BROWSER_TOKEN: ${Z_BROWSER_TOKEN:-}   # the worker refuses to start without it
+      Z_BROWSER_CONCURRENCY: ${Z_BROWSER_CONCURRENCY:-4}
+    tmpfs: ["/tmp:size=512m,uid=10001,gid=10001"]
+    shm_size: 256m
+    networks: [core, egress]
     <<: *hardening
 
   z-ui:
