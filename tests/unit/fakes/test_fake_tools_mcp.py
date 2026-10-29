@@ -15,9 +15,17 @@ from tests.fakes.fake_tools import FakeTools
 
 ROOT = Path(__file__).resolve().parents[3]
 CONNECTORS = {
-    "jira": ROOT / "packs/ticketing/connectors/jira.yaml",
     "gitlab": ROOT / "packs/dev/connectors/gitlab.yaml",
     "confluence": ROOT / "packs/archi-isp/connectors/confluence.yaml",
+}
+# The Jira pack connector uses the Jira Cloud REST API v3; the fake also serves an MCP flavour for MCP connectors.
+JIRA_MCP_TOOLS = {
+    "jira_search",
+    "jira_get_issue",
+    "jira_create_issue",
+    "jira_update_issue",
+    "jira_add_comment",
+    "jira_delete_issue",
 }
 
 
@@ -33,9 +41,9 @@ async def client(tools: FakeTools, tool: str, kind: str) -> AsyncIterator[Client
         yield session
 
 
-@pytest.mark.parametrize("tool", sorted(CONNECTORS))
+@pytest.mark.parametrize("tool", [*sorted(CONNECTORS), "jira"])
 async def test_tools_match_operation_map(tools: FakeTools, tool: str) -> None:
-    expected = set(yaml.safe_load(CONNECTORS[tool].read_text())["operation_map"])
+    expected = JIRA_MCP_TOOLS if tool == "jira" else set(yaml.safe_load(CONNECTORS[tool].read_text())["operation_map"])
     async with client(tools, tool, "read") as c:
         listed = (await c.list_tools()).tools
     assert {t.name for t in listed} == expected

@@ -1,6 +1,7 @@
 """Fake Jira: REST API v2 subset under `/jira/rest/api/2` and an MCP server at `/jira/mcp`. Bearer auth."""
 
 import copy
+import re
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -319,3 +320,215 @@ def mcp_tools(jira: Jira) -> list[McpTool]:
             access="destructive",
         ),
     ]
+
+
+# ---------------------------------------------------------------- Jira Cloud REST API v3
+# Basic auth (account e-mail + API token, the token being ro-jira / rw-jira), ADF rich text, /search/jql with
+# nextPageToken, transitions, comment properties, /myself. `POST /_fake/jira/throttle {"count": n}` makes the next
+# n requests answer 429 with Retry-After: 0 (to test retries).
+
+
+def adf_doc(text: str) -> dict[str, Any]:
+    paragraphs = (text or "").split("\n\n")
+    return {
+        "type": "doc",
+        "version": 1,
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": p}] if p else []} for p in paragraphs],
+    }
+
+
+def adf_text(node: Any) -> str:
+    if isinstance(node, str):
+        return node
+    if not isinstance(node, dict):
+        return ""
+    if node.get("type") == "text":
+        return str(node.get("text", ""))
+    if node.get("type") == "hardBreak":
+        return "\n"
+    parts = [adf_text(c) for c in node.get("content") or []]
+    sep = "\n\n" if node.get("type") == "doc" else ("\n" if node.get("type") in {"bulletList", "orderedList"} else "")
+    return sep.join(parts)
+
+
+def _is_adf(value: Any) -> bool:
+    return isinstance(value, dict) and value.get("type") == "doc" and value.get("version") == 1 and "content" in value
+
+
+TRANSITIONS = [
+    {"id": "11", "name": "To Do", "to": "To Do"},
+    {"id": "21", "name": "In Progress", "to": "In Progress"},
+    {"id": "31", "name": "Done", "to": "Done"},
+]
+
+
+def router_v3(store: Store, jira: Jira) -> APIRouter:
+    r = APIRouter(prefix="/jira/rest/api/3")
+    state: dict[str, int] = {"throttle": 0}
+    read = Depends(store.dep("jira", "basic", "read"))
+    write = store.dep("jira", "basic", "write")
+
+    def throttled() -> Response | None:
+        if state["throttle"] > 0:
+            state["throttle"] -= 1
+            return Response(
+                '{"errorMessages":["rate limited"]}',
+                status_code=429,
+                headers={"Retry-After": "0"},
+                media_type="application/json",
+            )
+        return None
+
+    def v3(issue: dict[str, Any], fields: list[str] | None = None) -> dict[str, Any]:
+        out = jira._render(issue)
+        out["self"] = out["self"].replace("/rest/api/2/", "/rest/api/3/")
+        f = out["fields"]
+        f["description"] = adf_doc(f.get("description") or "") if f.get("description") else None
+        for c in f.get("comment", {}).get("comments", []):
+            c["body"] = adf_doc(c["body"])
+        f["avatarUrls"] = {"48x48": "https://example.test/avatar.png"}
+        if fields and fields != ["*all"]:
+            out["fields"] = {k: v for k, v in f.items() if k in fields}
+        return out
+
+    @r.get("/myself", dependencies=[read])
+    def myself() -> dict[str, Any]:
+        return {
+            "accountId": "557058:fake",
+            "emailAddress": "z-bot@example.test",
+            "displayName": "Z Service",
+            "active": True,
+        }
+
+    @r.get("/search/jql", dependencies=[read], response_model=None)
+    def search(jql: str = "", maxResults: int = 50, fields: str = "", nextPageToken: str = "") -> Any:
+        if (resp := throttled()) is not None:
+            return resp
+        start = int(nextPageToken or 0)
+        page = jira.search(jql, start, min(maxResults, 100))
+        wanted = [f.strip() for f in fields.split(",") if f.strip()] or ["summary", "status"]
+        issues = [v3(jira._find(i["key"]), wanted) for i in page["issues"]]
+        done = start + len(issues) >= page["total"]
+        body: dict[str, Any] = {"issues": issues, "isLast": done}
+        if not done:
+            body["nextPageToken"] = str(start + len(issues))
+        return body
+
+    @r.get("/issue/{key}", dependencies=[read])
+    def get_issue(key: str, fields: str = "") -> dict[str, Any]:
+        wanted = [f.strip() for f in fields.split(",") if f.strip()] or None
+        return v3(jira._find(key), wanted)
+
+    def check_adf(value: Any, field: str) -> str:
+        if value is None:
+            return ""
+        if not _is_adf(value):
+            raise BadRequest(
+                "Operation value must be an Atlassian Document",
+                {
+                    "errorMessages": [],
+                    "errors": {
+                        field: "Operation value must be an Atlassian Document (see the Atlassian Document Format)"
+                    },
+                },
+            )
+        return adf_text(value)
+
+    @r.post("/issue", status_code=201)
+    async def create(request: Request, kind: Annotated[TokenKind, Depends(write)]) -> dict[str, Any]:
+        body = await request.json()
+        fields = dict(body.get("fields") or {})
+        fields["description"] = check_adf(fields.get("description"), "description")
+        if "duedate" in fields and not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fields["duedate"])):
+            raise BadRequest("bad date", {"errorMessages": [], "errors": {"duedate": "Error parsing date string"}})
+        result = jira.create(fields, kind)
+        issue = jira._find(result["key"])
+        for extra in ("duedate", "components", "assignee"):
+            if extra in fields:
+                issue["fields"][extra] = fields[extra]
+        result["self"] = result["self"].replace("/rest/api/2/", "/rest/api/3/")
+        return result
+
+    @r.put("/issue/{key}", status_code=204)
+    async def update(key: str, request: Request, kind: Annotated[TokenKind, Depends(write)]) -> Response:
+        body = await request.json()
+        fields = dict(body.get("fields") or {})
+        if "description" in fields:
+            fields["description"] = check_adf(fields["description"], "description")
+        jira.update(key, fields, body.get("update"), kind)
+        return Response(status_code=204)
+
+    @r.get("/issue/{key}/comment", dependencies=[read])
+    def comments(key: str, expand: str = "") -> dict[str, Any]:
+        issue = jira._find(key)
+        items = []
+        for c in issue["fields"]["comment"]["comments"]:
+            item = {k: v for k, v in c.items() if k != "properties"}
+            item["body"] = adf_doc(c["body"])
+            if "properties" in expand:
+                item["properties"] = c.get("properties", [])
+            items.append(item)
+        return {"startAt": 0, "maxResults": len(items), "total": len(items), "comments": items}
+
+    @r.post("/issue/{key}/comment", status_code=201)
+    async def comment(key: str, request: Request, kind: Annotated[TokenKind, Depends(write)]) -> dict[str, Any]:
+        body = await request.json()
+        text = check_adf(body.get("body"), "comment")
+        created = jira.comment(key, text, kind)
+        issue = jira._find(key)
+        stored = next(c for c in issue["fields"]["comment"]["comments"] if c["id"] == created["id"])
+        stored["properties"] = list(body.get("properties") or [])
+        return {**created, "body": adf_doc(text)}
+
+    @r.get("/issue/{key}/transitions", dependencies=[read])
+    def transitions(key: str) -> dict[str, Any]:
+        jira._find(key)
+        return {"transitions": [{"id": t["id"], "name": t["name"], "to": {"name": t["to"]}} for t in TRANSITIONS]}
+
+    @r.post("/issue/{key}/transitions", status_code=204)
+    async def transition(key: str, request: Request, kind: Annotated[TokenKind, Depends(write)]) -> Response:
+        body = await request.json()
+        wanted = str((body.get("transition") or {}).get("id", ""))
+        target = next((t for t in TRANSITIONS if t["id"] == wanted), None)
+        if target is None:
+            raise BadRequest(
+                "bad transition", {"errorMessages": ["Transition id is not valid for this issue."], "errors": {}}
+            )
+        jira.update(key, {"status": target["to"]}, None, kind)
+        return Response(status_code=204)
+
+    @r.delete("/issue/{key}", status_code=204)
+    def delete(key: str, kind: Annotated[TokenKind, Depends(write)]) -> Response:
+        jira.delete(key, kind)
+        return Response(status_code=204)
+
+    @r.get("/project/search", dependencies=[read])
+    def projects(query: str = "", maxResults: int = 50) -> dict[str, Any]:
+        values = [p for p in jira.data["projects"] if query.lower() in (p["key"] + p["name"]).lower()]
+        return {"values": values[:maxResults], "isLast": True, "total": len(values)}
+
+    @r.get("/user/search", dependencies=[read])
+    def users(query: str = "") -> list[dict[str, Any]]:
+        people = jira.data.get("users") or [
+            {
+                "accountId": "5b10ac8d82e05b22cc7d4ef5",
+                "displayName": "Alice Martin",
+                "emailAddress": "alice@example.test",
+                "active": True,
+            },
+            {
+                "accountId": "5b10a2844c20165700ede21g",
+                "displayName": "Bob Durand",
+                "emailAddress": "bob@example.test",
+                "active": True,
+            },
+        ]
+        q = query.lower()
+        return [u for u in people if q and (q in u["displayName"].lower() or q in u["emailAddress"].lower())]
+
+    @r.post("/_throttle", include_in_schema=False)
+    async def throttle(request: Request) -> dict[str, int]:
+        state["throttle"] = int((await request.json()).get("count", 1))
+        return state
+
+    return r

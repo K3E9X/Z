@@ -15,7 +15,7 @@ from fastapi import HTTPException, Request
 TOOLS = ("defectdojo", "cmdb", "logos", "jira", "gitlab", "confluence")
 TokenKind = Literal["read", "write"]
 Access = Literal["read", "write"]
-Scheme = Literal["token", "bearer", "gitlab", "git"]
+Scheme = Literal["token", "bearer", "gitlab", "git", "basic"]
 
 
 def default_tokens() -> dict[str, dict[str, str]]:
@@ -38,7 +38,7 @@ def extract_token(scheme: Scheme, headers: Any) -> str | None:
         return auth[7:].strip()
     if scheme == "gitlab" and headers.get("private-token"):
         return str(headers.get("private-token"))
-    if scheme == "git" and low.startswith("basic "):
+    if scheme in {"git", "basic"} and low.startswith("basic "):
         try:
             _, _, password = base64.b64decode(auth[6:]).decode().partition(":")
         except ValueError:

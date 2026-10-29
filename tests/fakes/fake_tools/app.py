@@ -78,6 +78,7 @@ def create_app(seed: dict[str, Any] | None = None, tokens: dict[str, dict[str, s
     app.include_router(cmdb.router(store))
     app.include_router(logos.router(store))
     app.include_router(jira.router(store, jira_api))
+    app.include_router(jira.router_v3(store, jira_api))
     app.include_router(confluence.router(store, conf_api))
     app.include_router(gitlab.router(store, gl))
 

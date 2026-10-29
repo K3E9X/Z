@@ -153,4 +153,17 @@ def materialize(manifest: dict[str, Any], connector_dir: Path | None = None) -> 
             continue
         floor, cls, exposed = decide(manifest, match, None)
         found[match] = OperationSpec(match, f"{manifest.get('kind')}:{match}", floor, cls, exposed, {"type": "object"})
+    for op in found.values():
+        builtin = builtin_schema(f"{manifest.get('name')}.{op.local_id}")
+        if builtin is not None:
+            op.input_schema = builtin
     return list(found.values())
+
+
+def builtin_schema(operation_id: str) -> dict[str, Any] | None:
+    """Writes with a built-in preview take the reviewer-facing payload (models/actions.py), not the tool's native
+    request: the agent proposes it, the reviewer reads it, the executor maps it to the tool's API."""
+    from z_common.models.actions import BUILTIN_PAYLOADS
+
+    model = BUILTIN_PAYLOADS.get(operation_id)
+    return model.model_json_schema(by_alias=True) if model is not None else None
