@@ -4,4 +4,9 @@
 # deps:* (osv-scanner, pip-audit, pnpm audit, trivy fs), iac (trivy config), sast (semgrep/bandit rule id), *.
 # Leaked secrets have no exceptions: rotate them.
 #   - {id: CVE-2026-12345, scope: image:z-runner, reason: "Not reachable: ...", owner: "@K3E9X", expires: 2026-12-31}
-exceptions: []
+exceptions:
+  - id: KSV-0109
+    scope: iac
+    reason: "trivy config flags ConfigMaps z-config (client_secret: ${OIDC_CLIENT_SECRET}) and z-postgres-init (CREATE ROLE ... PASSWORD :'app_pw'): both hold env references, the values come from Secrets. Ignored by id, so fix the chart wording or move to per-path ignores before expiry."
+    owner: "@K3E9X"
+    expires: 2027-01-31
