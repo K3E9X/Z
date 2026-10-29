@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from z_common.connectors.browser import connector_problems as browser_problems
+from z_common.connectors.queries import connector_problems as query_problems
 from z_common.contracts import contracts_dir
 from z_common.models.enums import OperationClass
 from z_common.packs import Pack, discover
@@ -161,7 +162,7 @@ def lint(packs: list[Pack], repo_root: Path) -> Report:
                 report.error(_rel(doc.path, repo_root), f"connector {cname!r} already defined")
             connectors[cname] = (pack, doc.data)
             _lint_connector_rules(doc.data, pack, _rel(doc.path, repo_root), report)
-            for problem in browser_problems(doc.data):
+            for problem in browser_problems(doc.data) + query_problems(doc.data):
                 report.error(_rel(doc.path, repo_root), problem)
             for known in connector_operations(doc.data, pack.root):
                 operations[known.full_id] = known
