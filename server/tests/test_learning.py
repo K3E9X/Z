@@ -371,3 +371,27 @@ def test_signals_come_from_review_and_guardrails(app: TestClient, jars: dict[str
     kinds = {s["kind"]: s for s in app.get("/api/v1/signals", params={"agent": "ticket-manager"}).json()["items"]}
     assert {"guardrail_hit", "action_edited", "action_rejected"} <= set(kinds), kinds
     assert kinds["action_edited"]["payload"]["after"]["summary"] == "A better ticket"
+
+
+def test_shadow_replay_of_recent_missions(app: TestClient, llm: FakeLLM, jars: dict[str, dict[str, str]]) -> None:
+    from z_server import learner
+    from z_server.workers import learning
+
+    # a real mission of the summarizer succeeded earlier: its prompt and accepted answer are the reference
+    made = app.post(
+        "/api/v1/missions", json={"prompt": "Summarise notes.md", "agents": ["summarizer"]}, headers=csrf(app)
+    )
+    assert made.status_code == 201, made.text
+    play_all(app, lambda spec: GOOD)
+    reject_twice(app, jars)
+    llm.add_rules({"match": PLANNER, "responses": [{"json": {"proposals": [SKILL_EDIT]}}]})
+    llm.add_rules(
+        {"match": RUBRIC, "responses": [{"json": {"score": 2, "justification": "same facts"}}], "repeat": True}
+    )
+    [pid] = call(app, learner.observe)
+    specs = play_all(app, lambda spec: GOOD)
+    replayed = [s for s in specs if s["prompt"] == "Summarise notes.md"]
+    assert len(replayed) == 1 and replayed[0]["skills"][0]["content"] == SKILL_EDIT["skill_content"]
+    call(app, learning.tick)
+    proposal = app.get(f"/api/v1/proposals/{pid}").json()
+    assert proposal["status"] == "ready" and proposal["shadow"] == {"missions": 1, "matched": 1}, proposal

@@ -313,7 +313,22 @@ async def start_evaluation(db: AsyncSession, state: AppState, proposal: Proposal
         proposal_id=proposal.id,
         overrides={"skills": {skill.name: (proposal.candidate or {}).get("content", skill.content)}},
     )
-    proposal.shadow = None
+    limit = int((state.config.get("learning") or {}).get("shadow_replay_missions", 10))
+    shadow = (
+        await evals.start_shadow(
+            db,
+            state,
+            principal,
+            agent,
+            model,
+            {"skills": {skill.name: (proposal.candidate or {}).get("content", skill.content)}},
+            proposal.id,
+            limit,
+        )
+        if limit > 0
+        else None
+    )
+    proposal.shadow = None if shadow else {"missions": 0, "matched": 0}
     proposal.status = ProposalStatus.evaluating.value
     proposal.eval_before, proposal.eval_after = None, None
     proposal.regressions = []
@@ -334,11 +349,30 @@ async def gate(state: AppState) -> list[str]:
                     await db.execute(select(EvalRun).where(EvalRun.proposal_id == pid).order_by(EvalRun.created_at))
                 ).scalars()
             )
-            if proposal is None or len(runs) < 2 or any(r.status in {"queued", "running"} for r in runs[-2:]):
+            kind = {
+                r.id: (
+                    "shadow"
+                    if (r.overrides or {}).get("shadow")
+                    else "try"
+                    if (r.overrides or {}).get("try")
+                    else "after"
+                    if r.overrides
+                    else "before"
+                )
+                for r in runs
+            }
+            befores = [r for r in runs if kind[r.id] == "before"]
+            afters = [r for r in runs if kind[r.id] == "after"]
+            shadows = [r for r in runs if kind[r.id] == "shadow"]
+            if proposal is None or not befores or not afters:
                 continue
-            before, after = runs[-2], runs[-1]
-            if before.overrides and not after.overrides:
-                before, after = after, before
+            before, after = befores[-1], afters[-1]
+            if any(r.status in {"queued", "running"} for r in (before, after, *shadows[-1:])):
+                continue
+            if shadows:  # informative: how often the candidate agrees with answers accepted in production
+                last = shadows[-1]
+                matched = sum(1 for c in last.cases if c.get("rubric") and all(x["score"] == 2 for x in c["rubric"]))
+                proposal.shadow = {"missions": len(last.cases), "matched": matched}
             if before.status != "succeeded" or after.status != "succeeded":
                 proposal.status = ProposalStatus.discarded.value
                 proposal.regressions = ["the evaluation could not be graded"]
@@ -476,7 +510,7 @@ async def try_on_mission(db: AsyncSession, state: AppState, proposal: Proposal, 
         cases=[],
         created_by=user.username,
         proposal_id=proposal.id,
-        overrides={"skills": {proposal.target: (proposal.candidate or {}).get("content", "")}},
+        overrides={"skills": {proposal.target: (proposal.candidate or {}).get("content", "")}, "try": True},
     )
     db.add(run)
     await db.flush()

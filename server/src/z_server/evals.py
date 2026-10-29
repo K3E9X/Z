@@ -159,6 +159,103 @@ async def start(
         ).all()
         if c.review_status == "approved"
     )
+    entries = await _launch(db, state, user, run, agent, pack, cases, model, writes, target)
+    run.cases = entries
+    await audit.record(
+        db,
+        audit.Actor(f"user:{user.username}"),
+        "eval.started",
+        "eval_run",
+        run.id,
+        after={"target": target, "model": model, "cases": len(entries)},
+    )
+    return run
+
+
+async def start_shadow(
+    db: AsyncSession,
+    state: AppState,
+    user: Principal,
+    agent: Agent,
+    model: str,
+    overrides: dict[str, Any],
+    proposal_id: str,
+    limit: int,
+) -> EvalRun | None:
+    """Shadow replay (docs/08 §4.2): the candidate replays the prompts of the agent's latest succeeded real
+    missions (reads are real, writes captured) and the judge compares each answer with the one accepted then."""
+    rows = (
+        await db.execute(
+            select(Job, Mission)
+            .join(Mission, Mission.id == Job.mission_id)
+            .where(
+                Job.agent_id == agent.id,
+                Job.status == "succeeded",
+                Job.output.is_not(None),
+                Mission.eval_run_id.is_(None),
+                Mission.status == "succeeded",
+            )
+            .order_by(Job.ended_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    if not rows:
+        return None
+    run = EvalRun(
+        id=new_id("evr"),
+        target=f"agent:{agent.name}",
+        target_version=agent.version,
+        model=model,
+        status="running",
+        cases=[],
+        created_by=user.username,
+        overrides={**overrides, "shadow": True},
+        proposal_id=proposal_id,
+    )
+    db.add(run)
+    await db.flush()
+    entries: list[dict[str, Any]] = []
+    for job, mission in rows:
+        reference = json.dumps(job.output, ensure_ascii=False)[:3000]
+        case = EvalCase.model_validate(
+            {
+                "id": f"shadow-{mission.id}",
+                "input": {"prompt": job.prompt or mission.prompt or mission.title},
+                "checks": [],
+                "rubric": [
+                    f"The answer agrees in substance with this reference answer accepted in production: {reference}"
+                ],
+            }
+        )
+        entries += await _launch(
+            db, state, user, run, agent, agent.pack, [case], model, [], run.target, list(mission.connectors or [])
+        )
+    run.cases = entries
+    await audit.record(
+        db,
+        audit.Actor(f"user:{user.username}"),
+        "eval.started",
+        "eval_run",
+        run.id,
+        after={"shadow": True, "cases": len(entries)},
+    )
+    return run
+
+
+async def _launch(
+    db: AsyncSession,
+    state: AppState,
+    user: Principal,
+    run: EvalRun,
+    agent: Agent,
+    pack: str | None,
+    cases: list[EvalCase],
+    model: str,
+    writes: list[str],
+    target: str,
+    connectors: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """One mission per case for `agent` with `model`, attached to `run` (writes captured, never applied)."""
     entries = []
     for case in cases:
         files = case.context_fixtures or {}
@@ -183,7 +280,7 @@ async def start(
                 playbook=None,
                 inputs={},
                 plan=plan,
-                connectors=[],
+                connectors=list(connectors or []),
                 data_class=None,
                 autonomy=None,
                 plan_first=False,
@@ -210,16 +307,7 @@ async def start(
             )
         await service.start(db, state, mission)
         entries.append({"id": case.id, "mission_id": mission.id, "case": case.dump()})
-    run.cases = entries
-    await audit.record(
-        db,
-        audit.Actor(f"user:{user.username}"),
-        "eval.started",
-        "eval_run",
-        run.id,
-        after={"target": target, "model": model, "cases": len(entries)},
-    )
-    return run
+    return entries
 
 
 # ---------------------------------------------------------------- eval missions: captured writes, answered questions
