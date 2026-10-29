@@ -74,8 +74,12 @@ def root(
         bool, typer.Option("--version", callback=_version, is_eager=True, help="Print the version.")
     ] = False,
 ) -> None:
-    st = guarded(lambda: state.set_state(state.State(config=Config.load(), url_override=url, profile=profile)))
-    output.configure(theme or st.setting("theme"), no_color=no_color)
+    def setup() -> state.State:
+        st = state.set_state(state.State(config=Config.load(), url_override=url, profile=profile))
+        output.configure(theme or st.setting("theme"), no_color=no_color)
+        return st
+
+    st = guarded(setup)
     if ctx.invoked_subcommand is not None:
         return
     if prompt is not None:
