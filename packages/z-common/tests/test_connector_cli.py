@@ -23,7 +23,9 @@ def test_argv_placeholders_and_optional_arguments() -> None:
         render_argv(["--selector={{args.selector}}"], {})
 
 
-@pytest.mark.parametrize("value", ["--kubeconfig=/etc/x", "-A", "a\nb", "x\x00", {"a": 1}, ["x"]])
+@pytest.mark.parametrize(
+    "value", ["--kubeconfig=/etc/x", "-A", "a\nb", "x\x00", {"a": 1}, ["x"], -1, -0.5, float("-inf"), float("nan")]
+)
 def test_values_cannot_become_flags_or_structure(value: object) -> None:
     with pytest.raises(CliError):
         render_argv(["get", "{{args.name}}"], {"name": value})
@@ -60,3 +62,14 @@ def test_static_checks() -> None:
     assert connector_problems({**manifest, "cli": {"image": "kubectl:latest"}, "declared": []}) == [
         "cli.image must be pinned by digest (name@sha256:...)"
     ]
+
+
+def test_an_optional_value_after_a_flag_must_be_attached() -> None:
+    def problems(command: list[str], required: list[str]) -> list[str]:
+        op = {"id": "x.get", "command": command, "input_schema": {"properties": {"o": {}}, "required": required}}
+        return connector_problems({"kind": "cli", "cli": {"image": IMAGE}, "declared": [op]})
+
+    swallowing = problems(["tool", "--output", "{{args.o}}", "--dry-run"], [])
+    assert any("optional argument o follows the flag --output" in p for p in swallowing)
+    assert problems(["tool", "--output={{args.o}}", "--dry-run"], []) == []
+    assert problems(["tool", "--output", "{{args.o}}"], ["o"]) == []

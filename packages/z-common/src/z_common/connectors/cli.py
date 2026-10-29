@@ -8,6 +8,8 @@ arguments never reach the environment.
 
 from __future__ import annotations
 
+import itertools
+import math
 import re
 from typing import Any
 
@@ -28,7 +30,9 @@ def _value(name: str, value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, int | float):
-        return str(value)
+        if isinstance(value, float) and not math.isfinite(value):
+            raise CliError(f"argument {name} must be a finite number")
+        value = str(value)  # then checked like text: -1 would be a flag
     if not isinstance(value, str):
         raise CliError(f"argument {name} must be a string, number or boolean")
     if value.startswith("-"):
@@ -91,8 +95,18 @@ def connector_problems(manifest: dict[str, Any]) -> list[str]:
             continue
         if len(command) > MAX_ARGV:
             problems.append(f"operation {op_id}: at most {MAX_ARGV} command elements")
-        declared = set(((op.get("input_schema") or {}).get("properties") or {}).keys())
+        schema = op.get("input_schema") or {}
+        declared = set((schema.get("properties") or {}).keys())
+        required = set(schema.get("required") or [])
         used = {n for element in command for n in ARG.findall(element)}
+        for before, element in itertools.pairwise(command):
+            alone = ARG.fullmatch(element.strip())
+            if alone and alone.group(1) not in required and before.startswith("-") and "=" not in before:
+                problems.append(
+                    f"operation {op_id}: optional argument {alone.group(1)} follows the flag {before}: when it is "
+                    f"left out the flag would take the next element; write {before}={{{{args.{alone.group(1)}}}}} "
+                    "or make the argument required"
+                )
         if missing := sorted(used - declared):
             problems.append(f"operation {op_id}: the command uses undeclared arguments {', '.join(missing)}")
         for element in command:
