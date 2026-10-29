@@ -8,6 +8,9 @@ dependencies = [
   "httpx>=0.27",
   "typer>=0.13",
   "rich>=13.9",
+  "textual>=8.2",     # interactive session (inline) and z top (full screen), docs/10
+  "keyring>=25.0",    # Z CLI token in the OS keyring (fallback: 0600 file), docs/10 §4
+  "pyyaml>=6.0",      # z admin groups dry-run|apply read YAML mappings
 ]
 
 [project.scripts]

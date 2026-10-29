@@ -1,12 +1,6 @@
-"""`z` entrypoint. Workstream B4 implements the subcommands."""
+"""`z` and `zctl` entrypoint."""
 
-import sys
-
-
-def main() -> int:
-    print("z: not built yet (BUILD phase B4)", file=sys.stderr)
-    return 2
-
+from z_cli.app import main
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
