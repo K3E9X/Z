@@ -223,3 +223,55 @@ async def test_api_requires_the_token(base_url: str) -> None:
         assert resp.status_code == 422  # a click needs a selector
     with pytest.raises(RuntimeError):
         create_app("short")
+
+
+async def center(rec: Any, selector: str) -> tuple[float, float]:
+    box = await rec.page.locator(selector).first.bounding_box()
+    assert box is not None
+    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+
+
+async def test_record_then_replay(browser: Any, base_url: str) -> None:
+    from z_browser.record import Recorder, RecordError
+
+    recorder = Recorder()
+    creds = Credentials(username="auditor", password=PASSWORD)
+    rec = await recorder.start(browser, base_url, None, "/login", creds)
+    for field, sel in (("username", "#user"), ("password", "#pass")):
+        x, y = await center(rec, sel)
+        await rec.act({"kind": "click", "x": x, "y": y})
+        await rec.act({"kind": "credential", "field": field})
+    x, y = await center(rec, "#go")
+    await rec.act({"kind": "click", "x": x, "y": y})
+    await rec.act({"kind": "goto", "url": "/rules?q=deny"})
+    x, y = await center(rec, "#rules td")
+    await rec.act({"kind": "extract", "what": "table", "x": x, "y": y, "name": "rules"})
+    with pytest.raises(RecordError, match="not an allowed host"):
+        await rec.act({"kind": "goto", "url": "https://example.org/"})
+    state = await rec.state()
+    assert state["url"] == "rules?q=deny" or state["url"].endswith("/rules?q=deny")
+    assert base64.b64decode(state["screen_jpeg"])[:2] == b"\xff\xd8"  # a JPEG
+    steps = rec.flow()["steps"]
+    assert [s["action"] for s in steps] == ["click", "fill", "click", "fill", "click", "goto", "extract_table"]
+    assert steps[1]["value"] == "{{auth.username}}" and steps[3]["value"] == "{{auth.password}}"
+    assert PASSWORD not in str(steps)  # the credential is typed, never recorded
+    assert steps[1]["selector"] == "#user" and steps[-1]["selector"] == "#rules"
+    flow = BrowserFlow.model_validate(rec.flow())  # the draft passes the same checks as a reviewed flow
+    await recorder.close(rec.id)
+    replayed = await replay(browser, flow, base_url, {}, creds)
+    assert replayed.ok, replayed.error
+    assert replayed.data["rules"] == [{"Name": "deny-telnet", "Port": "tcp/23", "State": "on"}]
+
+
+async def test_typed_arguments_become_placeholders(browser: Any, base_url: str) -> None:
+    from z_browser.record import Recorder
+
+    recorder = Recorder()
+    rec = await recorder.start(browser, base_url, None, "/login", Credentials())
+    x, y = await center(rec, "#user")
+    await rec.act({"kind": "click", "x": x, "y": y})
+    await rec.act({"kind": "type", "text": "auditor", "arg": "who"})
+    await rec.act({"kind": "type", "text": "literal"})
+    await rec.act({"kind": "undo"})
+    assert rec.flow()["steps"][-1] == {"action": "fill", "selector": "#user", "value": "{{args.who}}"}
+    await recorder.close(rec.id)

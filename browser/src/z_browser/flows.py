@@ -92,28 +92,25 @@ def _first_line(exc: BaseException) -> str:
     return (str(exc).strip().splitlines() or [type(exc).__name__])[0][:500]
 
 
-class Replay:
-    def __init__(
-        self, browser: Browser, flow: BrowserFlow, base_url: str | None, args: dict[str, Any], creds: Credentials
-    ) -> None:
-        self.browser, self.flow, self.base_url, self.args, self.creds = browser, flow, base_url, args, creds
-        self.hosts = hosts_for(base_url, flow.allowed_hosts)
+class Guard:
+    """The route handler of every browser context: http(s) to allowlisted hosts only, credential headers only to
+    the connector's own host. The browser follows redirects without calling the route again, so the guard
+    fetches each request itself without following redirects, checks the next hop, and hands the 3xx back to the
+    browser (whose request for the new location comes through here again)."""
+
+    def __init__(self, hosts: list[str], base_url: str | None, creds: Credentials, blocked: list[str]) -> None:
+        self.hosts, self.creds, self.blocked = hosts, creds, blocked
         self.base_host = (urlparse(base_url or "").hostname or "").lower()
-        self.result = FlowResult(ok=False)
-        self.text_budget = MAX_TEXT_CHARS
 
-    def _block(self, url: str) -> None:
+    def block(self, url: str) -> None:
         host = urlparse(url).hostname or url[:60]
-        if host not in self.result.blocked_hosts:
-            self.result.blocked_hosts.append(host)
+        if host not in self.blocked:
+            self.blocked.append(host)
 
-    async def _guard(self, route: Route, request: Request) -> None:
-        """The browser follows redirects without calling the route again, so the guard fetches each request
-        itself without following redirects, checks the next hop, and hands the 3xx back to the browser (whose
-        request for the new location comes through here again)."""
+    async def __call__(self, route: Route, request: Request) -> None:
         url = request.url
         if not host_allowed(url, self.hosts):
-            self._block(url)
+            self.block(url)
             await route.abort("blockedbyclient")
             return
         headers = dict(request.headers)
@@ -126,10 +123,21 @@ class Replay:
             return
         location = response.headers.get("location")
         if 300 <= response.status < 400 and location and not host_allowed(urljoin(url, location), self.hosts):
-            self._block(urljoin(url, location))
+            self.block(urljoin(url, location))
             await route.abort("blockedbyclient")
             return
         await route.fulfill(response=response)
+
+
+class Replay:
+    def __init__(
+        self, browser: Browser, flow: BrowserFlow, base_url: str | None, args: dict[str, Any], creds: Credentials
+    ) -> None:
+        self.browser, self.flow, self.base_url, self.args, self.creds = browser, flow, base_url, args, creds
+        self.hosts = hosts_for(base_url, flow.allowed_hosts)
+        self.result = FlowResult(ok=False)
+        self.guard = Guard(self.hosts, base_url, creds, self.result.blocked_hosts)
+        self.text_budget = MAX_TEXT_CHARS
 
     def _url(self, raw: str) -> str:
         url = resolve_url(self.base_url, render(raw, self.args, in_url=True))
@@ -227,7 +235,7 @@ class Replay:
         page: Page | None = None
         secrets = self.creds.secrets()
         try:
-            await context.route("**/*", self._guard)
+            await context.route("**/*", self.guard)
             page = await context.new_page()
             if self.flow.start_url:
                 await page.goto(self._url(self.flow.start_url), wait_until="load", timeout=DEFAULT_STEP_TIMEOUT_MS)
