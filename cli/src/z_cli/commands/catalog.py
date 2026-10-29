@@ -185,6 +185,27 @@ def skills_versions(skill: str, as_json: JsonOpt = False) -> None:
     )
 
 
+@command(skills_app, "rollback")
+def skills_rollback(
+    skill: str,
+    to: Annotated[str, typer.Option("--to", help="The version to go back to (see `z skills versions`).")],
+    reason: Annotated[str | None, typer.Option(help="Why, kept in the audit log.")] = None,
+    yes: YesOpt = False,
+    as_json: JsonOpt = False,
+) -> None:
+    """Roll a skill back to an earlier version; agents load it from their next job."""
+    if not confirm(f"Roll {skill} back to {to}?", yes=yes or as_json):
+        raise typer.Exit(1)
+    body: dict[str, Any] = {"to_version": to}
+    if reason:
+        body["reason"] = reason
+    s = state.get().api().post(f"/skills/{skill}/rollback", body)
+    if as_json:
+        output.print_json(s)
+    else:
+        output.success(f"{s['name']} is back to v{s['version']}")
+
+
 # ---------------------------------------------------------------- playbooks
 
 

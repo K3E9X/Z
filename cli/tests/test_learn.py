@@ -143,3 +143,13 @@ def test_connect_a_personal_account(z: Z, live: LiveServer, monkeypatch: Any) ->
         assert conn["status"] == "active" and conn["read_scopes"] and conn["write_scopes"]
         assert bob("disconnect", conn["id"], "--yes").exit_code == 0
         assert json.loads(bob("connections", "--json").output)[0]["status"] == "revoked"
+
+
+def test_skills_rollback(z: Z, live: LiveServer) -> None:
+    erin = z.as_user("erin")  # builder: skills:write
+    current = json.loads(erin("skills", "show", "summarize", "--json").output)["version"]
+    unknown = erin("skills", "rollback", "summarize", "--to", "0.0.1", "--yes")
+    assert unknown.exit_code == 1 and "no version 0.0.1" in plain(unknown.output), unknown.output
+    same = erin("skills", "rollback", "summarize", "--to", current, "--reason", "test", "--yes")
+    assert same.exit_code == 1 and "already the current version" in plain(same.output), same.output
+    assert erin("skills", "rollback", "summarize", "--to", current).exit_code == 2  # no terminal: needs --yes

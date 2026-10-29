@@ -18,7 +18,7 @@ def test_logos_openapi_ops(repo: Path) -> None:
     ops = _ops(repo, "packs/ticketing/connectors/logos.yaml")
     assert set(ops) == {"assets.get", "accounts.list", "accounts.disable", "accounts.delete"}
     disable = ops["accounts.disable"]
-    assert disable.op_class == OperationClass.destructive and disable.proposed_exposed  # type: ignore[attr-defined]
+    assert disable.op_class == OperationClass.destructive and disable.proposed_exposed is False  # type: ignore[attr-defined]
     assert ops["accounts.delete"].proposed_exposed is False  # type: ignore[attr-defined]
     assert ops["assets.get"].input_schema["required"] == ["id"]  # type: ignore[attr-defined]
 

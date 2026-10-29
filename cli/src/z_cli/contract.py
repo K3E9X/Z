@@ -58,6 +58,7 @@ def _ops() -> list[tuple[str, re.Pattern[str], type[ZModel] | None, type[ZModel]
         ("GET", "/skills", None, cat.Skill, "page"),
         ("GET", f"/skills/{ID}", None, cat.Skill, "one"),
         ("GET", f"/skills/{ID}/versions", None, cat.SkillVersion, "list"),
+        ("POST", f"/skills/{ID}/rollback", cat.SkillRollback, cat.Skill, "one"),
         ("GET", "/playbooks", None, cat.Playbook, "page"),
         ("GET", f"/playbooks/{ID}", None, cat.Playbook, "one"),
         ("GET", "/connectors", None, cat.Connector, "list"),
