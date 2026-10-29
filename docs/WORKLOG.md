@@ -64,6 +64,12 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   Secret. The connector builder drafts them (`POST /connectors/import` source `cli`).
 - GraphQL import by introspection (ADR 0020 §5): one document per query field (read) and per mutation (at least a
   write: read verbs are dropped from mutation ids), scalar leaves two levels deep, typed variables.
+- Mattermost tool connector (workplace pack): API v4 subset checked against mattermost/mattermost api/v4/source;
+  posts carry `props.z_action` set by the executor (the body schema gives agents no `props`), so recovery after a
+  crash searches the channel's posts since the proposal instead of posting twice. Rule ids need a read verb for
+  the pack linter (`threads.get`, not `posts.thread`).
+- Trap: FastAPI fakes defined inside a function must not use `from __future__ import annotations` with
+  `Annotated[..., Depends(local)]` (the string annotation cannot be resolved and becomes a query parameter).
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).

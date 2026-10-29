@@ -79,6 +79,9 @@ No tool is out of reach: anything below ships as a template (YAML + operation cl
 
 Out of scope by decision: SIEM, SOC and DFIR tooling (handled by an existing tool).
 
+Mattermost ships in the `workplace` pack: channels, posts and threads read with the read account; posts and replies
+applied by the executor with the write account, tagged `props.z_action` so a crash never posts twice.
+
 ## 8. Microsoft 365 in detail
 - **Two Entra ID app registrations**, so read and write stay apart even for delegated access: `z-m365-read` (read scopes, tokens held by the gateway) and `z-m365-write` (write scopes, tokens held by the executor only).
   - **Delegated (user) connections**: each person connects their own account from *Settings → Connections* and consents to both apps (two OAuth authorization code + PKCE flows, two token sets stored separately). Agents work on that person's mail, calendar and files only in missions that person starts or triggers they own. Refresh of read tokens happens in the gateway, of write tokens in the executor. Revocable by the user.

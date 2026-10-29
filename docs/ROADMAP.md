@@ -34,9 +34,9 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | done |
 | Trace replay, Evals, Analytics screens | done |
 | Agent builder | done (`POST /agents/draft` and the web builder) |
-| `workplace` pack | done (assistant and researcher agents, inbox triage and weekly report; m365 backed by a shipped Graph v1.0 subset spec) |
+| `workplace` pack | done (assistant and researcher agents, inbox triage and weekly report; m365 backed by a shipped Graph v1.0 subset spec, optional mattermost connector) |
 | Objectives and assignments (proactive agents) | done (API, z and connector metrics, suggestions in Review, read-only auto-start within budget, `report_objective` endpoint, Objectives screen) |
-| Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | doing (Microsoft 365 mail, calendar, chats, transcripts and file metadata; small file uploads to OneDrive/SharePoint with raw text bodies; Google Workspace and Slack/Mattermost as tool connectors later) |
+| Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | doing (Microsoft 365 mail, calendar, chats, transcripts and file metadata; small file uploads to OneDrive/SharePoint with raw text bodies; Mattermost channels, threads, posts and replies with crash-safe posting; Google Workspace and Slack as tool connectors later) |
 | Channels: Teams bot, Slack, Mattermost, inbound email | done (inbound, replies, follow-up approval cards linking to Z; ADR 0015, 0017) |
 | Personal (delegated) connections | done (OAuth PKCE per user, read and write grants apart) |
 | Notifications (Mattermost, Slack, email, webhook) | done (Slack, Mattermost, Teams, signed webhooks and SMTP email through a transactional outbox, budget and break-glass alerts, Admin → Notifications, personal email about one's own missions in Settings; ADR 0023) |
