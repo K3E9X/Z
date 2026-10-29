@@ -5049,6 +5049,12 @@ export interface components {
             operations?: components["schemas"]["OperationPolicy"];
             rate_limit?: components["schemas"]["RateLimit"];
             health?: components["schemas"]["HealthProbe"];
+            /** @description openapi/rest: for APIs that report errors in a 2xx body (Slack: {"ok": false, "error": "..."}), a 2xx answer whose body field `path` equals `equals` is an error; `message` names the field that holds the reason. */
+            error_body?: {
+                path: string;
+                equals: unknown;
+                message?: string;
+            };
             data_class?: components["schemas"]["DataClass"];
             /** @description cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` replaces the image CMD (it follows the ENTRYPOINT when the image has one), with {{args.<name>}} placeholders; no shell. */
             cli?: {

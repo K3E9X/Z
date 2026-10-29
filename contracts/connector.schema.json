@@ -33,6 +33,15 @@
     "operations": { "$ref": "#/$defs/OperationPolicy" },
     "rate_limit": { "$ref": "#/$defs/RateLimit" },
     "health": { "$ref": "#/$defs/HealthProbe" },
+    "error_body": {
+      "type": "object", "additionalProperties": false, "required": ["path", "equals"],
+      "description": "openapi/rest: for APIs that report errors in a 2xx body (Slack: {\"ok\": false, \"error\": \"...\"}), a 2xx answer whose body field `path` equals `equals` is an error; `message` names the field that holds the reason.",
+      "properties": {
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" },
+        "equals": {},
+        "message": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" }
+      }
+    },
     "data_class": { "$ref": "common.schema.json#/$defs/DataClass" },
     "cli": {
       "type": "object", "additionalProperties": false, "required": ["image"],
