@@ -90,7 +90,19 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   claims a queued job whose old runner is still referenced (reap first) - this also fixes retried
   needs_attention jobs getting a second runner while the first was parked. UI page and z top wording.
 
+- Browser recording by demonstration (ADR 0016 item 9): worker sessions behind the replay guard, unique-selector
+  candidates, credentials typed by the worker and recorded as `{{auth.*}}`, arguments as `{{args.x}}`; server
+  proxy per admin with audit per input; UI recorder page (live screenshot, click modes, typing, keys, goto,
+  extract, undo, save into the connector for review). Proven in the real UI against the fake console. Found by
+  the smoke: an empty start URL opened a 404 page and every click recorded `html` - clicks on no element are
+  refused now and recordings start at the connector's flow start page.
+- CI round 2: images, chart policy and helm green. Fixed shellcheck SC2015 in verify-signatures.sh, a semgrep
+  finding on the CLI editor launch (reviewed: local user's EDITOR, argv), and compose never seeding the packs
+  (`z-seed` one-shot service; the e2e failed with "no playbook summarize-file").
+
 Lessons / traps:
+- Never `pkill -f`/`awk` on a pattern that appears in your own command line (it kills the shell): start
+  helpers from a script file and kill by PID.
 - `.gitignore` has `*.pem`: placeholder files must not end in .pem (CI could not find `empty-ca.pem`).
 - This sandbox's proxy blocks deb.debian.org and dl-cdn.alpinelinux.org: apk/apt steps are only proven in CI.
 - Docker Hub rate-limits pulls here (429) for a while; the Hub tag API still gives index digests.
