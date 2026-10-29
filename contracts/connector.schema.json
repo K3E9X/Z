@@ -180,6 +180,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "provider": { "type": "string", "enum": ["microsoft", "google"], "description": "Identity platform conventions: microsoft (endpoints from tenant_id, offline_access scope, client credentials with <API origin>/.default) or google (Google endpoints by default, access_type=offline and prompt=consent for a refresh token, delegated flows only: Google has no client credentials grant). Without it: microsoft when tenant_id is set, otherwise the plain OAuth 2.0 authorization code flow with offline_access." },
         "tenant_id": { "type": "string" },
         "authorize_url": { "type": "string" },
         "token_url": { "type": "string" },

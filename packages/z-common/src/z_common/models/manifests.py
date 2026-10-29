@@ -307,6 +307,7 @@ class OAuthApp(ZModel):
 
 
 class OAuthApps(ZModel):
+    provider: Literal["microsoft", "google"] | None = None
     tenant_id: str | None = None
     authorize_url: str | None = None
     token_url: str | None = None

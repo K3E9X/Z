@@ -4787,7 +4787,7 @@ export interface components {
             /** @constant */
             kind: "chat_message";
             /** @enum {string} */
-            platform: "teams" | "slack" | "mattermost";
+            platform: "teams" | "slack" | "mattermost" | "google_chat";
             target: string;
             text: string;
         };
@@ -5053,6 +5053,11 @@ export interface components {
             write?: components["schemas"]["Auth"];
         };
         OAuthApps: {
+            /**
+             * @description Identity platform conventions: microsoft (endpoints from tenant_id, offline_access scope, client credentials with <API origin>/.default) or google (Google endpoints by default, access_type=offline and prompt=consent for a refresh token, delegated flows only: Google has no client credentials grant). Without it: microsoft when tenant_id is set, otherwise the plain OAuth 2.0 authorization code flow with offline_access.
+             * @enum {string}
+             */
+            provider?: "microsoft" | "google";
             tenant_id?: string;
             authorize_url?: string;
             token_url?: string;
@@ -5226,6 +5231,11 @@ export interface components {
                     secret?: components["schemas"]["SecretRef"];
                 };
                 OAuthApps: {
+                    /**
+                     * @description Identity platform conventions: microsoft (endpoints from tenant_id, offline_access scope, client credentials with <API origin>/.default) or google (Google endpoints by default, access_type=offline and prompt=consent for a refresh token, delegated flows only: Google has no client credentials grant). Without it: microsoft when tenant_id is set, otherwise the plain OAuth 2.0 authorization code flow with offline_access.
+                     * @enum {string}
+                     */
+                    provider?: "microsoft" | "google";
                     tenant_id?: string;
                     authorize_url?: string;
                     token_url?: string;

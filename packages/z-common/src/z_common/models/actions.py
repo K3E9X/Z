@@ -85,7 +85,7 @@ class EventPreview(ZModel):
 
 class ChatMessagePreview(ZModel):
     kind: Literal["chat_message"]
-    platform: Literal["teams", "slack", "mattermost"]
+    platform: Literal["teams", "slack", "mattermost", "google_chat"]
     target: str
     text: str
 

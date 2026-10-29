@@ -79,7 +79,7 @@
     },
     "ChatMessagePreview": {
       "type": "object", "additionalProperties": false, "required": ["kind", "platform", "target", "text"],
-      "properties": { "kind": { "const": "chat_message" }, "platform": { "type": "string", "enum": ["teams", "slack", "mattermost"] }, "target": { "type": "string" }, "text": { "type": "string" } }
+      "properties": { "kind": { "const": "chat_message" }, "platform": { "type": "string", "enum": ["teams", "slack", "mattermost", "google_chat"] }, "target": { "type": "string" }, "text": { "type": "string" } }
     },
     "FilePreview": {
       "type": "object", "additionalProperties": false, "required": ["kind", "name", "destination"],
