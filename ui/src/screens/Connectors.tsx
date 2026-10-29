@@ -162,7 +162,16 @@ function ExposureDialog({
   )
 }
 
-function OperationRow({ op, canManage }: { op: Operation; canManage: boolean }) {
+function OperationRow({
+  op,
+  connectorId,
+  canManage,
+}: {
+  op: Operation
+  /** The connector's id: its operations query is keyed by id (op.connector is the connector's name). */
+  connectorId: string
+  canManage: boolean
+}) {
   const qc = useQueryClient()
   const toast = useToast()
   const stepUp = useStepUp()
@@ -182,7 +191,7 @@ function OperationRow({ op, canManage }: { op: Operation; canManage: boolean }) 
         },
       )
       await Promise.all([
-        qc.invalidateQueries({ queryKey: qk.operations(op.connector) }),
+        qc.invalidateQueries({ queryKey: qk.operations(connectorId) }),
         qc.invalidateQueries({ queryKey: qk.connectors }),
       ])
     } catch (e) {
@@ -357,7 +366,12 @@ function Detail({ id }: { id: string }) {
           {() => (
             <ul className="m-0 list-none p-0">
               {shown.map((o) => (
-                <OperationRow key={o.id} op={o} canManage={canManage && con.review_status === 'approved'} />
+                <OperationRow
+                  key={o.id}
+                  op={o}
+                  connectorId={id}
+                  canManage={canManage && con.review_status === 'approved'}
+                />
               ))}
               {list.length > shown.length && (
                 <li className="py-2.5">

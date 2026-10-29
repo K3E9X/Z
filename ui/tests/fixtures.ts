@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { Mission } from '@/api/types'
+import type { Connector, Mission, Operation } from '@/api/types'
 
 export function mission(patch: Partial<Mission> = {}): Mission {
   return {
@@ -17,6 +17,39 @@ export function mission(patch: Partial<Mission> = {}): Mission {
     tokens_out: 0,
     created_at: new Date().toISOString(),
     started_at: new Date().toISOString(),
+    ...patch,
+  }
+}
+
+export function connector(patch: Partial<Connector> = {}): Connector {
+  return {
+    id: 'con_1',
+    name: 'jira',
+    kind: 'openapi',
+    display_name: 'Jira',
+    data_class: 'C1',
+    review_status: 'approved',
+    enabled: true,
+    health: { status: 'healthy' },
+    operations_total: 1,
+    operations_exposed: 0,
+    used_by: [],
+    manifest: {} as Connector['manifest'],
+    created_at: new Date().toISOString(),
+    ...patch,
+  }
+}
+
+export function operation(patch: Partial<Operation> = {}): Operation {
+  return {
+    id: 'jira.issues.get',
+    connector: 'jira',
+    source_ref: 'GET /issues/{key}',
+    class: 'read',
+    classifier_class: 'read',
+    exposed: false,
+    proposed_exposed: false,
+    input_schema: {},
     ...patch,
   }
 }
