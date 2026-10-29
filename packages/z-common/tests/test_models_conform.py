@@ -165,6 +165,10 @@ for _name in [
     "OperationPatch",
     "ApproveExposure",
     "ConnectorPatch",
+    "ConnectorTestRequest",
+    "ConnectorTestResult",
+    "ConnectorImport",
+    "ConnectorDraft",
 ]:
     API_MODELS[_name] = getattr(api_catalog, _name)
 for _name in [

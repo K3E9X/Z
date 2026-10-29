@@ -193,6 +193,9 @@ async def _seed_connectors(db: AsyncSession, pack: Pack, report: SeedReport) -> 
                     input_schema=op.input_schema,
                 )
             )
+        from z_server.gateway.admin import sync_credentials
+
+        await sync_credentials(db, connector)
         report.created.append(f"connector {name} (pending review)")
 
 

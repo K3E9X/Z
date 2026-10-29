@@ -19,7 +19,15 @@ from z_common.models.enums import (
     OperationClass,
     ReviewStatus,
 )
-from z_common.models.manifests import AgentProfile, ConnectorManifest, PlaybookInputs, PlaybookTrigger, Step, ToolRef
+from z_common.models.manifests import (
+    AgentProfile,
+    ConnectorManifest,
+    McpServer,
+    PlaybookInputs,
+    PlaybookTrigger,
+    Step,
+    ToolRef,
+)
 
 
 class EvalsSummary(ZModel):
@@ -229,3 +237,35 @@ class ApproveExposure(ZModel):
 class ConnectorPatch(ZModel):
     manifest: ConnectorManifest | None = None
     enabled: bool | None = None
+
+
+class ConnectorTestRequest(ZModel):
+    operation: str | None = None
+    params: dict[str, Any] | None = None
+    credential_id: str | None = None
+
+
+class ConnectorTestResult(ZModel):
+    ok: bool
+    latency_ms: int
+    status_code: int | None = None
+    detail: str
+    sample: Any = None
+
+
+class ConnectorImport(ZModel):
+    source: Literal["openapi", "graphql", "mcp", "docs"]
+    name: Slug
+    display_name: str | None = None
+    base_url: str | None = None
+    spec_url: str | None = None
+    spec: dict[str, Any] | str | None = None
+    mcp: McpServer | None = None
+    docs: str | None = None
+    data_class: DataClass | None = None
+
+
+class ConnectorDraft(ZModel):
+    manifest: ConnectorManifest
+    operations: list[Operation]
+    warnings: list[str] = Field(default_factory=list)
