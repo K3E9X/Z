@@ -455,3 +455,11 @@ async def patch_playbook(ctx: CtxDep, id: str, body: dict[str, Any]) -> m.Playbo
     await ctx.db.flush()
     await ctx.audit("playbook.updated", "playbook", row.id, before=before, after=body)
     return await playbook_out(ctx, row)
+
+
+@router.operation("draftAgent")
+async def draft_agent(ctx: CtxDep, body: dict[str, Any]) -> dict[str, Any]:
+    """Agent builder: a drafted, sanitized profile to edit before creating it (nothing is created here)."""
+    from z_server import agent_builder
+
+    return await agent_builder.draft(ctx.db, ctx.state, ctx.user, str(body["description"]), body.get("team"))
