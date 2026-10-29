@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -234,5 +235,8 @@ def test_lint_warns_on_small_eval_suites(packs_copy: Path) -> None:
     report = lint(discover(packs_copy), packs_copy.parent)
     assert any("vuln-analyst" in w and "eval suite has 1 cases, fewer than 10" in w for w in report.warnings)
     skill = packs_copy / "vuln/skills/triage-finding/SKILL.md"
-    skill.write_text(skill.read_text().replace("---\n", "---\nevals: evals/nope.jsonl\n", 1))
+    text = re.sub(r"^evals: .*$", "evals: evals/nope.jsonl", skill.read_text(), count=1, flags=re.M)
+    skill.write_text(
+        text if "evals: evals/nope.jsonl" in text else text.replace("---\n", "---\nevals: evals/nope.jsonl\n", 1)
+    )
     assert any("eval file evals/nope.jsonl not found" in e for e in _errors(packs_copy))
