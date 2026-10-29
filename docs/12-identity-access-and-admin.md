@@ -125,6 +125,7 @@ z admin mapping list · z admin mapping test --user alice     # dry run
 z admin sessions list · z admin sessions revoke --user alice
 z admin tokens list · z admin tokens revoke <id>
 z admin audit search --actor alice --since 7d · z admin audit verify
+z admin inference-key status · z admin inference-key set · z admin inference-key check   # key read hidden or from stdin (ADR 0027)
 ```
 
 ## 4. Audit log
