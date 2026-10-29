@@ -236,7 +236,7 @@ database:
 
 # --------------------------------------------------------------------------------------------------- Secrets
 secrets:
-  # Name of an existing Secret with the keys Z_SECRET_KEY, LITELLM_MASTER_KEY and optionally
+  # Name of an existing Secret with the keys Z_SECRET_KEY, LITELLM_MASTER_KEY, Z_METRICS_TOKEN and optionally
   # OIDC_CLIENT_SECRET, INFERENCE_API_KEY. Empty: the chart creates `<fullname>-secrets` from the values below
   # (empty Z_SECRET_KEY / LITELLM_MASTER_KEY are generated once and kept across upgrades and uninstall).
   existingSecret: ""
@@ -244,6 +244,7 @@ secrets:
   litellmMasterKey: ""
   oidcClientSecret: ""
   inferenceApiKey: ""
+  metricsToken: ""         # bearer token for GET /metrics (empty: generated once and kept)
   # External Secrets Operator: render an ExternalSecret that writes the Secret `<fullname>-secrets` instead.
   externalSecret:
     enabled: false

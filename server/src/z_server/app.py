@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
@@ -156,7 +158,12 @@ def create_app(
         return JSONResponse({"status": "ok", "version": __version__, "checks": {"database": {"ok": True}}})
 
     @app.get("/metrics", include_in_schema=False)
-    async def metrics() -> PlainTextResponse:
+    async def metrics(request: Request) -> PlainTextResponse:
+        # Runners can reach z-server: metrics need Z_METRICS_TOKEN as a bearer token (required in production).
+        token = os.environ.get("Z_METRICS_TOKEN", "")
+        given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        if (token and not hmac.compare_digest(given, token)) or (not token and settings.production):
+            return PlainTextResponse("not found", status_code=404)
         return PlainTextResponse(generate_latest().decode(), media_type=CONTENT_TYPE_LATEST)
 
     return app

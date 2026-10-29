@@ -172,6 +172,7 @@
         "litellmMasterKey": { "type": "string" },
         "oidcClientSecret": { "type": "string" },
         "inferenceApiKey": { "type": "string" },
+        "metricsToken": { "type": "string" },
         "externalSecret": {
           "type": "object",
           "properties": {

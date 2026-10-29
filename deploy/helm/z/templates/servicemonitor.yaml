@@ -20,4 +20,9 @@ spec:
       path: /metrics
       interval: {{ .Values.metrics.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ include "z.secretName" . }}
+          key: Z_METRICS_TOKEN
 {{- end }}

@@ -291,3 +291,10 @@ def login_location(client: TestClient, oidc: FakeGitLabOIDC, login: Callable[...
 def test_readyz_and_metrics(client: TestClient) -> None:
     assert client.get("/readyz").json()["checks"]["database"]["ok"] is True
     assert client.get("/metrics").status_code == 200
+
+
+def test_metrics_need_the_token_when_set(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("Z_METRICS_TOKEN", "m3trics-token-for-tests")
+    assert client.get("/metrics").status_code == 404
+    assert client.get("/metrics", headers={"Authorization": "Bearer wrong"}).status_code == 404
+    assert client.get("/metrics", headers={"Authorization": "Bearer m3trics-token-for-tests"}).status_code == 200

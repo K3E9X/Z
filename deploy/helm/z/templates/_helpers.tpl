@@ -173,6 +173,11 @@ in the Secret. External: the DSN comes from database.existingSecret.
       name: {{ $secret }}
       key: OIDC_CLIENT_SECRET
       optional: true
+- name: Z_METRICS_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secret }}
+      key: Z_METRICS_TOKEN
 - name: OIDC_ISSUER_URL
   value: {{ .Values.oidc.issuerUrl | quote }}
 - name: OIDC_CLIENT_ID
