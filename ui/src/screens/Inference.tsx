@@ -153,7 +153,7 @@ function ProviderDialog({ open, onClose }: { open: boolean; onClose: () => void 
               id={id}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Anthropic API"
+              placeholder="External API"
             />
           )}
         </Field>
@@ -165,7 +165,7 @@ function ProviderDialog({ open, onClose }: { open: boolean; onClose: () => void 
             </Select>
           )}
         </Field>
-        <Field label="Aliases" hint="As declared in LiteLLM, e.g. ext-claude" className="sm:col-span-2">
+        <Field label="Aliases" hint="As declared in LiteLLM, e.g. ext-large" className="sm:col-span-2">
           {(id, d) => (
             <Input
               id={id}
