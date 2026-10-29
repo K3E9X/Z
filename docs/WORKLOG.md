@@ -32,6 +32,16 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
 - Container restart mid-session stopped the sub-agents; briefs now live in `.claude/briefs/*.md` so they can be
   relaunched in their existing worktrees.
 
+- Gateway (B3): per-job MCP endpoint, executor (Jira Cloud, GitLab with git helper), connector admin
+  (create/patch/test/import), health monitor, git_clone workspaces. Jira and GitLab pack connectors are now REST
+  (Jira Cloud v3, GitLab v4): their MCP versions needed external servers with placeholder commands.
+- B1: usage/budgets/providers/inference/analytics/global stream; triggers, signed webhooks, cron schedules, Jira
+  polling, tasks board.
+- CLI (B4) merged (41 tests). Server fixes from its report: CLI sign-in audited as the user, agent handles
+  resolved, LiteLLM key errors are 503 problems.
+- Open requests from the CLI report (need contract changes): a CLI step-up flow (POST /auth/step-up refuses CLI
+  sessions, so admin writes from the CLI fail with exit 4 in OIDC mode) and GET /questions/{id}.
+
 Lessons / traps:
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
   `uv sync --all-packages`.
