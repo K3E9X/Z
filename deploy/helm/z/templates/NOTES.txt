@@ -1,0 +1,31 @@
+Z {{ .Chart.AppVersion }} is deployed in namespace {{ .Release.Namespace }} (runners: {{ .Values.runners.namespace }}).
+
+URL: {{ include "z.publicUrl" . }}
+
+First connection (docs/12 §1): the server prints the one-time password of the bootstrap admin at its first
+start (valid 24 h, shown once):
+
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "z.server.fullname" . }} | grep bootstrap
+
+Sign in at {{ include "z.publicUrl" . }}/signin as z-bootstrap, configure GitLab sign-in and the group
+mapping, then sign in with GitLab as an admin: the bootstrap account is disabled automatically.
+Lost it? kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "z.server.fullname" . }} -- z-server bootstrap --reset
+{{- $missing := list }}
+{{- range $n, $img := dict "server" .Values.server.image "runners" .Values.runners.image "ui" .Values.ui.image "litellm" .Values.litellm.image "postgres" .Values.postgres.image }}
+{{- if not $img.digest }}{{ $missing = append $missing $n }}{{ end }}
+{{- end }}
+{{- if $missing }}
+
+WARNING: images without a digest: {{ join ", " $missing }}. Deploy by digest (<component>.image.digest).
+{{- if and (eq .Values.env "production") (not .Values.runners.image.digest) }}
+z-server REFUSES TO START with env=production until runners.image.digest is set (Z_RUNNER_IMAGE@sha256:...).
+{{- end }}
+{{- end }}
+{{- if not .Values.persistence.artifacts.enabled }}
+
+WARNING: persistence.artifacts.enabled=false: artifacts live in an emptyDir and are lost with the pod.
+{{- end }}
+{{- if not .Values.runners.networkPolicy.enabled }}
+
+WARNING: runners.networkPolicy.enabled=false: agent pods are not network-isolated (docs/07 §3).
+{{- end }}
