@@ -259,3 +259,79 @@ def sessions_revoke(session_id: str, yes: YesOpt = False, as_json: JsonOpt = Fal
         output.print_json({"id": session_id, "revoked": True})
     else:
         output.success(f"Session {session_id} revoked")
+
+
+# ---------------------------------------------------------------- personal connections (docs/05 §6)
+
+
+@command(app, "connect")
+def connect(
+    connector: Annotated[str, typer.Argument(help="Connector name, e.g. m365.")],
+    purpose: Annotated[str, typer.Option("--purpose", help="read, write or both (two consents, two apps).")] = "both",
+    no_browser: Annotated[
+        bool, typer.Option("--no-browser", help="Print the consent link instead of opening it.")
+    ] = False,
+    timeout: Annotated[int, typer.Option("--timeout", help="Seconds to wait for each consent.")] = 300,
+    as_json: JsonOpt = False,
+) -> None:
+    """Connect your own account to a tool (delegated access used only in missions you start)."""
+    import time
+    import webbrowser
+
+    if purpose not in {"read", "write", "both"}:
+        raise UsageError("--purpose is read, write or both")
+    api = state.get().api()
+    for p in ["read", "write"] if purpose == "both" else [purpose]:
+        url = api.post(f"/me/connections/{connector}/oauth/start", {"purpose": p})["redirect_url"]
+        if no_browser or not webbrowser.open(url):
+            output.note(f"Open this link to give Z {p} access to {connector}:\n{url}")
+        else:
+            output.note(f"Your browser opened the {p} consent for {connector}.")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            rows = [c for c in api.get("/me/connections") if c["connector"] == connector]
+            scopes = (rows[0].get(f"{p}_scopes") if rows else None) or []
+            if rows and rows[0]["status"] == "active" and scopes:
+                break
+            time.sleep(2)
+        else:
+            raise UsageError(f"no {p} consent received for {connector} within {timeout} s")
+    final = [c for c in api.get("/me/connections") if c["connector"] == connector]
+    if as_json:
+        output.print_json(final[0] if final else None)
+        return
+    output.success(f"Connected to {connector}.")
+
+
+@command(app, "connections")
+def connections(as_json: JsonOpt = False) -> None:
+    """Your personal connections."""
+    rows = state.get().api().get("/me/connections")
+    if as_json:
+        output.print_json(rows)
+        return
+    output.out().print(
+        output.table(
+            ["Connection", "Connector", "Status", "Read scopes", "Write scopes", "Last used"],
+            [
+                [
+                    c["id"],
+                    c["connector"],
+                    c["status"],
+                    " ".join(c["read_scopes"]),
+                    " ".join(c["write_scopes"]),
+                    c.get("last_used_at") or "never",
+                ]
+                for c in rows
+            ],
+        )
+    )
+
+
+@command(app, "disconnect")
+def disconnect(connection_id: str, yes: YesOpt = False) -> None:
+    """Revoke a personal connection (its tokens are deleted)."""
+    if not confirm(f"Revoke {connection_id}?", yes=yes):
+        return
+    state.get().api().delete(f"/me/connections/{connection_id}")
+    output.success(f"{connection_id} revoked.")

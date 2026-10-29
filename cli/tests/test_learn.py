@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from typing import Any
+from urllib.parse import urlparse
 
 from cli.tests.harness import LiveServer, Z, plain
 
@@ -57,3 +59,66 @@ def test_learning_commands(z: Z, live: LiveServer) -> None:
     bob = z.as_user("bob")
     denied = bob("eval", "@summarizer", "--no-wait")
     assert denied.exit_code == 4 and "learning:apply" in plain(denied.output)
+
+
+def test_connect_a_personal_account(z: Z, live: LiveServer, monkeypatch: Any) -> None:
+    import httpx
+
+    from tests.fakes.fake_tools import FakeTools
+
+    with FakeTools() as tools:
+        base = tools.url_for("m365")
+        monkeypatch.setenv("MAIL_READ_SECRET", "read-secret")
+        monkeypatch.setenv("MAIL_WRITE_SECRET", "write-secret")
+        manifest = {
+            "name": "mail",
+            "kind": "rest",
+            "display_name": "Mail",
+            "base_url": f"{base}/v1.0",
+            "oauth": {
+                "authorize_url": f"{base}/oauth2/authorize",
+                "token_url": f"{base}/oauth2/token",
+                "read_app": {"client_id": "read-client", "secret": "env:MAIL_READ_SECRET"},
+                "write_app": {"client_id": "write-client", "secret": "env:MAIL_WRITE_SECRET"},
+            },
+            "auth": {
+                "read": {"user": {"flow": "authorization_code_pkce", "app": "read_app", "scopes": ["Mail.Read"]}},
+                "write": {"user": {"flow": "authorization_code_pkce", "app": "write_app", "scopes": ["Mail.Send"]}},
+            },
+            "declared": [
+                {
+                    "id": "messages.list",
+                    "description": "Mail",
+                    "method": "GET",
+                    "path": "/me/messages",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+            "data_class": "C2",
+        }
+        alice = z.as_user("alice")
+        live.fresh_step_up("alice")
+        admin = live.http(alice.token())
+        assert admin.post("/api/v1/connectors", json=manifest).status_code == 201
+        assert (
+            admin.post(
+                "/api/v1/connectors/mail/approve-exposure",
+                json={"operations": [{"id": "mail.messages.list", "exposed": True}]},
+            ).status_code
+            == 200
+        )
+
+        def consent(url: str, *args: Any, **kwargs: Any) -> bool:  # what the person does in the browser
+            back = urlparse(httpx.get(url, follow_redirects=False).headers["location"])
+            httpx.get(f"{live.url}{back.path}?{back.query}", follow_redirects=False)  # public_url -> test server
+            return True
+
+        monkeypatch.setattr("webbrowser.open", consent)
+        bob = z.as_user("bob")
+        done = bob("connect", "mail", "--timeout", "20")
+        assert done.exit_code == 0 and "Connected to mail" in plain(done.output), done.output
+        listed = bob("connections", "--json")
+        [conn] = json.loads(listed.output)
+        assert conn["status"] == "active" and conn["read_scopes"] and conn["write_scopes"]
+        assert bob("disconnect", conn["id"], "--yes").exit_code == 0
+        assert json.loads(bob("connections", "--json").output)[0]["status"] == "revoked"
