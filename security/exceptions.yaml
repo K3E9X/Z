@@ -7,6 +7,9 @@
 exceptions:
   - id: KSV-0109
     scope: iac
-    reason: "trivy config flags ConfigMaps z-config (client_secret: ${OIDC_CLIENT_SECRET}) and z-postgres-init (CREATE ROLE ... PASSWORD :'app_pw'): both hold env references, the values come from Secrets. Ignored by id, so fix the chart wording or move to per-path ignores before expiry."
+    # trivy config reads env references as secrets in ConfigMaps z-config (client_secret: ${OIDC_CLIENT_SECRET})
+    # and z-postgres-init (PASSWORD :'app_pw'); the values come from Secrets. Ignored by id: fix the chart
+    # wording or move to per-path ignores before expiry.
+    reason: "False positive: env references in ConfigMaps z-config and z-postgres-init, values come from Secrets"
     owner: "@K3E9X"
     expires: 2027-01-31
