@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from .mattermost import mattermost_seed
+
 DAY = 86400.0
 
 INJECTION_TICKET = (
@@ -661,4 +663,5 @@ def default_seed() -> dict[str, Any]:
         "jira": jira_seed(),
         "gitlab": gitlab_seed(),
         "confluence": confluence_seed(),
+        "mattermost": mattermost_seed(),
     }
