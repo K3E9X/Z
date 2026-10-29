@@ -26,10 +26,8 @@ def test_sign_in_creates_user_session_and_audit(client: TestClient, oidc: FakeGi
     assert me["user"]["teams"][0]["name"] == "Cyber Ops"
     perms = {p["permission"] for p in me["permissions"]}
     assert "missions:start" in perms and "actions:approve" not in perms
-    assert all(
-        p["scope"].startswith("team:") or p["permission"] in {"missions:read", "agents:read"} or True
-        for p in me["permissions"]
-    )
+    # the operator role comes from a team-scoped group mapping: every grant is scoped to that team, none to org
+    assert {p["scope"] for p in me["permissions"]} == {f"team:{me['user']['teams'][0]['id']}"}
     audit = client.get("/api/v1/audit").json()["items"]
     assert any(e["action"] == "auth.login" and e["result"] == "success" for e in audit)
 

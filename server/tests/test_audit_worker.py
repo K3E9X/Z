@@ -86,7 +86,7 @@ def test_forwarding_is_at_least_once_with_a_cursor_per_target(admin: TestClient)
     senders: dict[str, worker.Sender] = {"https": sender, "syslog": sender}
     _forwarding(admin, https={"enabled": True, "url": "https://localhost:9/z"})
     _tick(admin, senders)  # a new destination starts from now: the settings change itself is already behind it
-    assert received == [] or all(seq > 0 for seq in received)
+    assert received == []
     received.clear()
     _event(admin)
     _event(admin)

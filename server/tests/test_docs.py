@@ -27,8 +27,9 @@ def test_signed_in_users_read_the_documentation(make_client: Callable[..., TestC
 
     adr = client.get("/api/v1/docs/adr-0028-google-workspace-connectors").json()
     assert adr["title"].startswith("ADR 0028") and adr["markdown"].startswith("# ADR 0028")
-    index = client.get("/api/v1/docs/05-connectors").json()["markdown"]
-    assert "(/docs/" in index or "](" not in index  # links between pages are rewritten when present
+    # 02-architecture links the ADRs with relative paths: they are served as app routes, none left relative
+    architecture = client.get("/api/v1/docs/02-architecture").json()["markdown"]
+    assert "](/docs/adr-0001-openhands-sdk-runtime)" in architecture and "](adr/" not in architecture
 
     for bad in ("../../etc/passwd", "WORKLOG", "unknown-page", "%2e%2e%2fsettings.py"):
         assert client.get(f"/api/v1/docs/{bad}").status_code == 404, bad
