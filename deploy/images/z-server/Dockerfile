@@ -1,5 +1,5 @@
 # z-server: one image, every entrypoint (api, all, migrate, ...). Non-root, read-only root filesystem friendly.
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+ARG PYTHON_IMAGE=python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
 ARG RUNTIME_IMAGE=${PYTHON_IMAGE}
 
 FROM ${PYTHON_IMAGE} AS build

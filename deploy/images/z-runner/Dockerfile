@@ -1,7 +1,7 @@
 # z-runner: runs one agent job and exits (docs/04 §1, §8). Non-root, works with a read-only root filesystem:
 # only /workspace and /tmp must be writable mounts (emptyDir / tmpfs). As PID 1, z-runner forwards signals and
 # reaps orphaned processes itself (no extra init binary).
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+ARG PYTHON_IMAGE=python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
 # Runtime base: the same image by default. A pack image may start from a base that already has its build tools.
 ARG RUNTIME_IMAGE=${PYTHON_IMAGE}
 
