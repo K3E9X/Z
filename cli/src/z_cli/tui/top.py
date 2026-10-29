@@ -617,7 +617,8 @@ class TopApp(App[int]):
         self.push_screen(
             TextScreen(
                 Text(
-                    f"Workspace shell ({session.get('mode')}) until {session.get('expires_at')}:\n{session.get('terminal_url')}"
+                    f"Job paused. Its workspace ({session.get('mode')}) is open until {session.get('expires_at')}:\n"
+                    f"{session.get('terminal_url')}\nEnd the take-over there to resume."
                 )
             )
         )
