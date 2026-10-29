@@ -155,3 +155,17 @@ def test_mission_plans_must_be_ordered(app: TestClient) -> None:
     }
     resp = app.post("/api/v1/missions", json={"title": "x", "prompt": "x", "plan": plan}, headers=csrf(app))
     assert resp.status_code == 422 and "not earlier steps" in resp.text
+
+
+def test_platform_key_failure_is_unavailable(make_client: Callable[..., TestClient], oidc: FakeGitLabOIDC) -> None:
+    from z_server.llm.litellm import LlmKeyError
+
+    class Broken(RecordingKeyAdmin):
+        async def create(self, *a: Any, **k: Any) -> Any:
+            raise LlmKeyError("gateway down")
+
+    client = make_client(llm_keys=Broken(), litellm_url="http://127.0.0.1:9")
+    seed_packs(client)
+    use_jar(client, sign_in_as(client, oidc, "bob"))
+    resp = draft(client, "plan the week for the whole team")
+    assert resp.status_code == 503 and "platform key" in resp.json()["detail"]

@@ -254,7 +254,10 @@ async def draft(
         return Draft(single, suggested, parsed, _estimate([chosen[0]]))
     pool = chosen or list((await db.execute(select(Agent).where(Agent.status != "disabled"))).scalars())
     model = str((state.config.get("inference") or {}).get("planner_model", "z-heavy"))
-    key = await chat.platform_key(db, state)
+    try:
+        key = await chat.platform_key(db, state)
+    except chat.ChatError as exc:
+        raise Problem("unavailable", f"the planner could not draft a plan: {exc}") from exc
     team = await service._starter_team(db, user) or ""
     messages = [
         {"role": "system", "content": SYSTEM + "\n\n" + _catalog(pool, writes)},
