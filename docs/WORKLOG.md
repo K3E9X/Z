@@ -154,6 +154,21 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   (CI went red on b8dd30f8 for exactly this).
 - Traps: the dependency test caught an undeclared `anyio` import in the CLI (use asyncio.run); `MissionStatus`
   ends in `succeeded`, not `completed`; ZModel drops None fields, so read optional status keys with `.get`.
+- Bug hunt with agents (server races on a real Postgres, runner, UI, packs, tests/CI/docs, spec vs code). Server:
+  one lock order everywhere (mission row, then job/action/question row, then the audit lock;
+  `service.lock_with_mission`), slow runner operations lock only after their model or tool call
+  (`internal.DEFERRED_LOCK`), no lost token counts, the watchdog checks the attempt it saw, claims take an
+  advisory lock (caps hold across replicas), executor claim and recovery with SKIP LOCKED, the global stream pages
+  per mission on `seq`, an ended mission rejects its pending actions. Admin guardrails reach jobs
+  (`z_server.guardrails`). Deprovisioning revokes personal connections. Retention worker (ADR 0031). Memory facts
+  list/deactivate/restore (invariant 14). Team, agent and per-mission budgets, checked again before every job. API
+  rate limit per session. Sub-agent `budget_share` (migration 0005). Cost from `internal_cost_per_mtok`. Retry and
+  cancel-reason signals. Credentials in staged inputs make the mission C3. `z skills rollback`. Runner fixes and
+  the `patch_artifact` injection (ADR 0032). Docs now say what is built and list the known gaps (ROADMAP).
+- Trap: a test that reproduces a deadlock by taking the locks in the old order deadlocks whatever the server does:
+  drive the real request against a transaction that behaves like the other side instead.
+- Trap: gitleaks scans every local ref, including agent worktree branches; remove a merged worktree and its branch,
+  and list synthetic test tokens by exact fingerprint in `security/gitleaksignore` (or build them at runtime).
 
 ### Session 2 (autonomous night build)
 - Runner (B2) merged (113 tests). Aligned to the contract (`ControlMessage`).
