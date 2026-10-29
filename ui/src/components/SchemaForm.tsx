@@ -34,6 +34,24 @@ function str(v: unknown): string {
   return JSON.stringify(v)
 }
 
+/**
+ * `format: date-time` needs an offset (RFC 3339) but <input type="datetime-local"> has none: the field
+ * shows local time and the value is sent as ISO 8601 UTC.
+ */
+export function localInputToIso(v: string): string | undefined {
+  if (!v) return undefined
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? v : d.toISOString()
+}
+
+export function isoToLocalInput(v: unknown): string {
+  if (typeof v !== 'string' || !v) return ''
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return v
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function typeOf(s: JsonSchema): string {
   const t = Array.isArray(s.type) ? s.type.find((x) => x !== 'null') : s.type
   if (t) return t
@@ -195,6 +213,17 @@ function FieldFor({
         onChange={onChange}
       />
     )
+  } else if (schema.format === 'date-time') {
+    control = (
+      <Input
+        {...common}
+        type="datetime-local"
+        value={isoToLocalInput(value)}
+        onChange={(e) => {
+          onChange(localInputToIso(e.target.value))
+        }}
+      />
+    )
   } else if ((schema.maxLength ?? 0) > 200) {
     control = (
       <Textarea
@@ -210,15 +239,7 @@ function FieldFor({
     control = (
       <Input
         {...common}
-        type={
-          schema.format === 'date'
-            ? 'date'
-            : schema.format === 'date-time'
-              ? 'datetime-local'
-              : schema.format === 'uri'
-                ? 'url'
-                : 'text'
-        }
+        type={schema.format === 'date' ? 'date' : schema.format === 'uri' ? 'url' : 'text'}
         value={str(value)}
         onChange={(e) => {
           onChange(e.target.value)

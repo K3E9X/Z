@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { StackedBars } from '@/components/charts'
 import { activeToken, MentionTextarea, parseMentions, type MentionOption } from '@/components/MentionTextarea'
 import { PreviewView } from '@/components/previews'
@@ -78,6 +78,29 @@ describe('SchemaForm', () => {
       repos: ['api', 'billing'],
     })
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  describe('date-time fields', () => {
+    const tz = process.env.TZ
+    afterEach(() => {
+      if (tz === undefined) delete process.env.TZ
+      else process.env.TZ = tz
+    })
+    it('show local time and send ISO 8601 UTC with an offset', () => {
+      process.env.TZ = 'Europe/Paris'
+      let last: FormValue = {}
+      const dt: JsonSchema = {
+        type: 'object',
+        properties: { since: { type: 'string', format: 'date-time' } },
+      }
+      const { rerender } = render(<SchemaForm schema={dt} value={{}} onChange={(v) => (last = v)} />)
+      fireEvent.change(screen.getByLabelText(/Since/), { target: { value: '2026-03-01T09:30' } })
+      expect(last).toEqual({ since: '2026-03-01T08:30:00.000Z' })
+      rerender(<SchemaForm schema={dt} value={last} onChange={(v) => (last = v)} />)
+      expect(screen.getByLabelText(/Since/)).toHaveValue('2026-03-01T09:30')
+      fireEvent.change(screen.getByLabelText(/Since/), { target: { value: '' } })
+      expect(last).toEqual({ since: undefined })
+    })
   })
 })
 
