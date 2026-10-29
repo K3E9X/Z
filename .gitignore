@@ -40,3 +40,4 @@ artifacts/
 
 # agent worktrees (Claude Code)
 .claude/worktrees/
+.claude/briefs/

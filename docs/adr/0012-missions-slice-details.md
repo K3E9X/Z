@@ -43,6 +43,15 @@ Building B1 (missions, scheduler, runner protocol, review) required decisions th
     user 10001, runners network, read-only rootfs, all caps dropped, no-new-privileges only, tmpfs on /workspace
     and /tmp with nosuid,nodev, CPU/memory/pids limits, no mounts, devices, host namespaces or extra runtime).
 
+14. **Connector names** use lowercase letters and digits only: the contract's `Slug` allows `-` and
+    `OperationId` allows `_`, and a connector name is both a slug and the first segment of its operation ids.
+15. **Gateway verdicts** travel in the MCP result `_meta` (`io.z/judge`, `io.z/artifact`, `io.z/truncated`);
+    the runner copies them into its `tool_result` event. The gateway itself emits `judge`, `denied` and
+    `data_class` events and one audit record per call (`gateway.call`, runs-as = the read account).
+16. **Executor idempotency**: Jira issues carry a `z-<action id>` label and comments a `z` entity property;
+    an action found `applying` after a crash is looked up first, re-applied only when the operation is
+    idempotent, otherwise failed as "outcome unknown" for a human to check. Never a blind retry of a POST.
+
 ## Consequences
 The review inbox, CLI and web follow these rules; B3 implements the clone helper and the executor that applies
 approved actions; B6 adds the model stage of the judge on top of the same verdict shape.
