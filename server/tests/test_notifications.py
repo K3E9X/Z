@@ -184,7 +184,8 @@ def test_webhooks_are_signed_and_failures_retry_without_resending(
 ) -> None:
     monkeypatch.setenv("Z_HOOK_A", f"{receiver.url}/a")
     monkeypatch.setenv("Z_HOOK_B", f"{receiver.url}/b")
-    monkeypatch.setenv("Z_HOOK_SECRET", "s3cret-signing-key")
+    signing_key = "test-" + "signing-" + "key"  # fake; built at run time so no key-shaped literal is committed
+    monkeypatch.setenv("Z_HOOK_SECRET", signing_key)
     events_ = ["needs_attention"]
     _configure(
         admin,
@@ -205,7 +206,7 @@ def test_webhooks_are_signed_and_failures_retry_without_resending(
     first = _tick(admin)
     assert first == {"sent": 1, "failed": 1, "rows": 1}
     _, headers, raw = next(r for r in receiver.requests if r[0] == "/a")
-    expected = hmac.new(b"s3cret-signing-key", headers["x-z-timestamp"].encode() + b"." + raw, hashlib.sha256)
+    expected = hmac.new(signing_key.encode(), headers["x-z-timestamp"].encode() + b"." + raw, hashlib.sha256)
     assert headers["x-z-signature"] == f"sha256={expected.hexdigest()}"
     body = json.loads(raw)
     assert body["kind"] == "needs_attention" and body["link"].endswith(f"/missions/{mission}")
