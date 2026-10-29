@@ -93,8 +93,11 @@ def test_summarize_file_runs_in_a_hardened_runner(api: httpx.Client) -> None:
             ).stdout
         )[0]["Config"]["Env"]
     )
-    added = {e.split("=", 1)[0] for e in inspect["Config"]["Env"] if e not in image_env}
-    assert added == {"Z_SERVER_URL", "Z_JOB_ID", "Z_JOB_TOKEN"}, added  # no model key, no tool credential
+    added = dict(e.split("=", 1) for e in inspect["Config"]["Env"] if e not in image_env)
+    proxy_vars = {"HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy", "NO_PROXY", "no_proxy"}
+    # no model key, no tool credential: the job identity plus, when egress is configured, the egress proxy
+    assert set(added) - proxy_vars == {"Z_SERVER_URL", "Z_JOB_ID", "Z_JOB_TOKEN"}, sorted(added)
+    assert not any("@" in added[k] for k in proxy_vars & set(added)), "proxy URLs never carry credentials"
 
     mission = wait(api, mission_id, {"succeeded", "failed", "waiting", "cancelled", "timed_out", "budget_exceeded"})
     jobs = api.get(f"/missions/{mission_id}/jobs").json()["items"]
