@@ -38,7 +38,7 @@ Boundaries: user ↔ z-server (OIDC), z-server ↔ runner (job token), runner �
 - `z-runners`: default-deny ingress and egress; allow egress to pods labelled `z.io/runner-reachable: "true"` in namespace `z` (LiteLLM, api, gateway, egress proxy; set on whichever pods run them, including the single `all` pod), and DNS. Nothing else. The egress proxy allows only `egress.mirrors`.
 - Runner pods: `automountServiceAccountToken: false`, `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, `capabilities: drop [ALL]`, `seccompProfile: RuntimeDefault`, `emptyDir` for `/workspace` and `/tmp` with size limits, CPU/memory limits, `activeDeadlineSeconds`, `ttlSecondsAfterFinished`.
 - Optional `runtimeClassName: gvisor` (k3s: configure containerd with `runsc`; Kubernetes: per distribution).
-- The scheduler's ServiceAccount can only create, get, list, watch and delete Jobs and Pods (and read logs) in `z-runners`.
+- The scheduler's ServiceAccount can only create, get, list and delete Jobs, get and list Pods, read their logs, and create, get, patch and delete the per-job Secrets in `z-runners` (the Secret holding a job token is owned by its Job and goes with it).
 - Secrets via Kubernetes Secrets (encryption at rest enabled on the cluster) or External Secrets / Vault.
 - Ingress through the cluster's controller (Traefik on k3s, ingress-nginx or Gateway API elsewhere) with TLS; OIDC in-app, or oauth2-proxy in front if preferred.
 

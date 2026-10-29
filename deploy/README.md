@@ -1,7 +1,8 @@
 # Deploying Z
 
-Status of this build: **step 1 (base)**. The compose file runs Postgres, LiteLLM and z-server
-(API, sign-in, admin, audit). Runners, the web UI, the egress proxy and the Helm chart arrive with the next steps.
+Status: Docker Compose (Postgres, LiteLLM, z-server, z-ui on :8080, docker-socket-proxy, hardened runners) and the
+Helm chart for k3s and Kubernetes (`deploy/helm/z`, kubernetes executor) are ready. The egress proxy for package
+mirrors and the z-browser worker are not built yet: runners reach only Z and LiteLLM.
 
 ## Docker Compose (local or single host)
 

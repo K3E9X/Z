@@ -39,8 +39,8 @@ Values files:
 # k3s
 helm upgrade --install z deploy/helm/z -n z --create-namespace \
   -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
-# first connection: user z-bootstrap, one-time password from the Secret
-kubectl -n z get secret z-bootstrap -o jsonpath='{.data.password}' | base64 -d
+# first connection: user z-bootstrap, one-time password printed once by z-server at first start
+kubectl -n z logs deploy/z-server | grep bootstrap
 
 # Kubernetes
 helm upgrade --install z deploy/helm/z -n z --create-namespace \

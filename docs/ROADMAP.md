@@ -22,7 +22,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Admin area (web + `z admin`) | B1, B4, B5 | doing (API done; web and CLI pending) |
 | Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | doing (forwarding and the hourly checkpoint worker pending) |
 | CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | doing (python job, supply-chain checks) |
-| Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose base + z-server image) |
+| Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose with z-ui, Helm chart linted and kubeconform-valid for k3s and k8s, kubernetes executor; egress proxy and z-browser images pending) |
 | E2E and acceptance | C | todo |
 
 ## v1.1 — complete (BUILD P1)
