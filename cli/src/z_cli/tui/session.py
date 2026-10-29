@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import io
 import json
 import os
 from collections.abc import Awaitable, Callable
@@ -35,7 +36,7 @@ from z_cli.config import state_dir
 from z_cli.errors import CliError, NotAvailable
 from z_cli.live import MissionView
 from z_cli.render import mission_tree, status_text, tokens
-from z_cli.theme import THEME_NAMES, state_style
+from z_cli.theme import THEME_NAMES, rich_theme, state_style
 from z_cli.tui import decisions
 from z_cli.tui.common import Choice, apply_theme
 from z_cli.tui.top import edit_with_suspend
@@ -117,7 +118,7 @@ class PromptArea(TextArea):
             event.stop()
             event.prevent_default()
             if completing:
-                self.post_message(self.Nav("accept"))
+                self.post_message(self.Nav("enter"))
                 return
             self.post_message(self.Submitted(self.text))
             return
@@ -550,6 +551,9 @@ class SessionApp(App[int]):
                 view.apply(event)
                 block.redraw()
                 self.update_tasks()
+                if view.terminal and self.focus_id == mission_id:
+                    self.focus_id = None  # the next request starts a new mission
+                    self.update_status()
                 if event.get("type") in {"action_proposed", "question"} or (
                     event.get("type") == "status" and (event.get("payload") or {}).get("to") in {"waiting", "planned"}
                 ):
@@ -1109,22 +1113,31 @@ class SessionApp(App[int]):
         if event.text_area.id != "input":
             return
         text = event.text_area.text
-        row, col = event.text_area.cursor_location
-        line = text.split("\n")[row] if text else ""
-        before = line[:col]
-        word = before.split(" ")[-1] if before else ""
-        if text.startswith("/") and " " not in text:
-            items = [c for c in SLASH if c.startswith(text)]
+        _, _, word = self._token(event.text_area)
+        if word.startswith("/"):
+            items = [c for c in SLASH if c.startswith(word)]
         elif word.startswith("@"):
             items = [f"@{a['handle']}" for a in self.agents if a["handle"].startswith(word[1:])]
         elif word.startswith("#"):
             items = [f"#{c['name']}" for c in self.connectors if c["name"].startswith(word[1:])]
         else:
             items = []
-        if items and not (len(items) == 1 and items[0] == word):
+        if items and items != [word] and text:
             self.show_completion(items[:8])
         elif self._completion_mode == "complete":
             self.hide_completion()
+
+    @staticmethod
+    def _token(area: TextArea) -> tuple[int, int, str]:
+        """(row, start column, text) of the word being typed; a leading /command is the whole first word."""
+        row, col = area.cursor_location
+        lines = area.text.split("\n")
+        line = lines[row] if row < len(lines) else ""
+        before = line[:col]
+        if row == 0 and line.startswith("/") and " " not in before:
+            return row, 0, before
+        word = before.split(" ")[-1]
+        return row, col - len(word), word
 
     def show_completion(self, items: list[str], mode: str = "complete") -> None:
         box = self.query_one("#complete", OptionList)
@@ -1154,22 +1167,23 @@ class SessionApp(App[int]):
                 current = box.highlighted or 0
                 box.highlighted = (current + (1 if message.key == "down" else -1)) % n
                 return
-            if message.key == "accept":
+            if message.key in {"accept", "enter"}:
                 choice = self._completion_items[box.highlighted or 0]
                 if self._completion_mode == "history":
+                    self.hide_completion()
                     area.load_text(choice)
-                else:
-                    text = area.text
-                    row, col = area.cursor_location
-                    lines = text.split("\n")
-                    before, after = lines[row][:col], lines[row][col:]
-                    head = before[: len(before) - len(before.split(" ")[-1])]
-                    lines[row] = head + choice + " " + after.lstrip()
-                    area.load_text("\n".join(lines))
-                    area.cursor_location = (row, len(head) + len(choice) + 1)
-                self.hide_completion()
-                if self._completion_mode == "history":
                     area.cursor_location = area.document.end
+                    return
+                row, start, word = self._token(area)
+                self.hide_completion()
+                if message.key == "enter" and word == choice:
+                    area.post_message(PromptArea.Submitted(area.text))
+                    return
+                lines = area.text.split("\n")
+                col = start + len(word)
+                lines[row] = lines[row][:start] + choice + " " + lines[row][col:].lstrip()
+                area.load_text("\n".join(lines))
+                area.cursor_location = (row, start + len(choice) + 1)
                 return
         if message.key in {"up", "down"} and self.history:
             if self.history_pos is None:
@@ -1215,7 +1229,7 @@ class SessionApp(App[int]):
 
 
 def _plain(renderable: RenderableType) -> str:
-    console = Console(width=120, record=True, color_system=None, file=open(os.devnull, "w"))  # noqa: SIM115
+    console = Console(width=120, record=True, color_system=None, file=io.StringIO(), theme=rich_theme(None))
     console.print(renderable)
     return console.export_text().rstrip()
 
