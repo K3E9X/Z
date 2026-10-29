@@ -9,16 +9,26 @@ import {
 } from '@/api/queries'
 import { useCan } from '@/lib/auth'
 
-/** Counts shown next to the navigation (docs/09 §3: the Review count is visible everywhere). */
+/**
+ * Counts shown next to the navigation (docs/09 §3: the Review count is visible everywhere). Each source is
+ * fetched and polled only when the user holds its read permission: no 403 every few seconds.
+ */
 export function useShellData() {
   const canMissions = useCan('missions:read')
-  const review = useReview('all')
-  const running = useMissions({ status: 'running,waiting,paused,queued' }, { live: canMissions })
-  const agents = useAgents()
-  const connectors = useConnectors({ live: true })
-  const proposals = useProposals('ready')
-  const health = useInferenceHealth()
-  const budgets = useBudgets()
+  const canAgents = useCan('agents:read')
+  const canConnectors = useCan('connectors:read')
+  const canLearning = useCan('learning:read')
+  const canUsage = useCan('usage:read')
+  const review = useReview('all', { enabled: canMissions })
+  const running = useMissions(
+    { status: 'running,waiting,paused,queued' },
+    { live: canMissions, enabled: canMissions },
+  )
+  const agents = useAgents({ enabled: canAgents })
+  const connectors = useConnectors({ live: true, enabled: canConnectors })
+  const proposals = useProposals('ready', { enabled: canLearning })
+  const health = useInferenceHealth({ enabled: canUsage })
+  const budgets = useBudgets({ enabled: canUsage })
 
   const reviewCount = review.data?.counts.all ?? null
   const runningCount = running.data

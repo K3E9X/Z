@@ -84,10 +84,12 @@ export function CommandPalette({
   const me = useOptionalMe()
   const canStart = useCan('missions:start')
   const canControl = useCan('missions:control')
-  const agents = useAgents()
-  const missions = useMissions({ status: 'running,waiting,paused,queued' })
-  const playbooks = usePlaybooks()
-  const review = useReview('all')
+  // Only what the user may read: the palette is mounted on every screen.
+  const canMissions = useCan('missions:read')
+  const agents = useAgents({ enabled: useCan('agents:read') })
+  const missions = useMissions({ status: 'running,waiting,paused,queued' }, { enabled: canMissions })
+  const playbooks = usePlaybooks({}, { enabled: useCan('playbooks:read') })
+  const review = useReview('all', { enabled: canMissions })
 
   useEffect(() => {
     const d = ref.current

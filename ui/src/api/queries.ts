@@ -113,12 +113,16 @@ export interface MissionListParams {
   limit?: number
 }
 
-export function useMissions(params: MissionListParams = {}, opts: { live?: boolean } = {}) {
+export function useMissions(
+  params: MissionListParams = {},
+  opts: { live?: boolean; enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: qk.missions(params as Record<string, unknown>),
     queryFn: () => unwrap(api.GET('/missions', { params: { query: { limit: 100, ...params } } })),
     refetchInterval: opts.live ? 5_000 : false,
     placeholderData: keepPreviousData,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -179,7 +183,7 @@ export function useJobArtifacts(id: string | null) {
 
 export type ReviewKind = 'all' | 'writes' | 'questions' | 'suggestions'
 
-export function useReview(kind: ReviewKind = 'all', opts: { mission?: string } = {}) {
+export function useReview(kind: ReviewKind = 'all', opts: { mission?: string; enabled?: boolean } = {}) {
   return useQuery({
     queryKey: opts.mission ? [...qk.review(kind), opts.mission] : qk.review(kind),
     queryFn: () =>
@@ -189,6 +193,7 @@ export function useReview(kind: ReviewKind = 'all', opts: { mission?: string } =
         }),
       ),
     refetchInterval: POLL_MS,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -202,11 +207,12 @@ export function useAction(id: string | null) {
 
 // ------------------------------------------------------------------ catalog
 
-export function useAgents() {
+export function useAgents(opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.agents,
     queryFn: () => unwrap(api.GET('/agents', { params: { query: { limit: 200 } } })),
     staleTime: 30_000,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -266,12 +272,13 @@ export function useSkillVersions(id: string | null) {
   })
 }
 
-export function usePlaybooks(params: { domain?: string; q?: string } = {}) {
+export function usePlaybooks(params: { domain?: string; q?: string } = {}, opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.playbooks(params),
     queryFn: () => unwrap(api.GET('/playbooks', { params: { query: { limit: 200, ...params } } })),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -303,11 +310,12 @@ export function useTriggers(opts: { enabled?: boolean } = {}) {
 
 // ------------------------------------------------------------------ connectors
 
-export function useConnectors(opts: { live?: boolean } = {}) {
+export function useConnectors(opts: { live?: boolean; enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.connectors,
     queryFn: () => unwrap(api.GET('/connectors')),
     refetchInterval: opts.live ? 30_000 : false,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -345,11 +353,12 @@ export function useChannels() {
 
 // ------------------------------------------------------------------ inference and usage
 
-export function useInferenceHealth() {
+export function useInferenceHealth(opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.inferenceHealth,
     queryFn: () => unwrap(api.GET('/inference/health')),
     refetchInterval: 30_000,
+    enabled: opts.enabled ?? true,
   })
 }
 
@@ -382,8 +391,12 @@ export function useUsage(group_by: UsageGroup, from: string, to: string, bucket:
   })
 }
 
-export function useBudgets() {
-  return useQuery({ queryKey: qk.budgets, queryFn: () => unwrap(api.GET('/budgets')) })
+export function useBudgets(opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.budgets,
+    queryFn: () => unwrap(api.GET('/budgets')),
+    enabled: opts.enabled ?? true,
+  })
 }
 
 export function useDocs() {
@@ -423,11 +436,12 @@ export function useSignals() {
   })
 }
 
-export function useProposals(status?: string) {
+export function useProposals(status?: string, opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.proposals(status),
     queryFn: () =>
       unwrap(api.GET('/proposals', { params: { query: { limit: 100, ...(status ? { status } : {}) } } })),
+    enabled: opts.enabled ?? true,
   })
 }
 
