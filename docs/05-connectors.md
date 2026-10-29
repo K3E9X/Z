@@ -101,7 +101,8 @@ A mission records whose identity each call used; the History screen shows it as 
 | Outlook / email | Mail to a Z address (or forward) creates a task with attachments; reply to a Z mail answers a question | Digests (daily decisions, weekly report), notifications |
 | Slack / Mattermost | Mention or slash command `/z` | Thread updates, approval buttons |
 - Chat users are mapped to Z users through SSO; unknown users cannot start missions.
-- Approving from a chat card requires a fresh Z session check; **destructive actions and two-approver actions can only be approved in the Z app**.
+- Approving from a chat card requires a fresh Z session check; **destructive actions and two-approver actions can only be approved in the Z app**. In v1 every card links to the action's review in Z (ADR 0017); chat buttons never approve.
+- Follow-ups carry content (summaries, questions) only up to the channel's `content_up_to` data class (default C1); above it they say the details are in Z.
 - Channel content is untrusted input, scanned by the judge like any tool output.
 
 ## 11. Intake (tools pushing work to Z)
