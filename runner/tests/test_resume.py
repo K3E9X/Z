@@ -3,17 +3,22 @@ pod) starts from the last checkpoint and finishes without redoing the finished s
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import signal
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
-from runner.tests.conftest import Harness
+from z_runner.checkpoint import Checkpoint
+from z_runner.runner import EXIT_INTERRUPTED, Runner, RunnerConfig
+
+from runner.tests.conftest import Harness, JobRun
 from runner.tests.fake_internal import GOOD_SUMMARY, FakeJob, finish, tool_call, write_result
 
 
@@ -107,3 +112,61 @@ def test_kill_mid_job_then_resume_from_checkpoint(harness: Harness, tmp_path: Pa
     assert "Apply the summarize skill" in history  # the original task is still in the conversation
     assert "step1" in history  # and the result of the read done before the crash
     assert history.count("echo step1 >> counter.txt") == 1
+
+
+def _interrupted_at(harness: Harness, tools: dict[str, Any], step: int, tmp_path: Path) -> tuple[Any, FakeJob]:
+    """Run a job in-process until the checkpoint of `step`, then stop as on SIGTERM. Returns (spec, job)."""
+    spec = harness.spec(tools=tools)
+    job = harness.add(spec)
+    config = RunnerConfig(workspace_dir=tmp_path / "pod-1-ws", state_dir=tmp_path / "pod-1-state", strict_events=True)
+    runner = Runner(harness.server.url, spec.job_id, job.bootstrap_token, config)
+
+    def on_checkpoint(job_: FakeJob, record: dict[str, Any]) -> None:
+        if record["step"] == step:
+            runner.request_termination()
+
+    job.on_checkpoint = on_checkpoint
+    assert runner.run() == EXIT_INTERRUPTED
+    return spec, job
+
+
+def _resume(harness: Harness, spec: Any, job: FakeJob, tools: dict[str, Any], tmp_path: Path) -> JobRun:
+    checkpoint = job.checkpoints[-1]
+    resumed_spec = harness.spec(
+        job_id=spec.job_id,
+        tools=tools,
+        checkpoint_b64=checkpoint["blob_b64"],
+        resume_from_step=checkpoint["step"],
+        attempt=2,
+    )
+    return harness.run(resumed_spec, harness.add(resumed_spec), workspace=tmp_path / "pod-2-ws")
+
+
+def test_checkpoint_with_a_redacted_quoted_header_still_resumes(harness: Harness, tmp_path: Path) -> None:
+    # The command is stored JSON-escaped (`\"`): redacting the raw JSON text used to swallow the backslash.
+    command = 'echo "Authorization: Bearer abcdefgh12345" "password=hunter2hunter2" > hdr.txt'
+    harness.llm.add_rules(
+        {
+            "responses": [
+                tool_call("terminal", {"command": command}),
+                tool_call("read", {"path": "notes.md"}),
+                write_result(GOOD_SUMMARY),
+                finish("ok"),
+            ]
+        }
+    )
+    tools = {"local": ["read", "edit", "terminal"], "builtins": [], "gateway": []}
+    spec, job = _interrupted_at(harness, tools, 1, tmp_path)
+
+    backend = Checkpoint.decode(job.checkpoints[-1]["blob_b64"]).backend
+    with tarfile.open(fileobj=io.BytesIO(backend), mode="r:gz") as tar:
+        files = [m for m in tar if m.isfile() and m.name.endswith(".json")]
+        texts = [tar.extractfile(m).read().decode() for m in files]  # type: ignore[union-attr]
+    assert texts
+    for text in texts:
+        json.loads(text)  # every persistence file is still valid JSON
+    stored = "".join(texts)
+    assert "abcdefgh12345" not in stored and "hunter2hunter2" not in stored
+
+    run = _resume(harness, spec, job, tools, tmp_path)
+    assert run.completion["status"] == "succeeded", run.completion

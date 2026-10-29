@@ -78,6 +78,18 @@ def test_redactor_known_secrets_and_structures() -> None:
     assert Redactor().text("plain text, nothing secret") == "plain text, nothing secret"
 
 
+def test_redacting_escaped_text_keeps_it_valid_json() -> None:
+    raw = json.dumps({"command": 'echo "Authorization: Bearer abc12345" "x-api-key: k1234567" "password=hunter22"'})
+    redacted = Redactor().text(raw)
+    assert json.loads(redacted)["command"] == (f'echo "Authorization: {MASK}" "x-api-key: {MASK}" "password={MASK}"')
+    # structured redaction keeps the shape and never masks by key (harness state must still load)
+    assert Redactor().strings({"token": 3, "api_key": "plain", "l": ["password=hunter22"]}) == {
+        "token": 3,
+        "api_key": "plain",
+        "l": [f"password={MASK}"],
+    }
+
+
 # ---------------------------------------------------------------------- guardrails
 @pytest.mark.parametrize(
     "command",

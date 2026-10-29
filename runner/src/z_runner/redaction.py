@@ -21,17 +21,18 @@ MIN_KNOWN_SECRET_LEN = 8
 
 _PEM = re.compile(r"-----BEGIN [A-Z0-9 ]+-----.*?-----END [A-Z0-9 ]+-----", re.S)
 
-# (name, pattern, replacement). Replacements keep a harmless prefix so the text stays readable.
+# (name, pattern, replacement). Replacements keep a harmless prefix so the text stays readable. Value classes stop
+# at a backslash so that redacting escaped text (JSON, shell) never eats the escape of a closing quote.
 _PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("pem_block", _PEM, MASK),
     (
         "authorization_header",
-        re.compile(r"(?i)\b((?:proxy-)?authorization\s*[:=]\s*)(?:(?:bearer|basic|token|apikey)\s+)?[^\s'\",;]+"),
+        re.compile(r"(?i)\b((?:proxy-)?authorization\s*[:=]\s*)(?:(?:bearer|basic|token|apikey)\s+)?[^\s'\",;\\]+"),
         r"\1" + MASK,
     ),
     (
         "token_header",
-        re.compile(r"(?i)\b((?:private-token|x-api-key|api-key|x-auth-token)\s*[:=]\s*)[^\s'\",;]+"),
+        re.compile(r"(?i)\b((?:private-token|x-api-key|api-key|x-auth-token)\s*[:=]\s*)[^\s'\",;\\]+"),
         r"\1" + MASK,
     ),
     ("url_credentials", re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s:@'\"]+:[^/\s@'\"]+@"), r"\1" + MASK + "@"),
@@ -45,7 +46,7 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
         "password_assignment",
         re.compile(
-            r"(?i)\b((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[=:]\s*['\"]?)[^\s'\",;]{6,}"
+            r"(?i)\b((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[=:]\s*['\"]?)[^\s'\",;\\]{6,}"
         ),
         r"\1" + MASK,
     ),
@@ -97,6 +98,17 @@ class Redactor:
         with self._lock:
             known = list(self._known)
         return any(secret.encode("utf-8") in data for secret in known)
+
+    def strings(self, value: Any) -> Any:
+        """Redact every string of a JSON-like structure and keep its shape (no key-based masking): for state that
+        must still load after redaction, such as the harness persistence files in a checkpoint."""
+        if isinstance(value, str):
+            return self.text(value)
+        if isinstance(value, dict):
+            return {key: self.strings(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.strings(item) for item in value]
+        return value
 
     def value(self, value: Any) -> Any:
         """Redact a JSON-like structure: strings are redacted, values under secret-looking keys are masked."""

@@ -19,8 +19,8 @@ How the SDK is used (verified against the installed sources):
 
 from __future__ import annotations
 
-import contextlib
 import io
+import json
 import logging
 import re
 import tarfile
@@ -253,13 +253,29 @@ class OpenHandsBackend:
                     info.type, info.mode = tarfile.DIRTYPE, 0o700
                     tar.addfile(info)
                     continue
-                data = path.read_bytes()
-                with contextlib.suppress(UnicodeDecodeError):
-                    data = self._redactor.text(data.decode("utf-8")).encode("utf-8")
+                data = self._redact_file(path)
                 info = tarfile.TarInfo(arcname)
                 info.size, info.mode = len(data), 0o600
                 tar.addfile(info, io.BytesIO(data))
         return buf.getvalue()
+
+    def _redact_file(self, path: Path) -> bytes:
+        """A persistence file, redacted. JSON files are redacted value by value and re-serialized: redacting the
+        raw text could cut an escape sequence (`\\"`) and leave a file the SDK cannot load on resume."""
+        assert self._redactor is not None
+        data = path.read_bytes()
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data
+        if path.suffix == ".json":
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                pass
+            else:
+                return json.dumps(self._redactor.strings(parsed), ensure_ascii=False).encode("utf-8")
+        return self._redactor.text(text).encode("utf-8")
 
     def inject_message(self, text: str) -> None:
         cast(Any, self._require()).send_message(text)
