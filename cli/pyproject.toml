@@ -12,6 +12,7 @@ dependencies = [
   "textual>=8.2",     # interactive session (inline) and z top (full screen), docs/10
   "keyring>=25.0",    # Z CLI token in the OS keyring (fallback: 0600 file), docs/10 §4
   "pyyaml>=6.0",      # z admin groups dry-run|apply read YAML mappings
+  "mcp>=1.30,<2",     # z mcp serve (stdio MCP server)
 ]
 
 [project.scripts]

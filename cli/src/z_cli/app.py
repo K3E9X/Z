@@ -13,7 +13,7 @@ from typing import Annotated
 import typer
 
 from z_cli import __version__, output, state
-from z_cli.commands import account, admin, audit, catalog, learn, misc, missions, work
+from z_cli.commands import account, admin, audit, catalog, learn, mcp, misc, missions, work
 from z_cli.commands._common import ask, command, guarded
 from z_cli.config import Config
 from z_cli.errors import NotAvailable, UsageError
@@ -43,6 +43,7 @@ app.add_typer(account.tokens_app, name="tokens")
 app.add_typer(account.sessions_app, name="sessions")
 app.add_typer(learn.learn_app, name="learn")
 app.add_typer(learn.objectives_app, name="objectives")
+app.add_typer(mcp.mcp_app, name="mcp")
 for group in (account.app, missions.top_level, work.top_level, misc.top_level, learn.top_level):
     app.registered_commands.extend(group.registered_commands)
 
