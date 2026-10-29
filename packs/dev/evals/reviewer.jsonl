@@ -1,1 +1,1 @@
-{"id": "rv-1", "input": {"patch": "evals/fixtures/sqli.patch"}, "checks": [{"type": "field_equals", "path": "verdict", "value": "changes_requested"}], "rubric": ["Blocker names the injectable line"]}
+{"id": "rv-1", "input": {"patch": "evals/fixtures/sqli.patch"}, "checks": [{"type": "field_equals", "path": "output.verdict", "value": "changes_requested"}], "rubric": ["Blocker names the injectable line"]}
