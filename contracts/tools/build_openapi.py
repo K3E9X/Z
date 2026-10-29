@@ -556,7 +556,8 @@ schemas = {
         ["job_id"],
     ),
     "TakeOverSession": obj(
-        {"job_id": S, "terminal_url": S, "expires_at": TS, "mode": S}, ["job_id", "terminal_url", "expires_at", "mode"],
+        {"job_id": S, "terminal_url": S, "expires_at": TS, "mode": S},
+        ["job_id", "terminal_url", "expires_at", "mode"],
         desc="terminal_url opens the take-over page of the web app: the paused workspace as files (read, and edit in read_write).",
     ),
     "TakeOverFile": obj(
