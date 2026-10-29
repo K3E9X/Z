@@ -14,18 +14,26 @@ One codebase, three targets. Differences live in configuration, never in code.
 | Files | `deploy/compose/` | `deploy/helm/z` + `values-k3s.yaml` | `deploy/helm/z` + `values-k8s.yaml` |
 
 ## 1. Docker Compose (`deploy/compose/docker-compose.yml`)
-Services: `postgres` (16 + pgvector, init script creating databases `z` and `litellm`), `litellm`, `z-server` (`all` entrypoint), `z-browser` (gateway-side browser worker), `egress-proxy` (allows only `egress.mirrors`), `z-ui`, `docker-socket-proxy`, optional `langfuse`.
-Networks: `edge` (ui ↔ server), `core` (server ↔ postgres, litellm), `runners` (declared with `name: z_runners`, `internal: true`: runners ↔ litellm, server internal API + gateway, egress-proxy; no internet), `egress` (egress-proxy and z-browser only, to mirrors and allowlisted apps).
-Runners are started by z-server through the socket proxy on the `runners` network with the hardening options of `07-security.md`.
+Services: `postgres` (16 + pgvector, init script creating the roles `z`, `z_app`, `litellm` and the databases `z` and `litellm`), `litellm`, `z-migrate` (applies the migrations, then exits), `z-seed` (loads the packs baked into the image into the catalog, then exits), `z-server` (`all` entrypoint, started once both succeeded), `z-ui`, `docker-socket-proxy`, and two optional profiles: `egress` (`egress-proxy`, allows only `Z_EGRESS_MIRRORS`) and `browser` (`z-browser`, the gateway-side browser worker).
+Networks: `edge` (z-ui ↔ z-server), `core` (z-server and LiteLLM: the way out to tools and the inference cluster), `db` (internal: Postgres ↔ z-server, LiteLLM, z-migrate, z-seed), `dockerapi` (internal: z-server ↔ socket proxy), `browser` (internal: z-server ↔ z-browser), `runners` (declared with `name: z_runners`, `internal: true`: runners ↔ LiteLLM, z-server internal API + gateway, egress-proxy; no internet), `egress` (egress-proxy and z-browser only, to mirrors and allowlisted apps).
+Runners are started by z-server through the socket proxy on the `runners` network with the hardening options of `07-security.md`. Compose builds z-server, z-ui and the socket proxy; the runner image is not a Compose service, so build it yourself. `Z_ENV` defaults to `production`, where z-server runs only a runner image pinned by digest (`Z_RUNNER_IMAGE` must contain `@sha256:`), refuses weak secrets and needs `Z_SOCKET_PROXY_TOKEN`.
 ```bash
-cp .env.example .env
-cp config/litellm.example.yaml config/litellm.yaml
-cp config/z.example.yaml config/z.yaml
-docker compose -f deploy/compose/docker-compose.yml up -d
-docker compose -f deploy/compose/docker-compose.yml exec z-server z-server migrate
-docker compose -f deploy/compose/docker-compose.yml exec z-server z-server seed --packs packs/
-docker compose -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # one-time password for the first connection (z-bootstrap)
+cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
+# random secrets (Compose refuses to start without them, z-server refuses weak ones); GNU sed
+for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD LITELLM_DB_PASSWORD Z_SOCKET_PROXY_TOKEN; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" .env; done
+for k in LITELLM_MASTER_KEY LITELLM_SALT_KEY; do sed -i "s|^$k=.*|$k=sk-$(openssl rand -hex 32)|" .env; done
+sed -i "s|^Z_SECRET_KEY=.*|Z_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env
+echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env   # the socket's group, for z-socket-proxy only
+docker build -f deploy/images/z-server/Dockerfile -t z-server:local .
+docker build -f deploy/images/z-runner/Dockerfile -t z-runner:local .
+echo "Z_RUNNER_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' z-runner:local)" >> .env   # z-runner@sha256:...
+docker compose --env-file .env -f deploy/compose/docker-compose.yml up -d --wait   # z-migrate and z-seed run first
+docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # one-time password for the first connection (z-bootstrap)
 ```
+- `--env-file .env` is required: Compose otherwise looks for `.env` next to the compose file, and the passwords, `DOCKER_GID` and `Z_RUNNER_IMAGE` would be missing.
+- A locally built image has a `RepoDigests` entry only with Docker's containerd image store (`docker info` shows `driver-type: io.containerd.snapshotter.v1`). With the classic store, push `z-runner` to your registry and use `<registry>/z-runner@sha256:...` instead; on a laptop, `Z_ENV=development` in `.env` accepts `z-runner:local` (development only: it also allows dev sign-in, test accounts and weak secrets).
+- After upgrading packs: `docker compose --env-file .env -f deploy/compose/docker-compose.yml run --rm z-seed` (idempotent).
 
 ## 2. Helm chart (`deploy/helm/z`)
 Templates: Deployments for `api`, `scheduler`, `gateway`, `executor`, `learner`, `monitor` (each can be disabled to run `all` in one pod), `ui`, `litellm`, `z-browser`, `egress-proxy` (e.g. Squid or Envoy with a domain allowlist from `egress.mirrors`); label `z.io/runner-reachable: "true"` on litellm, api, gateway and egress-proxy (or the `all` pod); Services; Ingress (class configurable) or HTTPRoute; ConfigMaps from `config/z.yaml` and `config/litellm.yaml`; Secrets or ExternalSecrets; PVC for artifacts (or S3 settings); namespace `z-runners` with ResourceQuota, LimitRange, PSA labels, NetworkPolicies; scheduler ServiceAccount + Role/RoleBinding in `z-runners`; optional RuntimeClass reference; optional Postgres StatefulSet for dev; PodDisruptionBudgets; ServiceMonitor (if Prometheus Operator is present).

@@ -8,13 +8,17 @@ the egress proxy (runners reach package mirrors only through it) and the z-brows
 
 ```bash
 cp .env.example .env                                   # then fill every secret (below) and OIDC_*
-for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD LITELLM_DB_PASSWORD LITELLM_MASTER_KEY LITELLM_SALT_KEY Z_SOCKET_PROXY_TOKEN; do
+for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD LITELLM_DB_PASSWORD Z_SOCKET_PROXY_TOKEN; do
   sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" .env; done
+for k in LITELLM_MASTER_KEY LITELLM_SALT_KEY; do sed -i "s|^$k=.*|$k=sk-$(openssl rand -hex 32)|" .env; done
 sed -i "s|^Z_SECRET_KEY=.*|Z_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env
 echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env   # the socket's group, for z-socket-proxy only
 cp config/litellm.example.yaml config/litellm.yaml     # put the real inferX model ids
 cp config/z.example.yaml config/z.yaml
 docker build -f deploy/images/z-server/Dockerfile -t z-server:local .
+docker build -f deploy/images/z-runner/Dockerfile -t z-runner:local .   # started by z-server, not by compose
+# Z_ENV=production runs only a runner image pinned by digest
+echo "Z_RUNNER_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' z-runner:local)" >> .env
 docker compose --env-file .env -f deploy/compose/docker-compose.yml up -d --wait
 docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # one-time password
 curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0.1:8080 (z-ui)
@@ -27,7 +31,11 @@ curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0
   audit events) and `litellm` (owns the LiteLLM database only). They are created by `deploy/compose/postgres/init.sh`
   on the first start.
 - `Z_ENV` defaults to `production`: weak or example secrets, dev sign-in, test accounts and runner images without
-  a digest are refused. Set `Z_ENV=development` only on a laptop.
+  a digest (`Z_RUNNER_IMAGE` must contain `@sha256:`) are refused. Set `Z_ENV=development` only on a laptop.
+- A locally built image has a `RepoDigests` entry (`z-runner@sha256:...`) only with Docker's containerd image store
+  (`docker info` shows `driver-type: io.containerd.snapshotter.v1`). With the classic store the command above
+  fails: push `z-runner` to your registry and set `Z_RUNNER_IMAGE=<registry>/z-runner@sha256:...`, or, on a
+  laptop, set `Z_ENV=development` and keep `z-runner:local`.
 - Each secret reaches only the containers that need it: z-server and z-seed read `.env` for connector credentials,
   with the database owner password, the LiteLLM salt key and the model provider keys blanked out.
 - Networks: Postgres, the Docker socket proxy and z-browser are on internal networks reachable by z-server only;

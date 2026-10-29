@@ -26,9 +26,18 @@ Claude Code reads [`CLAUDE.md`](CLAUDE.md) automatically. Other coding agents re
 ## Run it (once built)
 
 ```bash
-# Local, Docker Compose
+# Local, Docker Compose (details, options and the classic Docker image store: deploy/README.md)
 cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
-docker compose -f deploy/compose/docker-compose.yml up -d
+for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD LITELLM_DB_PASSWORD Z_SOCKET_PROXY_TOKEN; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" .env; done
+for k in LITELLM_MASTER_KEY LITELLM_SALT_KEY; do sed -i "s|^$k=.*|$k=sk-$(openssl rand -hex 32)|" .env; done
+sed -i "s|^Z_SECRET_KEY=.*|Z_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env
+echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env
+docker build -f deploy/images/z-server/Dockerfile -t z-server:local .
+docker build -f deploy/images/z-runner/Dockerfile -t z-runner:local .
+echo "Z_RUNNER_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' z-runner:local)" >> .env   # pinned by digest
+docker compose --env-file .env -f deploy/compose/docker-compose.yml up -d --wait
+docker compose --env-file .env -f deploy/compose/docker-compose.yml logs z-server | grep bootstrap   # first sign-in
 open http://localhost:8080
 
 # k3s
