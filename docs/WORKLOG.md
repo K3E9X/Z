@@ -37,6 +37,14 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   and the health monitor in the same transaction; worker delivers to Slack/Mattermost/Teams webhooks, signed
   webhooks and SMTP, with retries/backoff, per-target delivery state and budget alerts once per period.
   Admin → Notifications tab.
+- inferX (ADR 0024, from the user's inferX docs): pinned catalogue models, private gateway, Retry-After-aware
+  router retries, then Z requeues jobs that report `llm_unavailable` from their checkpoint; `ixk_` keys redacted and
+  in gitleaks. Open requirement: no external fallback (genapi) on any model Z's key can call; no shared embeddings
+  model yet (memory search stays off).
+- CI: license gate on installed packages (found and excluded a closed `lmnr-claude-code-proxy` binary pulled in by
+  openhands-sdk), kind smoke install under PSS restricted, release notes from conventional commits, ZAP baseline.
+- Verified LiteLLM 1.103.4 behaviour in its installed source (docs.litellm.ai is not reachable from this sandbox):
+  provider headers come back as `llm_provider-*`, the router honours `Retry-After` for a single deployment.
 - Traps: the dependency test caught an undeclared `anyio` import in the CLI (use asyncio.run); `MissionStatus`
   ends in `succeeded`, not `completed`; ZModel drops None fields, so read optional status keys with `.get`.
 
