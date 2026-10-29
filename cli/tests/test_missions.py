@@ -258,10 +258,9 @@ def test_problem_details_and_unserved_endpoints(z: Z) -> None:
     assert denied.exit_code == 4 and "connectors:manage" in plain(denied.output)
     for args in (["usage"], ["inference", "status"]):
         assert bob(*args).exit_code == 0, args
-    for args in (["--resume"],):
-        result = bob(*args)
-        assert result.exit_code == 1, (args, result.output)
-        assert "not available on this server yet" in plain(result.output), args
+    assert "No saved session yet" in plain(bob("-c").output)
+    assert "No saved session yet" in plain(bob("--resume").output)
+    assert bob("--session", "ses_nope").exit_code != 0
 
 
 @pytest.mark.parametrize("pairs", [["n=3", "flag=true", "tags=a,b", 'obj:={"k": 1}']])

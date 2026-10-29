@@ -35,7 +35,7 @@ from z_cli import state as state_mod
 from z_cli.client import Api, AsyncApi
 from z_cli.config import state_dir
 from z_cli.errors import CliError, NotAvailable
-from z_cli.live import MissionView
+from z_cli.live import TERMINAL_MISSION, MissionView
 from z_cli.render import mission_tree, status_text, tokens
 from z_cli.theme import THEME_NAMES, rich_theme, state_style
 from z_cli.tui import decisions
@@ -205,10 +205,13 @@ class SessionApp(App[int]):
         Binding("ctrl+d", "quit", "quit", show=False),
     ]
 
-    def __init__(self, st: state_mod.State, api: AsyncApi | None, *, cwd: Path | None = None) -> None:
+    def __init__(
+        self, st: state_mod.State, api: AsyncApi | None, *, cwd: Path | None = None, session_id: str | None = None
+    ) -> None:
         super().__init__()
         self.st = st
         self.api = api
+        self.session_id = session_id  # the server-side conversation (docs/10 §1 Sessions); created on first prompt
         self.cwd = cwd or Path.cwd()
         default = st.setting("autonomy_default") or "propose"
         self.mode = default if default in MODES else "propose"
@@ -250,6 +253,8 @@ class SessionApp(App[int]):
         self.update_status()
         self.load_context()
         self.counts_loop()
+        if self.session_id:
+            self.load_session(self.session_id)
 
     def on_resize(self, event: events.Resize) -> None:
         """Inline apps share the terminal: keep the input and status line on screen whatever its height."""
@@ -490,41 +495,58 @@ class SessionApp(App[int]):
         self._echo_prompt(text)
         from z_cli.commands.missions import mentions
 
-        handles, conns = mentions(text)
+        handles, _ = mentions(text)  # the server parses #connectors and plans; this only catches typos early
         known = {a["handle"]: a for a in self.agents} | {a["name"]: a for a in self.agents}
-        unknown = [h for h in handles if h not in known]
+        unknown = [h for h in handles if h not in known] if self.agents else []
         if unknown:
             self.say(Text(f"Unknown agent {', '.join('@' + u for u in unknown)} (try /agents).", style="z.wait"))
             return
-        if not handles:
-            self.say(
-                Text(
-                    "Say which agent should do it with @handle, or run a playbook with /playbooks. "
-                    "(Free-form planning across agents, POST /missions/draft-plan, is not available on this server yet.)",
-                    style="z.wait",
-                )
-            )
-            return
-        body: dict[str, Any] = {"prompt": text}
-        if self.model_override and len(handles) == 1:
-            agent = known[handles[0]]
-            body["plan"] = {
-                "steps": [{"id": "main", "agent": agent["name"], "prompt": text, "model": self.model_override}]
-            }
-            body["title"] = text[:200]
-        else:
-            body["agents"] = [known[h]["handle"] for h in handles]
-        if conns:
-            body["connectors"] = conns
-        body["autonomy"] = "read_only" if self.mode == "read_only" else "propose"
+        body: dict[str, Any] = {"text": text, "autonomy": "read_only" if self.mode == "read_only" else "propose"}
         if self.mode == "plan_first":
             body["plan_first"] = True
+        if self.model_override:
+            body["model"] = self.model_override
         try:
-            mission = await api.post("/missions", body)
+            if self.session_id is None:
+                created = await api.post("/sessions", {"surface": "cli", "title": text[:80]})
+                self.session_id = str(created["id"])
+            if not handles:
+                self.say(Text("Drafting a plan…", style="z.d"))
+            reply = await api.post(f"/sessions/{self.session_id}/messages", body)
         except CliError as exc:
             self.say(_err(exc))
             return
-        self.attach(mission)
+        for message in reply.get("messages") or []:
+            if message["role"] == "assistant":
+                self.say(Text(message["text"], style="z.d" if reply.get("mission") else "z.wait"))
+        if reply.get("mission"):
+            self.attach(reply["mission"])
+
+    @work(group="missions", exit_on_error=False)
+    async def load_session(self, session_id: str) -> None:
+        """Replay a saved session and follow its missions that are still running."""
+        api = self._need_api()
+        if api is None:
+            return
+        try:
+            detail = await api.get(f"/sessions/{session_id}")
+        except CliError as exc:
+            self.say(_err(exc))
+            return
+        self.session_id = str(detail["id"])
+        self.say(Text(f"Resumed “{detail['title']}” ({len(detail['messages'])} messages)", style="z.acc"))
+        for message in detail["messages"]:
+            if message["role"] == "user":
+                self._echo_prompt(message["text"])
+            else:
+                self.say(Text(message["text"], style="z.d"))
+        for mission_id in detail["missions"][-5:]:
+            try:
+                mission = await api.get(f"/missions/{mission_id}")
+            except CliError:
+                continue
+            if mission["status"] not in TERMINAL_MISSION:
+                self.attach(mission)
 
     def attach(self, mission: dict[str, Any]) -> None:
         mid = mission["id"]
@@ -1008,9 +1030,29 @@ class SessionApp(App[int]):
         if api is None:
             return
         try:
-            await api.get("/sessions", {"surface": "cli"}, feature="Saved sessions (GET /sessions)")
+            page = await api.get("/sessions", {"surface": "cli", "limit": 20}, feature="Saved sessions (GET /sessions)")
         except CliError as exc:
             self.say(_err(exc))
+            return
+        rows = page.get("items") or []
+        arg = arg.strip()
+        if arg:
+            picked = rows[int(arg) - 1]["id"] if arg.isdigit() and 1 <= int(arg) <= len(rows) else arg
+            self.load_session(str(picked))
+            return
+        if not rows:
+            self.say(Text("No saved session yet.", style="z.d"))
+            return
+        lines = Text()
+        for i, row in enumerate(rows, 1):
+            mark = "●" if row["id"] == self.session_id else " "
+            lines.append(f"{mark} {i:>2}  ", style="z.acc")
+            lines.append(f"{row['title'][:60]}", style="z.text")
+            lines.append(
+                f"  {len(row['missions'])} missions · {row['updated_at'][:16].replace('T', ' ')}\n", style="z.d"
+            )
+        lines.append("Type /resume <number> to continue one.", style="z.d")
+        self.say(lines)
 
     async def cmd_export(self, arg: str) -> None:
         path = Path(arg).expanduser() if arg else self.cwd / f"z-session-{datetime.now().strftime('%Y%m%d-%H%M%S')}.md"
@@ -1265,11 +1307,11 @@ def _agent_card(agent: dict[str, Any]) -> Group:
     )
 
 
-def run_session(st: state_mod.State) -> int:
+def run_session(st: state_mod.State, session_id: str | None = None) -> int:
     api: AsyncApi | None = None
     if credentials.load(st.server_url()) is not None:
         st.api().get("/me")  # fail fast (exit 4) on an expired token before opening the session
         api = st.async_api()
-    app = SessionApp(st, api)
+    app = SessionApp(st, api, session_id=session_id)
     code = app.run(inline=True, inline_no_clear=True)
     return int(code or 0)

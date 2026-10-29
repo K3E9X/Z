@@ -7,15 +7,16 @@ Exit codes: 0 success · 1 failure (mission failed, cancelled or timed out; requ
 
 from __future__ import annotations
 
+import sys
 from typing import Annotated
 
 import typer
 
 from z_cli import __version__, output, state
 from z_cli.commands import account, admin, audit, catalog, misc, missions, work
-from z_cli.commands._common import command, guarded
+from z_cli.commands._common import ask, command, guarded
 from z_cli.config import Config
-from z_cli.errors import NotAvailable
+from z_cli.errors import NotAvailable, UsageError
 
 app = typer.Typer(
     name="z",
@@ -64,6 +65,7 @@ def root(
     plan_first: Annotated[bool, typer.Option("--plan-first", help="With -p: draft the plan and stop.")] = False,
     continue_: Annotated[bool, typer.Option("--continue", "-c", help="Continue the last session.")] = False,
     resume: Annotated[bool, typer.Option("--resume", help="Pick a past session.")] = False,
+    session: Annotated[str | None, typer.Option("--session", help="Open this saved session (ses_…).")] = None,
     url: Annotated[
         str | None, typer.Option("--url", envvar="Z_URL", help="Z server URL (overrides the profile).")
     ] = None,
@@ -95,20 +97,46 @@ def root(
             as_json=output_format in {"json", "stream-json"},
         )
         raise typer.Exit(int(code))
+    session_id = session
+    if session_id:  # fail here (exit 1) rather than inside the full-screen session
+        guarded(lambda: state.get().api().get(f"/sessions/{session_id}", feature="Saved sessions"))
     if continue_ or resume:
-        guarded(_sessions)
-        return
+        session_id = guarded(lambda: _pick_session(last=continue_))
+        if session_id is None:
+            return
     from z_cli.tui.session import run_session
 
-    raise typer.Exit(int(guarded(run_session, st)))
+    raise typer.Exit(int(guarded(lambda: run_session(st, session_id=session_id))))
 
 
-def _sessions() -> None:
-    """Server-side sessions (GET /sessions) are part of the contract; say so if this server lacks them."""
+def _pick_session(*, last: bool) -> str | None:
+    """`z -c`: the latest CLI session. `z --resume`: list them and ask which one (in a terminal)."""
     try:
-        state.get().api().get("/sessions", {"surface": "cli"}, feature="Saved sessions (GET /sessions)")
+        page = state.get().api().get("/sessions", {"surface": "cli", "limit": 20}, feature="Saved sessions")
     except NotAvailable as exc:
         raise NotAvailable("Saved sessions (`z -c`, `z --resume`)") from exc
+    rows = page.get("items") or []
+    if not rows:
+        output.note("No saved session yet: type a request in `z` to start one.")
+        return None
+    if last:
+        return str(rows[0]["id"])
+    output.out().print(
+        output.table(
+            ["#", "Session", "Title", "Missions", "Updated"],
+            [
+                [str(i), r["id"], r["title"], str(len(r["missions"])), r["updated_at"][:16].replace("T", " ")]
+                for i, r in enumerate(rows, 1)
+            ],
+        )
+    )
+    if not sys.stdin.isatty():
+        output.note("Open one with `z --session <id>`.")
+        return None
+    choice = ask("Session number", default="1").strip()
+    if not choice.isdigit() or not 1 <= int(choice) <= len(rows):
+        raise UsageError(f"pick a number between 1 and {len(rows)}")
+    return str(rows[int(choice) - 1]["id"])
 
 
 @command(app, "top")

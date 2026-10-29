@@ -302,14 +302,28 @@ async def test_session_prompt_completion_question_and_commands(
         assert area.text == "@summarizer summarize the notes"
         type_in(area, "")
 
-        # a prompt without an agent is refused with a hint, nothing is created
+        # a prompt without an agent goes to the planner; this stack has no model, so Z says why, in the session
         type_in(area, "do something")
         await pilot.press("enter")
-        await until(pilot, lambda: "Say which agent" in transcript_text(app), what="hint")
-        assert len(app.blocks) == 1
+        await until(pilot, lambda: "could not start this" in transcript_text(app), what="the planner's answer")
+        assert len(app.blocks) == 1 and app.session_id is not None
+        type_in(area, "/resume")
+        await pilot.press("enter")
+        await until(pilot, lambda: "/resume <number>" in transcript_text(app), what="saved sessions")
+        assert "@summarizer summarize the notes" in transcript_text(app)
+        session_id = app.session_id
         await pilot.press("ctrl+c")
     history = (bob.home / "state" / "history").read_text()
     assert "@summarizer summarize the notes" in history
+
+    # the conversation is stored server-side: a new session app replays it
+    again = SessionApp(st, AsyncApi(live.url, bob.token()), cwd=tmp_path, session_id=session_id)
+    async with again.run_test(size=(150, 60)) as pilot:
+        await until(pilot, lambda: "Resumed" in transcript_text(again), what="the replay")
+        text = transcript_text(again)
+        assert "@summarizer summarize the notes" in text and "could not start this" in text
+        assert again.blocks == {}  # its mission ended; only running ones are followed
+        await pilot.press("ctrl+c")
 
 
 async def test_session_inline_approval_and_interrupt(
