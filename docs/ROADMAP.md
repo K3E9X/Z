@@ -14,7 +14,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | done (every screen of docs/09, plus admin, take-over, browser recorder, notifications) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | done (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals, eval runs on real missions, learner proposals with eval gates, shadow replay, apply/try, memory retrieval in job specs) |
-| Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
+| Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | done (seeded and lint-clean; every seed agent has ≥ 10 eval cases and every skill ≥ 5 (docs/08 §6), with injection, missing-fact and write-scope cases; the linter enforces rooted check paths and warns below the minimums; not yet run against the real inferX models) |
 | Inference monitor (inferX health on the Inference screen) | B1 | done (LiteLLM health, model info, Prometheus/DCGM queries, Inference screen; inferX catalogue wired in ADR 0024) |
 | Named agents (rename, handle, avatar, duplicate) | B1, B5 | done |
 | GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |

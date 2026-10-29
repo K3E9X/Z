@@ -76,6 +76,14 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   5 per skill). Eval suites written by five sub-agents (one per pack group), reviewed and committed per pack.
 - Connector builder "from docs": planner-model draft of `rest` operations, sanitised (relative paths, no header
   arguments, classifier classes, reads only proposed for exposure); database and webhook kinds stay YAML.
+- Eval runner made to behave like real missions (found by the five eval sub-agents, checked in the code): output
+  schema from the case's json_schema check (or a generic object), literal-text fixtures, the agent's connectors
+  attached, skill cases filtered by their mark, contract schemas with their $refs, changes.patch in `files`
+  workspaces, and case missions stuck on needs_attention end as failed instead of holding the run.
+- Pack design gaps reported, not changed (they change agent behaviour; to decide with the owners): no output
+  schemas for the archi-isp and workplace agents (checks use report.md), no `read` tool for assistant, researcher
+  and the core agents (cases pass data inline), no edit/documents tool for ticket-manager and vuln-analyst (no
+  report.md), the browser-flows "CSV artifact" step has no tool, meeting-prep "tasks" has no m365 operation.
 - Trap: a change to `contracts/*.schema.json` also changes the UI types (openapi-typescript inlines external refs):
   run `pnpm -C ui generate:api` after every contract change, and never push before the local UI checks finish
   (CI went red on b8dd30f8 for exactly this).
