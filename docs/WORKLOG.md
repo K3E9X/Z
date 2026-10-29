@@ -45,6 +45,16 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   openhands-sdk), kind smoke install under PSS restricted, release notes from conventional commits, ZAP baseline.
 - Verified LiteLLM 1.103.4 behaviour in its installed source (docs.litellm.ai is not reachable from this sandbox):
   provider headers come back as `llm_provider-*`, the router honours `Retry-After` for a single deployment.
+- First fully green CI on PR #1 (ef60c4fe): python, ui, lint, security, images, chart, policy, compose e2e with a
+  real mission + ZAP baseline, kind smoke install under PSS restricted.
+- Found by checking the code against the spec: the workplace pack's m365 connector pointed at a `builtin:` spec
+  that nothing served (now a shipped Graph v1.0 subset, and the pack lint refuses such specs); docs/06 §5 metrics
+  were missing from `/metrics` (now served, plus a Grafana dashboard in the chart); LiteLLM fetched its price map
+  from GitHub at start (now bundled).
+- inference guard (ADR 0024): LiteLLM callback refusing answers served through an inferX external fallback for
+  C2/C3 keys; verified against the real LiteLLM 1.105.0 image with a fake upstream (200 without the header, 403
+  with it).
+- Dropped pre-commit (no hooks configured; its virtualenv dependency got GHSA-cx6f-vjhg-g3cc).
 - Traps: the dependency test caught an undeclared `anyio` import in the CLI (use asyncio.run); `MissionStatus`
   ends in `succeeded`, not `completed`; ZModel drops None fields, so read optional status keys with `.get`.
 
