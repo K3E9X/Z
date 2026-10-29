@@ -226,6 +226,55 @@ class DeclaredOperation(ZModel):
     output_hint: str | None = None
 
 
+BrowserAction = Literal[
+    "goto",
+    "click",
+    "fill",
+    "select",
+    "check",
+    "uncheck",
+    "press",
+    "wait_for",
+    "wait_for_url",
+    "extract_text",
+    "extract_table",
+    "extract_attribute",
+    "assert_text",
+    "assert_visible",
+    "screenshot",
+]
+
+
+class BrowserStep(ZModel):
+    action: BrowserAction
+    selector: str | None = None
+    url: str | None = None
+    value: str | None = None
+    key: str | None = None
+    name: str | None = None
+    attribute: str | None = None
+    all: bool | None = None
+    state: Literal["visible", "hidden", "attached", "detached"] | None = None
+    full_page: bool | None = None
+    optional: bool | None = None
+    timeout_ms: Annotated[int, Field(ge=100, le=120_000)] | None = None
+
+
+class BrowserFlow(ZModel):
+    description: str | None = None
+    start_url: str | None = None
+    allowed_hosts: list[str] | None = None
+    timeout_s: Annotated[int, Field(ge=5, le=300)] | None = None
+    steps: Annotated[list[BrowserStep], Field(min_length=1, max_length=200)]
+
+    @model_validator(mode="after")
+    def _placeholders(self) -> BrowserFlow:
+        from z_common.connectors.browser import check_flow
+
+        check_flow(self.model_dump(exclude_none=True))
+        return self
+
+
 class SimpleAuth(ZModel):
     type: Literal["bearer", "api_key", "basic", "oauth", "mtls", "none"]
     secret: SecretRef | None = None
@@ -310,6 +359,7 @@ class ConnectorManifest(ZModel):
     builtin: str | None = None
     config: Json | None = None
     declared: list[DeclaredOperation] | None = None
+    flows: dict[str, BrowserFlow] | None = None
     auth: AuthSet | None = None
     oauth: OAuthApps | None = None
     operations: OperationPolicy | None = None

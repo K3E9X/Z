@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -109,6 +111,12 @@ def from_openapi(manifest: dict[str, Any], spec: dict[str, Any]) -> list[Operati
     return out
 
 
+def flow_ref(manifest: dict[str, Any], name: str) -> str:
+    """`flow:<name>@<digest>`: any change to the steps changes the reference, so exposure is reviewed again."""
+    body = json.dumps((manifest.get("flows") or {}).get(name), sort_keys=True, separators=(",", ":"))
+    return f"flow:{name}@{hashlib.sha256(body.encode()).hexdigest()[:12]}"
+
+
 def materialize(manifest: dict[str, Any], connector_dir: Path | None = None) -> list[OperationSpec]:
     """Operations known statically. Local OpenAPI specs are read from `connector_dir`."""
     found: dict[str, OperationSpec] = {}
@@ -126,11 +134,14 @@ def materialize(manifest: dict[str, Any], connector_dir: Path | None = None) -> 
     for declared in manifest.get("declared") or []:
         method = declared.get("method")
         floor, cls, exposed = decide(manifest, declared["id"], method)
-        ref = (
-            f"{method} {declared.get('path')}"
-            if method
-            else str(declared.get("query") or declared.get("command") or declared.get("flow") or declared["id"])
-        )
+        if manifest.get("kind") == "browser" and declared.get("flow"):
+            ref = flow_ref(manifest, str(declared["flow"]))
+        else:
+            ref = (
+                f"{method} {declared.get('path')}"
+                if method
+                else str(declared.get("query") or declared.get("command") or declared.get("flow") or declared["id"])
+            )
         found[declared["id"]] = OperationSpec(
             declared["id"],
             ref,

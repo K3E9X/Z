@@ -73,6 +73,8 @@ CASES: list[tuple[str, str, type[BaseModel]]] = [
     ("connector.schema.json", "", manifests.ConnectorManifest),
     ("connector.schema.json", "/$defs/McpServer", manifests.McpServer),
     ("connector.schema.json", "/$defs/DeclaredOperation", manifests.DeclaredOperation),
+    ("connector.schema.json", "/$defs/BrowserFlow", manifests.BrowserFlow),
+    ("connector.schema.json", "/$defs/BrowserStep", manifests.BrowserStep),
     ("connector.schema.json", "/$defs/SimpleAuth", manifests.SimpleAuth),
     ("connector.schema.json", "/$defs/OAuthFlow", manifests.OAuthFlow),
     ("connector.schema.json", "/$defs/ScopedAuth", manifests.ScopedAuth),

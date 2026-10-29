@@ -21,7 +21,9 @@ from z_common.models.enums import (
 )
 from z_common.models.manifests import (
     AgentProfile,
+    BrowserFlow,
     ConnectorManifest,
+    DeclaredOperation,
     McpServer,
     PlaybookInputs,
     PlaybookTrigger,
@@ -254,7 +256,7 @@ class ConnectorTestResult(ZModel):
 
 
 class ConnectorImport(ZModel):
-    source: Literal["openapi", "graphql", "mcp", "docs"]
+    source: Literal["openapi", "graphql", "mcp", "docs", "browser"]
     name: Slug
     display_name: str | None = None
     base_url: str | None = None
@@ -262,6 +264,8 @@ class ConnectorImport(ZModel):
     spec: dict[str, Any] | str | None = None
     mcp: McpServer | None = None
     docs: str | None = None
+    flows: dict[str, BrowserFlow] | None = None
+    declared: list[DeclaredOperation] | None = None
     data_class: DataClass | None = None
 
 
