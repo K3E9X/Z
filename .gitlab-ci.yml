@@ -1,0 +1,476 @@
+# Z on the internal GitLab mirror (docs/13): the same stages and open-source tools as GitHub Actions, plus
+# signed deploys to the team's k3s. Supply chain (docs/13 §3): every image pinned by digest (Renovate), scanners
+# from ci/scripts/install-scanners.sh (pinned versions, verified checksums), images built rootless with Buildah
+# (no privileged Docker-in-Docker), signed with cosign after the scan, signatures verified before every deploy.
+#
+# Repository settings this file expects (Settings > CI/CD > Variables; "protected" = protected branches/tags
+# only, so merge request pipelines never see them):
+#   COSIGN_PRIVATE_KEY      file, protected      cosign key pair (cosign generate-key-pair), signs images
+#   COSIGN_PASSWORD         masked, protected    its password
+#   COSIGN_PUBLIC_KEY       file                 public half, used by verify-signatures.sh before deploys
+#   KUBE_CONTEXT_STAGING    protected            GitLab agent context, e.g. group/infra:k3s-staging
+#   KUBE_CONTEXT_PRODUCTION protected            GitLab agent context for production
+#   VALUES_STAGING          file, protected      Helm values for staging (host, OIDC, secrets refs, runners
+#   VALUES_PRODUCTION       file, protected        namespace, imagePullSecrets for this registry)
+#   RELEASE_ALLOWED_SIGNERS file, protected      SSH allowed-signers file: release tags must be signed by one
+# Optional: INTERNAL_PYPI_MIRROR, INTERNAL_NPM_MIRROR, APT_MIRROR (package mirrors), SCANNERS_MIRROR (mirror of
+# the GitHub release URLs in ci/scripts/versions.lock), TRIVY_DB_REPOSITORY, COSIGN_TLOG=true (also upload
+# signatures to the public Rekor; off by default so internal digests stay internal).
+# Protect the `staging` and `production` environments, require approval on production, protect `v*` tags.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+stages: [guard, lint, test, security, build, scan, sign, chart, e2e, deploy, release]
+
+default:
+  interruptible: true
+  retry:
+    max: 1
+    when: [runner_system_failure, stuck_or_timeout_failure]
+
+variables:
+  PYTHON_IMAGE: python:3.12-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+  NODE_IMAGE: node:22.23.3-bookworm-slim@sha256:3ed98443660ff48413b5af19ecefce3b9d50845a901a43420d47cc63a9fddbe9
+  BUILDAH_IMAGE: debian:trixie-20261020-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+  HELM_IMAGE: alpine/helm:3.22.1@sha256:8191701ad1f82ee3695c87211fcbfe6d7b1bb7df92ac1c8de9ccdb0995a6a2c1
+  RELEASE_CLI_IMAGE: registry.gitlab.com/gitlab-org/release-cli:v0.24.0@sha256:3f52d526f48e8d10625c722fa6d6423ee82aadeae1b1aa91f07b62551d96dacf
+  PGVECTOR_IMAGE: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+  SCANNERS_DIR: $CI_PROJECT_DIR/.scanners
+  UV_CACHE_DIR: $CI_PROJECT_DIR/.cache/uv
+  UV_LINK_MODE: copy
+  BUILD_PLATFORMS: linux/amd64,linux/arm64
+  COSIGN_TLOG: "false"
+  GIT_DEPTH: "20"
+  IMAGES: z-server z-runner z-ui z-browser z-socket-proxy egress-proxy # also in the parallel matrices below
+
+# --- shared snippets -------------------------------------------------------------------------------------
+.mirrors:
+  script:
+    - |
+      if [ -n "${INTERNAL_PYPI_MIRROR:-}" ]; then export PIP_INDEX_URL="$INTERNAL_PYPI_MIRROR" UV_DEFAULT_INDEX="$INTERNAL_PYPI_MIRROR"; fi
+      if [ -n "${INTERNAL_NPM_MIRROR:-}" ]; then export npm_config_registry="$INTERNAL_NPM_MIRROR" COREPACK_NPM_REGISTRY="$INTERNAL_NPM_MIRROR"; fi
+      if [ -n "${APT_MIRROR:-}" ] && [ -f /etc/apt/sources.list.d/debian.sources ]; then
+        sed -i "s#http://deb.debian.org#${APT_MIRROR%/}#g" /etc/apt/sources.list.d/debian.sources
+      fi
+      export PATH="$SCANNERS_DIR/bin:$PATH"
+
+.python:
+  image: $PYTHON_IMAGE
+  cache:
+    key: uv-$CI_COMMIT_REF_SLUG
+    paths: [.cache/uv]
+  before_script:
+    - !reference [.mirrors, script]
+    - ci/scripts/install-scanners.sh uv
+    # The root is a virtual workspace (package = false): always --all-packages.
+    - uv sync --frozen --all-packages
+
+.node:
+  image: $NODE_IMAGE
+  variables:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  before_script:
+    - !reference [.mirrors, script]
+    - cd ui
+    # pnpm comes from the packageManager field (pnpm@10.28.0), fetched and verified by corepack.
+    - corepack enable
+    - pnpm install --frozen-lockfile --ignore-scripts
+
+.scanners:
+  image: $PYTHON_IMAGE
+  before_script:
+    - !reference [.mirrors, script]
+
+.publish:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+
+# --- guard: before anything is installed --------------------------------------------------------------
+guard:
+  stage: guard
+  image: $PYTHON_IMAGE
+  script:
+    - python3 ci/scripts/check_blocked.py
+    - python3 ci/scripts/check_exceptions.py security/exceptions.yaml
+    # Active exception ids per scope, for the scanners of later jobs (some images have no python3).
+    - mkdir -p .exc
+    - |
+      for scope in deps:pypi deps:npm iac sast $(for i in $IMAGES; do echo "image:$i"; done); do
+        python3 ci/scripts/check_exceptions.py ids "$scope" > ".exc/$(echo "$scope" | tr : -)"
+      done
+      cat .exc/deps-pypi .exc/deps-npm > .exc/deps
+  artifacts:
+    paths: [.exc/]
+    expire_in: 1 day
+
+# --- lint ----------------------------------------------------------------------------------------------
+lint:python:
+  extends: .python
+  stage: lint
+  script:
+    - uv run ruff check . && uv run ruff format --check .
+    - |
+      paths="server/src runner/src cli/src packages/z-common/src deploy/images/z-socket-proxy/socket_proxy.py"
+      if [ -d browser/src ]; then paths="$paths browser/src"; fi
+      uv run mypy $paths
+    - MYPYPATH=ci/scripts uv run mypy ci/scripts
+
+lint:ui:
+  extends: .node
+  stage: lint
+  script:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm format:check
+
+lint:ci:
+  extends: .scanners
+  stage: lint
+  script:
+    - ci/scripts/install-scanners.sh yamllint hadolint
+    - yamllint --strict -c ci/yamllint.yml .github/workflows .gitlab-ci.yml ci security
+    - hadolint --failure-threshold error deploy/images/*/Dockerfile tests/e2e/Dockerfile*
+
+# --- test ----------------------------------------------------------------------------------------------
+test:python:
+  extends: .python
+  stage: test
+  services:
+    - name: $PGVECTOR_IMAGE
+      alias: postgres
+      variables:
+        POSTGRES_USER: z
+        POSTGRES_PASSWORD: z
+        POSTGRES_DB: postgres
+  variables:
+    Z_TEST_DATABASE_URL: postgresql://z:z@postgres:5432/postgres
+  script:
+    - uv run python -m z_common.contracts.validate_examples
+    - uv run python -m z_common.packs.lint packs/
+    - |
+      if uv run python -c "import playwright" 2>/dev/null; then
+        uv run playwright install --with-deps chromium
+      fi
+    - uv run pytest --cov=server/src --cov=packages/z-common/src --cov-fail-under=80 --cov-report=term
+      --cov-report=xml:coverage.xml --junitxml=report.xml
+    - uv run pytest ci/tests
+  coverage: '/^TOTAL.+?(\d+(?:\.\d+)?%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report: { coverage_format: cobertura, path: coverage.xml }
+
+test:ui:
+  extends: .node
+  stage: test
+  script:
+    - pnpm test
+    - pnpm check:api
+    - pnpm build
+
+# --- security ------------------------------------------------------------------------------------------
+security:repo:
+  extends: .scanners
+  stage: security
+  variables:
+    GIT_DEPTH: "0" # gitleaks reads the whole history
+  script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null
+    - ci/scripts/install-scanners.sh gitleaks trivy semgrep bandit
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - gitleaks git --redact --no-banner --exit-code 1 --gitleaks-ignore-path security/gitleaksignore .
+    - |
+      set -- ; while read -r id; do set -- "$@" --exclude-rule "$id"; done < .exc/sast
+      semgrep scan --metrics=off --error --severity ERROR --disable-version-check \
+        --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes "$@"
+    - skips=$(paste -sd, .exc/sast)
+    - bandit -q -r server/src runner/src cli/src packages/z-common/src deploy/images ci/scripts
+      --severity-level high --confidence-level high ${skips:+--skip "$skips"}
+    - trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln --ignorefile .exc/deps --skip-dirs .scanners --skip-dirs .cache .
+    - |
+      for v in k3s k8s; do
+        trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile .exc/iac \
+          --helm-values "deploy/helm/z/values-$v.yaml" deploy/
+      done
+
+security:deps:
+  extends: .python
+  stage: security
+  script:
+    - ci/scripts/install-scanners.sh osv-scanner pip-audit
+    - rc=0; osv-scanner scan source -L uv.lock -L ui/pnpm-lock.yaml --format json --output-file osv.json || rc=$?
+    - '[ "$rc" -le 1 ] || exit "$rc"'
+    - python3 ci/scripts/vuln_gate.py osv osv.json
+    - uv export --frozen --all-packages --no-emit-workspace --format requirements-txt -q -o requirements.txt
+    - rc=0; pip-audit --disable-pip --require-hashes -r requirements.txt --progress-spinner off --format json --output pip-audit.json || rc=$?
+    - '[ "$rc" -le 1 ] || exit "$rc"'
+    - python3 ci/scripts/vuln_gate.py pip-audit pip-audit.json
+  artifacts:
+    when: always
+    paths: [osv.json, pip-audit.json]
+
+security:npm:
+  extends: .node
+  stage: security
+  script:
+    - set -- ; while read -r id; do set -- "$@" --ignore "$id"; done < ../.exc/deps-npm
+    - pnpm audit --audit-level high "$@"
+
+# --- build: rootless Buildah, no privileged Docker-in-Docker ---------------------------------------------
+# Runner requirements: an unprivileged runner where Buildah's chroot isolation works (Kubernetes executor or
+# Docker executor with user namespaces; seccomp/AppArmor may need to allow unshare/mount for this job), and
+# qemu binfmt handlers registered on the host with the F flag for the arm64 build (or set BUILD_PLATFORMS).
+.buildah:
+  image: $BUILDAH_IMAGE
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    BUILDAH_FORMAT: oci
+  parallel:
+    matrix:
+      - IMAGE: [z-server, z-runner, z-ui, z-browser, z-socket-proxy, egress-proxy]
+  before_script:
+    - !reference [.mirrors, script]
+    - |
+      if [ ! -f "deploy/images/$IMAGE/Dockerfile" ]; then
+        echo "deploy/images/$IMAGE/Dockerfile does not exist yet: nothing to build"; exit 0
+      fi
+    # Debian's signed buildah package (set BUILDAH_IMAGE to an image that ships buildah to skip this).
+    - command -v buildah >/dev/null || { apt-get update -qq && apt-get install -y -qq --no-install-recommends buildah ca-certificates curl >/dev/null; }
+
+build:mr:
+  extends: .buildah
+  stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    SCANNERS_BLOCKED_CHECKED: "1" # no python3 in this image; the guard job checked versions.lock
+    DOCKLE_ACCEPT: --accept-key KEY_SHA512 --accept-file settings.py # nginx key checksum, Python settings.py modules
+  script:
+    # Build amd64 and scan it here: no push, and no multi-GB image artifact between jobs.
+    - buildah build --platform linux/amd64 -t "z-ci/$IMAGE:mr" -f "deploy/images/$IMAGE/Dockerfile" .
+    - buildah push "z-ci/$IMAGE:mr" "docker-archive:$CI_PROJECT_DIR/image.tar:z-ci/$IMAGE:mr"
+    - ci/scripts/install-scanners.sh trivy dockle
+    - trivy image --quiet --input image.tar --severity HIGH,CRITICAL --exit-code 0
+    - trivy image --quiet --input image.tar --severity CRITICAL --ignore-unfixed --exit-code 1 --ignorefile ".exc/image-$IMAGE"
+    - dockle --exit-code 1 --exit-level fatal $DOCKLE_ACCEPT $(sed 's/^/--ignore /' ".exc/image-$IMAGE") --input image.tar
+
+build:image:
+  extends: [.buildah, .publish]
+  stage: build
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - buildah build --platform "$BUILD_PLATFORMS" --manifest "z-ci/$IMAGE" -f "deploy/images/$IMAGE/Dockerfile"
+      --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" --label "org.opencontainers.image.source=$CI_PROJECT_URL" .
+    - mkdir -p digests
+    - buildah manifest push --all --digestfile "digests/$IMAGE" "z-ci/$IMAGE" "docker://$CI_REGISTRY_IMAGE/$IMAGE:sha-$CI_COMMIT_SHORT_SHA"
+    - if [ -n "${CI_COMMIT_TAG:-}" ]; then buildah manifest push --all "z-ci/$IMAGE" "docker://$CI_REGISTRY_IMAGE/$IMAGE:$CI_COMMIT_TAG"; fi
+    - digest=$(cat "digests/$IMAGE") && echo "$CI_REGISTRY_IMAGE/$IMAGE@$digest" > "digests/$IMAGE" && cat "digests/$IMAGE"
+    - buildah logout "$CI_REGISTRY"
+  artifacts:
+    paths: [digests/]
+
+# --- scan: trivy image (CRITICAL with a fix blocks) and dockle (FATAL blocks) ---------------------------
+scan:image:
+  extends: [.scanners, .publish]
+  stage: scan
+  needs: [guard, build:image]
+  parallel:
+    matrix:
+      - IMAGE: [z-server, z-runner, z-ui, z-browser, z-socket-proxy, egress-proxy]
+  variables:
+    DOCKLE_ACCEPT: --accept-key KEY_SHA512 --accept-file settings.py # nginx key checksum, Python settings.py modules
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+    DOCKLE_USERNAME: $CI_REGISTRY_USER
+    DOCKLE_PASSWORD: $CI_REGISTRY_PASSWORD
+  script:
+    - '[ -f "digests/$IMAGE" ] || { echo "no $IMAGE image in this pipeline"; exit 0; }'
+    - ci/scripts/install-scanners.sh trivy dockle
+    - ref=$(cat "digests/$IMAGE")
+    - cp ".exc/image-$IMAGE" ignore
+    - |
+      for platform in $(echo "$BUILD_PLATFORMS" | tr ',' ' '); do
+        echo "== $ref ($platform)"
+        trivy image --quiet --platform "$platform" --severity HIGH,CRITICAL --exit-code 0 "$ref"
+        trivy image --quiet --platform "$platform" --severity CRITICAL --ignore-unfixed --exit-code 1 --ignorefile ignore "$ref"
+      done
+    - dockle --exit-code 1 --exit-level fatal $DOCKLE_ACCEPT $(sed 's/^/--ignore /' ignore) "$ref"
+
+# --- sign: only scanned digests; key pair from protected variables -------------------------------------
+sign:image:
+  extends: [.scanners, .publish]
+  stage: sign
+  needs: [build:image, scan:image]
+  parallel:
+    matrix:
+      - IMAGE: [z-server, z-runner, z-ui, z-browser, z-socket-proxy, egress-proxy]
+  variables:
+    SYFT_REGISTRY_AUTH_USERNAME: $CI_REGISTRY_USER
+    SYFT_REGISTRY_AUTH_PASSWORD: $CI_REGISTRY_PASSWORD
+  script:
+    - '[ -f "digests/$IMAGE" ] || { echo "no $IMAGE image in this pipeline"; exit 0; }'
+    - '[ -n "${COSIGN_PRIVATE_KEY:-}" ] || { echo "COSIGN_PRIVATE_KEY is not set (protected file variable)"; exit 1; }'
+    - ci/scripts/install-scanners.sh cosign syft
+    - ref=$(cat "digests/$IMAGE")
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - tlog="--use-signing-config=false --tlog-upload=false"; [ "$COSIGN_TLOG" != "true" ] || tlog=""
+    - mkdir -p sbom && syft -q "$ref" -o "spdx-json=sbom/$IMAGE.spdx.json"
+    - cosign sign --yes --key "$COSIGN_PRIVATE_KEY" $tlog "$ref"
+    - cosign attest --yes --key "$COSIGN_PRIVATE_KEY" $tlog --type spdxjson --predicate "sbom/$IMAGE.spdx.json" "$ref"
+  artifacts:
+    paths: [sbom/]
+    expire_in: 90 days
+
+# --- chart ---------------------------------------------------------------------------------------------
+chart:check:
+  stage: chart
+  image:
+    name: $HELM_IMAGE
+    entrypoint: [""]
+  needs: [guard]
+  variables:
+    SCANNERS_BLOCKED_CHECKED: "1" # no python3 in this image; the guard job checked versions.lock
+  script:
+    - export PATH="$SCANNERS_DIR/bin:$PATH"
+    - ci/scripts/install-scanners.sh kubeconform kube-score kubescape
+    - |
+      set -e
+      for v in k3s k8s; do
+        helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml"
+        helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" > "rendered-$v.yaml"
+        kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
+        kube-score score --output-format ci "rendered-$v.yaml" || true   # report only (docs/13)
+        kubescape scan framework nsa,cis-v1.10.0 "rendered-$v.yaml" --compliance-threshold 85
+      done
+    - helm package deploy/helm/z -d chart/
+  artifacts:
+    paths: [chart/]
+
+# --- e2e: dedicated, isolated runner with a Docker daemon (never a shared runner) -----------------------
+e2e:compose:
+  stage: e2e
+  tags: [z-e2e]
+  needs: [guard]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [server/**/*, runner/**/*, browser/**/*, packages/**/*, deploy/**/*, config/**/*, tests/e2e/**/*, tests/fakes/**/*, uv.lock]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    COMPOSE: docker compose --env-file ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml -f ../../tests/e2e/compose.e2e.yml
+  script:
+    - ci/scripts/install-scanners.sh uv && export PATH="$SCANNERS_DIR/bin:$PATH"
+    - uv sync --frozen --all-packages
+    - cp .env.example .env && cp config/litellm.example.yaml config/litellm.yaml && cp config/z.example.yaml config/z.yaml
+    - for k in POSTGRES_PASSWORD Z_APP_DB_PASSWORD Z_METRICS_TOKEN; do echo "$k=$(openssl rand -hex 24)" >> .env; done
+    - echo "LITELLM_MASTER_KEY=sk-$(openssl rand -hex 24)" >> .env && echo "Z_SECRET_KEY=$(openssl rand -hex 48)" >> .env
+    - docker build -t z-runner:local -f deploy/images/z-runner/Dockerfile .
+    - cd deploy/compose && DOCKER_GID=$(stat -c %g /var/run/docker.sock) $COMPOSE up -d --build --wait --wait-timeout 600 && cd ../..
+    - uv run pytest -m e2e tests/e2e -v
+  after_script:
+    - cd deploy/compose && docker compose --env-file ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml
+      -f ../../tests/e2e/compose.e2e.yml logs --no-color --tail 200 || true
+    - docker compose --env-file ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml
+      -f ../../tests/e2e/compose.e2e.yml down -v --remove-orphans || true
+
+# --- deploy: verified signatures, digests only, atomic Helm upgrade ------------------------------------
+.deploy:
+  stage: deploy
+  image:
+    name: $HELM_IMAGE
+    entrypoint: [""]
+  interruptible: false
+  variables:
+    SCANNERS_BLOCKED_CHECKED: "1"
+    COSIGN_IGNORE_TLOG: "1" # key pair is the trust root (signatures are not in the public Rekor by default)
+  before_script:
+    - export PATH="$SCANNERS_DIR/bin:$PATH"
+    - '[ -n "${COSIGN_PUBLIC_KEY:-}" ] || { echo "COSIGN_PUBLIC_KEY is not set"; exit 1; }'
+    - '[ "$COSIGN_TLOG" != "true" ] || export COSIGN_IGNORE_TLOG=0'
+    - ci/scripts/install-scanners.sh cosign
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+  script:
+    - |
+      case "$CI_ENVIRONMENT_NAME" in
+        staging) values="${VALUES_STAGING:-}" context="${KUBE_CONTEXT_STAGING:-}" ;;
+        production) values="${VALUES_PRODUCTION:-}" context="${KUBE_CONTEXT_PRODUCTION:-}" ;;
+        *) echo "unknown environment $CI_ENVIRONMENT_NAME"; exit 1 ;;
+      esac
+      [ -s "$values" ] && [ -n "$context" ] || { echo "values file or kube context missing for $CI_ENVIRONMENT_NAME"; exit 1; }
+    - ci/scripts/verify-signatures.sh -p "$CI_REGISTRY_IMAGE" -t "$IMAGE_TAG" -o digests.env z-server z-runner z-ui
+    - '. ./digests.env && test -n "${z_server:-}" && test -n "${z_runner:-}" && test -n "${z_ui:-}"'
+    - helm upgrade --install z deploy/helm/z --kube-context "$context" -n "$NAMESPACE" --create-namespace
+      --atomic --wait --timeout "$HELM_TIMEOUT" -f deploy/helm/z/values-k3s.yaml -f "$values"
+      --set "server.image.repository=$CI_REGISTRY_IMAGE/z-server" --set "server.image.digest=$z_server"
+      --set "runners.image.repository=$CI_REGISTRY_IMAGE/z-runner" --set "runners.image.digest=$z_runner"
+      --set "ui.image.repository=$CI_REGISTRY_IMAGE/z-ui" --set "ui.image.digest=$z_ui"
+  artifacts:
+    paths: [digests.env]
+
+deploy:staging:
+  extends: .deploy
+  needs: [sign:image, chart:check]
+  environment:
+    name: staging
+  resource_group: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    IMAGE_TAG: sha-$CI_COMMIT_SHORT_SHA
+    NAMESPACE: z-staging
+    HELM_TIMEOUT: 10m
+
+verify:tag:
+  stage: deploy
+  image:
+    name: $HELM_IMAGE
+    entrypoint: [""]
+  needs: []
+  variables:
+    GIT_DEPTH: "1"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - '[ -s "${RELEASE_ALLOWED_SIGNERS:-}" ] || { echo "RELEASE_ALLOWED_SIGNERS is not set (protected file variable)"; exit 1; }'
+    - apk add --no-cache openssh-keygen >/dev/null
+    - git fetch --depth 1 origin "refs/tags/$CI_COMMIT_TAG:refs/tags/$CI_COMMIT_TAG" --force
+    - git -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$RELEASE_ALLOWED_SIGNERS" verify-tag "$CI_COMMIT_TAG"
+
+deploy:production:
+  extends: .deploy
+  needs: [sign:image, chart:check, verify:tag]
+  environment:
+    name: production
+  resource_group: production
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+      when: manual
+  allow_failure: false
+  variables:
+    IMAGE_TAG: $CI_COMMIT_TAG
+    NAMESPACE: z
+    HELM_TIMEOUT: 15m
+
+# --- release -------------------------------------------------------------------------------------------
+release:
+  stage: release
+  image: $RELEASE_CLI_IMAGE
+  needs: [sign:image, chart:check, verify:tag]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - echo "Release $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: Z $CI_COMMIT_TAG
+    description: >-
+      Images $CI_REGISTRY_IMAGE/{z-server,z-runner,z-ui}:$CI_COMMIT_TAG, signed with cosign (verify with
+      ci/scripts/verify-signatures.sh); SBOMs in the sign:image artifacts, chart in the chart:check artifacts.
