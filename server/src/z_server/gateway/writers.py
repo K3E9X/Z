@@ -323,6 +323,51 @@ class GitLab:
         return await Generic().apply(gw, connector, op, action, files)
 
 
+class Mattermost:
+    """Mattermost API v4. A post carries `props.z_action` (the agent cannot set props: the operation's body schema
+    has no such field); after a crash the channel's posts since the proposal are searched for it."""
+
+    async def lookup(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
+    ) -> dict[str, Any] | None:
+        if op.local_id != "posts.create":
+            return None
+        body = action.payload.get("body") or {}
+        since = int(action.created_at.timestamp() * 1000) - 60_000  # tolerate clock skew with the server
+        inv = await gw.send(
+            connector,
+            "GET",
+            f"/api/v4/channels/{quote(str(body.get('channel_id', '')), safe='')}/posts",
+            "write",
+            params={"since": since},
+        )
+        _fail(inv, "idempotency lookup")
+        posts = (inv.body or {}).get("posts") if isinstance(inv.body, dict) else None
+        for post in (posts or {}).values():
+            if isinstance(post, dict) and (post.get("props") or {}).get("z_action") == action.id:
+                return {"id": post.get("id"), "channel_id": post.get("channel_id"), "recovered": True}
+        return None
+
+    async def apply(
+        self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction, files: dict[str, bytes]
+    ) -> Applied:
+        if op.local_id != "posts.create":
+            return await Generic().apply(gw, connector, op, action, files)
+        body = {**(action.payload.get("body") or {}), "props": {"z_action": action.id}}
+        inv = await gw.send(connector, "POST", "/api/v4/posts", "write", json_body=body)
+        _fail(inv, "post")
+        post = inv.body if isinstance(inv.body, dict) else {}
+        return Applied(
+            inv,
+            {
+                "status": inv.status,
+                "id": post.get("id"),
+                "channel_id": post.get("channel_id"),
+                **({"root_id": post["root_id"]} if post.get("root_id") else {}),
+            },
+        )
+
+
 class Generic:
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -349,6 +394,8 @@ def writer_for(connector: Connector, op: Operation) -> Writer:
         return JiraCloud()
     if connector.kind in {"rest", "openapi"} and op.id.startswith("gitlab."):
         return GitLab()
+    if connector.kind in {"rest", "openapi"} and op.id.startswith("mattermost."):
+        return Mattermost()
     return Generic()
 
 

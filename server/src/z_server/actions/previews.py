@@ -6,7 +6,15 @@ import re
 from pathlib import Path
 from typing import Any
 
-from z_common.models.actions import CommentPreview, DiffFile, DiffPreview, IssuePreview, IssueUpdatePreview, JsonPreview
+from z_common.models.actions import (
+    ChatMessagePreview,
+    CommentPreview,
+    DiffFile,
+    DiffPreview,
+    IssuePreview,
+    IssueUpdatePreview,
+    JsonPreview,
+)
 
 MAX_DIFF_CHARS = 20_000
 HUNK_FILE = re.compile(r"^\+\+\+ (?:b/)?(\S+)")
@@ -74,4 +82,10 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
         iid = payload.get("merge_request_iid")
         target = f"{payload['project']}!{iid}" if iid else f"{payload['project']}#{payload.get('issue_iid')}"
         return CommentPreview(kind="comment", tracker="gitlab", target=target, body=payload["body"]).dump()
+    if operation == "mattermost.posts.create":
+        body = payload.get("body") or {}
+        target = str(body.get("channel_id", "")) + (f" (reply to {body['root_id']})" if body.get("root_id") else "")
+        return ChatMessagePreview(
+            kind="chat_message", platform="mattermost", target=target, text=str(body.get("message", ""))
+        ).dump()
     return JsonPreview(kind="json", data=payload).dump()
