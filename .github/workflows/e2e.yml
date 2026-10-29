@@ -1,7 +1,8 @@
 # End-to-end (docs/13 §1 "e2e"): the compose stack with the fake LLM, fake tools and fake GitLab OIDC
-# (tests/e2e/compose.fakes.yml + compose.e2e.yml), images built locally, then `pytest -m e2e tests/e2e`.
-# Runs on PRs that touch the server, runner, deploy or e2e code, and on main. No secrets: the stack's
-# passwords are random per run. Job `kind` installs the Helm chart on a kind cluster; the compose job ends with a ZAP baseline scan.
+# (tests/e2e/compose.fakes.yml + compose.e2e.yml), images built locally, then `pytest -m e2e tests/e2e` and the socket proxy
+# tests against the real Docker daemon. Runs on PRs that touch the code, packs, contracts, deploy, config, UI or e2e
+# files, and on main. No secrets: the stack's passwords are random per run. Job `kind` installs the Helm chart on a
+# kind cluster; the compose job ends with a ZAP baseline scan.
 name: e2e
 on:
   pull_request:
