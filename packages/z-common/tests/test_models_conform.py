@@ -9,7 +9,17 @@ import pytest
 from pydantic import BaseModel, ValidationError
 from z_common import contracts
 from z_common.contracts import load_document
-from z_common.models import actions, api_catalog, api_identity, api_internal, api_missions, common, events, manifests
+from z_common.models import (
+    actions,
+    api_catalog,
+    api_identity,
+    api_internal,
+    api_missions,
+    api_ops,
+    common,
+    events,
+    manifests,
+)
 from z_common.models.enums import ENUM_BY_SCHEMA_DEF
 
 
@@ -171,6 +181,37 @@ for _name in [
     "ConnectorDraft",
 ]:
     API_MODELS[_name] = getattr(api_catalog, _name)
+for _name in [
+    "Task",
+    "TaskPatch",
+    "Trigger",
+    "TriggerCreate",
+    "WebhookAccepted",
+    "Session",
+    "SessionCreate",
+    "SessionMessage",
+    "SessionDetail",
+    "SessionMessageIn",
+    "SessionReply",
+    "InferenceModel",
+    "InferenceNode",
+    "InferenceHealth",
+    "UsageBucket",
+    "UsageSeries",
+    "Usage",
+    "Budget",
+    "BudgetWrite",
+    "Provider",
+    "ProviderWrite",
+    "Analytics",
+    "Objective",
+    "ObjectivePatch",
+    "ObjectiveCheck",
+    "Assignment",
+    "AssignmentCreate",
+    "ProposalDecision",
+]:
+    API_MODELS[_name] = getattr(api_ops, _name)
 for _name in [
     "SkillBundle",
     "MemorySnippet",
