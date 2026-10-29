@@ -297,7 +297,16 @@ in the Secret. External: the DSN comes from database.existingSecret.
 
 {{/* Validation that must stop the render (called from server-deployment.yaml) */}}
 {{- define "z.validate" -}}
+{{- if not (has .Values.env (list "production" "staging" "development")) -}}
+{{- fail (printf "env must be production, staging or development (got %q)" .Values.env) -}}
+{{- end -}}
 {{- if eq .Values.env "production" -}}
+{{- if not .Values.networkPolicy.enabled -}}
+{{- fail "env=production: networkPolicy.enabled=false is refused (release namespace policies, docs/07 §3)" -}}
+{{- end -}}
+{{- if not .Values.runners.networkPolicy.enabled -}}
+{{- fail "env=production: runners.networkPolicy.enabled=false is refused (agent pods must stay network-isolated, docs/07 §3)" -}}
+{{- end -}}
 {{- include "z.validateLitellmEgress" . -}}
 {{- if not .Values.networkPolicy.serverEgress.enabled -}}
 {{- fail "env=production: networkPolicy.serverEgress.enabled=false is refused; list what z-server must reach in networkPolicy.serverEgress.allow" -}}

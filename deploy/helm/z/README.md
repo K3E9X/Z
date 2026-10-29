@@ -211,7 +211,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 
 | Key | Default | Description |
 |---|---|---|
-| `env` | `production` | `Z_ENV`. Production refuses dev auth, the process executor, test accounts, runner images without digest |
+| `env` | `production` | `Z_ENV`: `production`, `staging` or `development` (schema enum). Production: the server refuses dev auth, the process executor, test accounts, runner images without digest; the chart refuses to render without the checks listed under [Production checks](#production-checks) |
 | `publicUrl` | `""` | `Z_PUBLIC_URL`; empty: from `ingress.host` |
 | `oidc.issuerUrl`, `oidc.clientId` | `""` | GitLab OIDC (the secret is in the Secret) |
 | `authMode` | `oidc` | `Z_AUTH_MODE` |
@@ -236,6 +236,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `runners.jobTTLSeconds` | `3600` | `Z_RUNNER_JOB_TTL_S` |
 | `runners.podSecurity.level` | `restricted` | the only accepted value |
 | `runners.resourceQuota`, `runners.limitRange` | on | quota of the runner namespace, container defaults/max |
+| `runners.networkPolicy.enabled` | `true` | runner namespace policies; refused `false` in production |
 | `runners.networkPolicy.reachablePorts` | `[8000, 4000]` | ports runners may open on reachable pods |
 | `runners.networkPolicy.extraEgress` | `[]` | extra egress rules for runners |
 | `dns.namespace`, `dns.podLabels` | `kube-system`, `k8s-app: kube-dns` | DNS peer of the runner policy |
@@ -252,7 +253,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `persistence.artifacts.{enabled,size,storageClass,accessModes,existingClaim}` | `true`, `20Gi`, `""`, `[ReadWriteOnce]`, `""` | `Z_ARTIFACTS_DIR` volume |
 | `ingress.{enabled,className,host,tls}` | `true`, `""`, `z.example.internal`, TLS on | Ingress to z-ui |
 | `httpRoute.{enabled,parentRefs,hostnames}` | `false` | Gateway API HTTPRoute |
-| `networkPolicy.enabled` | `true` | release namespace policies |
+| `networkPolicy.enabled` | `true` | release namespace policies; refused `false` in production |
 | `networkPolicy.ingressController` | `kube-system` | namespace/pod selector of the ingress controller |
 | `networkPolicy.metricsFrom` | `[]` | peers allowed to scrape `/metrics` |
 | `networkPolicy.litellmEgress` | `[]` | restrict LiteLLM egress to these rules (+ DNS); required in production |
@@ -267,6 +268,16 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 
 `podSecurityContext` and `containerSecurityContext` apply to every pod and container; the schema refuses any
 weakening (invariant 13).
+
+## Production checks
+
+With `env: production` (the default) `helm template` / `helm install` fail, with the reason, unless:
+
+- `networkPolicy.enabled`, `runners.networkPolicy.enabled` and `networkPolicy.serverEgress.enabled` are
+  `true` (the schema refuses `false`, and the templates refuse it again under `--skip-schema-validation`);
+- `networkPolicy.litellmEgress` pins LiteLLM to the inference cluster (a CIDR and ports, not `0.0.0.0/0`).
+
+In every environment `env` must be `production`, `staging` or `development`.
 
 ## Checks
 

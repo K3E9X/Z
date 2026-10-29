@@ -30,8 +30,30 @@
     }
   },
   "required": ["env", "server", "runners", "litellm", "postgres", "database", "secrets", "config", "containerSecurityContext", "podSecurityContext"],
+  "allOf": [
+    {
+      "description": "env=production: the network policies cannot be switched off (docs/07 §3)",
+      "if": { "required": ["env"], "properties": { "env": { "const": "production" } } },
+      "then": {
+        "properties": {
+          "networkPolicy": {
+            "required": ["enabled"],
+            "properties": {
+              "enabled": { "const": true },
+              "serverEgress": { "properties": { "enabled": { "const": true } } }
+            }
+          },
+          "runners": {
+            "properties": {
+              "networkPolicy": { "required": ["enabled"], "properties": { "enabled": { "const": true } } }
+            }
+          }
+        }
+      }
+    }
+  ],
   "properties": {
-    "env": { "type": "string", "minLength": 1, "description": "Z_ENV" },
+    "env": { "enum": ["production", "staging", "development"], "description": "Z_ENV" },
     "publicUrl": { "type": "string", "pattern": "^(https?://.+)?$" },
     "authMode": { "enum": ["oidc", "dev"] },
     "releaseNamespace": {

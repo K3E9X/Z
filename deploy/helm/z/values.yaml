@@ -5,8 +5,10 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# Z_ENV. `production` refuses dev auth, the process executor, test accounts and runner images without a digest
-# (the server checks this at start and exits with the reason).
+# Z_ENV: production | staging | development. `production` refuses dev auth, the process executor, test
+# accounts and runner images without a digest (the server checks this at start and exits with the reason),
+# and the chart refuses to render with the network policies off or LiteLLM egress unpinned (README
+# "Production checks").
 env: production
 
 # Public URL of Z (Z_PUBLIC_URL). Empty: derived from ingress.host (https when ingress.tls.enabled).
