@@ -1,8 +1,8 @@
 # 13 — CI/CD
 
-Two equivalent pipelines ship as **templates** in `ci/`, because the code does not exist yet and a workflow that runs on an empty repo only fails:
-- `ci/github/*.yml` → copied to `.github/workflows/` in BUILD phase A (the repo lives on GitHub);
-- `ci/gitlab/.gitlab-ci.yml` → copied to the repo root for the internal GitLab mirror, which also **deploys to the team's k3s**.
+Two equivalent pipelines run the same stages with the same open-source tools:
+- GitHub Actions in `.github/workflows/` (the repo lives on GitHub): build, scan, sign and publish to GHCR;
+- `.gitlab-ci.yml` at the root for the internal GitLab mirror, which also **deploys to the team's k3s**.
 
 Both run the same stages with the same open-source tools, so results match.
 
@@ -11,11 +11,11 @@ Both run the same stages with the same open-source tools, so results match.
 |---|---|---|
 | **lint** | `ruff`, `mypy --strict` (server, runner, cli), `eslint`, `tsc --noEmit`, `prettier --check`, `hadolint` (Dockerfiles), `yamllint`, `actionlint` (GitHub) | any error |
 | **test** | `pytest` with coverage (server, runner, cli), UI unit and component tests, contract tests (examples validate, OpenAPI diff vs `main` must be additive unless labelled `breaking`), pack lint, RBAC matrix and route-permission tests, audit-chain test | any failure; coverage < 80 % on `server/` and `runner/` |
-| **security** | `gitleaks` (secrets), `semgrep` (SAST: Python, TS, Dockerfile, Kubernetes rulesets) and `bandit`, `osv-scanner` + `pip-audit` + `pnpm audit` (dependencies), `trivy fs` and `trivy config` (repo, IaC), license check (allowlist) | any secret; high/critical findings without an accepted exception in `security/exceptions.yaml` (owner + expiry) |
+| **security** | `gitleaks` (secrets), `semgrep` (SAST: Python, TS, Dockerfile, Kubernetes rulesets) and `bandit`, `osv-scanner` + `pip-audit` + `pnpm audit` (dependencies), `trivy fs` and `trivy config` (repo, IaC), license check (allowlist) | any secret; high/critical findings without an accepted exception in `security/exceptions.yaml` (owner + expiry): osv-scanner and trivy fs block on CVSS >= 7 or an unscored finding, pip-audit on any vulnerability with a fix (`ci/scripts/vuln_gate.py`) |
 | **build** | Multi-arch images (amd64, arm64) for `z-server`, `z-runner`, `z-browser`, `z-ui` with BuildKit (GitHub) or rootless Buildah/Kaniko (GitLab, no privileged Docker-in-Docker); reproducible tags `sha-<short>`, `vX.Y.Z` | build failure |
 | **scan** | `trivy image` on each image, `dockle` (image best practices) | critical vulnerability with a fix available |
 | **sbom and sign** | `syft` SBOM (SPDX JSON) attached as an attestation; `cosign` signature (keyless with GitHub OIDC; key in GitLab protected variable or Vault for the mirror); SLSA provenance via BuildKit | — (runs on main and tags only) |
-| **chart** | `helm lint`, `helm template` with `values-k3s.yaml` and `values-k8s.yaml` piped to `kubeconform -strict`, `kube-score` and `kubescape` (NSA/CIS frameworks) on rendered manifests, `helm package` | lint/schema errors; kubescape score under threshold |
+| **chart** | `helm lint`, `helm template` with `values-k3s.yaml` and `values-k8s.yaml` piped to `kubeconform -strict`, `kube-score` (report only) and `kubescape` (NSA/CIS frameworks) on rendered manifests, `helm package` | lint/schema errors; kubescape score under 85 % |
 | **e2e** | Compose stack with fake LLM, fake tools and fake GitLab OIDC; `tests/e2e/` scenarios of BUILD phase C; smoke install on **kind** (Kubernetes) and **k3d** (k3s) | any failure |
 | **dast** | OWASP ZAP baseline scan against the running compose UI and API (authenticated with a test session) | high alerts |
 | **deploy** (GitLab only) | `helm upgrade --install --atomic --wait` to the k3s `staging` namespace on `main`; to `production` on a signed tag, **manual job in a protected environment** with required approval; image signatures verified before deploy (cosign verify, or Kyverno/sigstore policy-controller in the cluster) | — |
@@ -40,13 +40,13 @@ In March 2026 a credential-stealing campaign overwrote `aquasecurity/trivy-actio
 ## 4. Files
 | File | Purpose |
 |---|---|
-| `ci/github/ci.yml` | lint, test, security on PRs and pushes |
-| `ci/github/images.yml` | build, scan, SBOM, sign, push to GHCR on main and tags |
-| `ci/github/chart.yml` | chart lint, render, policy checks |
-| `ci/github/e2e.yml` | compose e2e, ZAP baseline, kind and k3d smoke |
-| `ci/gitlab/.gitlab-ci.yml` | all stages for the internal mirror, plus deploy to k3s |
-| `ci/CODEOWNERS.example`, `ci/renovate.json`, `ci/security-exceptions.example.yaml` | repo hygiene |
-| `ci/blocked-versions.example.yaml` | versions CI refuses (LiteLLM 1.82.7/1.82.8, Trivy 0.69.4–0.69.6…) |
-| `ci/scripts/versions.lock.example` | pinned scanner versions and checksums (B8 writes `install-scanners.sh`, `verify-signatures.sh`, `check_exceptions.py`) |
+| `.github/workflows/ci.yml` | guard (blocked versions, expired exceptions), lint, Python, UI and security jobs on PRs, pushes and weekly |
+| `.github/workflows/images.yml` | build and scan on PRs; on main and tags: multi-arch publish to GHCR, scan, cosign keyless signature and SPDX attestation (separate jobs and permissions) |
+| `.github/workflows/helm.yml`, `chart-policy.yml` | chart lint and render with kubeconform; kubescape and kube-score |
+| `.github/workflows/e2e.yml` | compose e2e on PRs touching server, runner, browser, deploy or the lockfile |
+| `.gitlab-ci.yml` | all stages for the internal mirror (rootless Buildah, cosign key pair), staging deploy on main, production on a signed tag (manual, protected) |
+| `ci/scripts/install-scanners.sh`, `versions.lock`, `requirements/` | scanners from pinned versions with verified checksums or hashes, fail closed |
+| `ci/scripts/check_blocked.py`, `check_exceptions.py`, `vuln_gate.py`, `verify-signatures.sh` | blocked versions, exception expiry, severity gate, signature and SBOM verification before deploy |
+| `security/blocked-versions.yaml`, `security/exceptions.yaml`, `security/gitleaksignore` | versions CI refuses, accepted findings (owner + expiry), reviewed gitleaks fingerprints |
 
-BUILD phase A copies the GitHub templates into `.github/workflows/` with only the jobs whose code exists enabled; B8 completes and enables the rest.
+Not built yet: ZAP baseline, kind/k3d smoke installs, license check, changelog generation (ADR 0018).

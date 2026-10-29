@@ -19,3 +19,4 @@ Format: context, decision, consequences. Add a new file for every decision the s
 - [0015 — Personal OAuth connections and chat/mail channels](0015-connections-and-channels.md)
 - [0016 — Browser connectors: reviewed flows replayed by z-browser](0016-browser-flows.md)
 - [0017 — Chat follow-ups: approval cards link to Z, content capped by data class](0017-channel-follow-ups.md)
+- [0018 — CI pipelines as built](0018-ci-pipelines.md)
