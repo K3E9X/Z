@@ -37,6 +37,8 @@ Values files:
 
 `env` is `production` (default), `staging` or `development`. With `production` the chart refuses to render when the network policies are switched off (`networkPolicy.enabled`, `networkPolicy.serverEgress.enabled`, `runners.networkPolicy.enabled`; schema `if`/`then` and a template `fail`) or LiteLLM egress is not pinned (below), or an image it runs (z-server, z-runner, LiteLLM, and z-ui, z-browser, egress-proxy, Postgres when enabled) is not pinned by digest.
 
+Client addresses: z-server trusts `X-Forwarded-For` only from `server.trustedProxies` (`Z_TRUSTED_PROXIES`), by default `cluster.podCIDR` (k3s `10.42.0.0/16`), so the audit log and the per-IP sign-in limiter record the client that the ingress controller and z-ui forward rather than the z-ui pod. Runner pods share that CIDR and could forge the header on their own requests to z-server; narrow the value to the z-ui / ingress controller ranges where the CNI allows it, or set `127.0.0.1` to trust no proxy.
+
 The release namespace must enforce Pod Security `restricted` like `z-runners` (`07-security.md` §3). Helm stores the release record in that namespace before it creates any resource, so the chart cannot create or label it on `helm install`: create and label it first instead of `--create-namespace` (NOTES.txt warns after install or upgrade when the label is missing). `releaseNamespace.create: true` renders the labelled Namespace for `helm template | kubectl apply` and Argo CD.
 
 ```bash

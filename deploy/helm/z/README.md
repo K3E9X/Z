@@ -224,7 +224,7 @@ exactly those Secrets with `server.secretRefs`, or mount them (`server.extraVolu
 | `server.replicas` | `1` | `all` replicas; > 1 needs RWX artifacts and `migrate.mode: hook` |
 | `server.image.{repository,tag,digest}` | `ghcr.io/k3e9x/z-server`, `v<appVersion>`, `""` | digest wins over tag; `latest` refused |
 | `server.splitComponents` | `false` | one Deployment per component: not implemented, `true` fails the render |
-| `server.trustedProxies` | `""` | `Z_TRUSTED_PROXIES` (X-Forwarded-For) |
+| `server.trustedProxies` | `""` (`cluster.podCIDR`) | `Z_TRUSTED_PROXIES`: proxies whose X-Forwarded-For is trusted, so audit IPs and the sign-in limiter see the client. Runners share the pod CIDR and could forge the header: narrow it when you can (see values.yaml) |
 | `server.clusterCIDRs` | `""` | `Z_CLUSTER_CIDRS` for the SSRF guard (pod + service CIDRs) |
 | `server.outboundAllow` | `""` | `Z_OUTBOUND_ALLOW` |
 | `server.secretsBackend` | `kubernetes` | `Z_SECRETS_BACKEND` |

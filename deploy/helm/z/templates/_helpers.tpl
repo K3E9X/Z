@@ -240,7 +240,7 @@ in the Secret. External: the DSN comes from database.existingSecret.
   value: {{ .Values.server.replicas | quote }}
 - name: Z_SHUTDOWN_GRACE_S
   value: {{ .Values.server.shutdownGraceSeconds | quote }}
-{{- with .Values.server.trustedProxies }}
+{{- with (default .Values.cluster.podCIDR .Values.server.trustedProxies) }}
 - name: Z_TRUSTED_PROXIES
   value: {{ . | quote }}
 {{- end }}

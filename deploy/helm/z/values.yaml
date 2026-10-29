@@ -57,7 +57,8 @@ releaseNamespace:
   # Argo CD. Leave false with `helm install` / `helm upgrade` (the Namespace would conflict with the release).
   create: false
 
-# Address ranges of the cluster (defaults: k3s). The egress proxy may never reach them. Other distributions:
+# Address ranges of the cluster (defaults: k3s). The egress proxy may never reach them; podCIDR is also the
+# default of server.trustedProxies. Other distributions:
 # set your own (kubeadm services 10.96.0.0/12; pods per CNI, e.g. Calico 192.168.0.0/16).
 cluster:
   podCIDR: 10.42.0.0/16
@@ -79,9 +80,13 @@ server:
     pullPolicy: IfNotPresent
   port: 8000
   logLevel: INFO           # Z_LOG_LEVEL
-  # Z_TRUSTED_PROXIES: addresses/CIDRs whose X-Forwarded-For is trusted (uvicorn forwarded_allow_ips).
-  # Empty keeps the server default (127.0.0.1). Set it to the z-ui / ingress controller pod CIDR to record
-  # client IPs in the audit log; runners share the pod CIDR, so only do it if that trade-off is acceptable.
+  # Z_TRUSTED_PROXIES: comma-separated addresses/CIDRs whose X-Forwarded-For is trusted (uvicorn
+  # forwarded_allow_ips). Empty: cluster.podCIDR, so the audit log and the per-IP sign-in limiter see the
+  # client address that z-ui and the ingress controller forward instead of the z-ui pod's. Trade-off: runner
+  # pods share the pod CIDR and can reach z-server, so they could forge X-Forwarded-For on their own requests
+  # (spoofed audit IP, sign-in attempts counted against another IP). Narrow it to the z-ui / ingress
+  # controller addresses when your CNI allows it (e.g. a dedicated node pool's pod range), or set 127.0.0.1
+  # to trust no proxy.
   trustedProxies: ""
   # Z_CLUSTER_CIDRS: ranges the SSRF guard treats as cluster-internal. Empty keeps the server default
   # (10.42.0.0/16,10.43.0.0/16,10.96.0.0/12). Set your pod and service CIDRs.
