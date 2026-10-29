@@ -2,6 +2,7 @@
 name: flow-matrix-check
 description: Check a flow matrix against segmentation rules.
 version: 1.0.0
+evals: evals/flow-matrix-check.jsonl
 ---
 
 1. Load the matrix (CSV/XLSX): source, destination, port, protocol, justification.

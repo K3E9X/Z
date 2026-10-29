@@ -2,6 +2,7 @@
 name: project-pre-review
 description: Draft a project security pre-review from its project file.
 version: 1.0.0
+evals: evals/project-pre-review.jsonl
 ---
 
 Sections:

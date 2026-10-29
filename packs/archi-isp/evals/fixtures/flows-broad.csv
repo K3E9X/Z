@@ -1,0 +1,5 @@
+id,fw_rule,source,source_zone,destination,destination_zone,port,protocol,justification,owner
+B-01,fw-iot-in-01,0.0.0.0/0,INTERNET,app-iot-01.example.internal,APP,1-65535,TCP,Device telemetry from the field,IoT team (P. Navarro)
+B-02,fw-iot-db-01,10.0.0.0/8,USER,db-iot-01.example.internal,DATA,5432,TCP/PostgreSQL,Analysts query telemetry,IoT team (P. Navarro)
+B-03,fw-iot-gw-01,any (internet),INTERNET,gw-iot.example.internal,DMZ,8883,TCP/MQTT over TLS,Device telemetry gateway,IoT team (P. Navarro)
+B-04,fw-iot-app-01,gw-iot.example.internal,DMZ,app-iot-01.example.internal,APP,8443,TCP/HTTPS,Gateway to the telemetry application,IoT team (P. Navarro)

@@ -1,0 +1,9 @@
+id,fw_rule,source,source_zone,destination,destination_zone,port,protocol,justification,owner
+A-01,fw-oss-olt-01,bastion-02.example.internal,ADMIN,olt-par-07.example.internal,OSS,23,TCP/Telnet,CLI access to the OLT,Access network team (M. Roux)
+A-02,fw-oss-olt-02,nms-01.example.internal,ADMIN,olt-par-07.example.internal,OSS,161,UDP/SNMPv2c,Polling of OLT counters,Access network team (M. Roux)
+A-03,fw-oss-bkp-01,olt-par-07.example.internal,OSS,bkp-01.example.internal,ADMIN,21,TCP/FTP,Nightly configuration backup,Access network team (M. Roux)
+A-04,fw-oss-sw-01,bastion-02.example.internal,ADMIN,sw-core-03.example.internal,OSS,80,TCP/HTTP,Web administration of the core switch,Core network team (J. Petit)
+A-05,fw-oss-sw-02,bastion-02.example.internal,ADMIN,sw-core-03.example.internal,OSS,22,TCP/SSH,CLI access to the core switch,Core network team (J. Petit)
+A-06,fw-oss-acs-01,bastion-02.example.internal,ADMIN,acs-01.example.internal,OSS,443,TCP/HTTPS,ACS web console,Access network team (M. Roux)
+A-07,fw-oss-olt-03,nms-01.example.internal,ADMIN,olt-par-08.example.internal,OSS,161,UDP/SNMPv3,Polling of OLT counters (authPriv),Access network team (M. Roux)
+A-08,fw-oss-sw-03,lan-noc-users,USER,sw-core-03.example.internal,OSS,22,TCP/SSH,NOC engineers connect from their laptops,Core network team (J. Petit)
