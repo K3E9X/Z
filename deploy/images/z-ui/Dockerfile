@@ -1,6 +1,6 @@
 # z-ui: the static web app served by an unprivileged nginx, which also proxies /api to z-server.
 # Non-root (uid 101), read-only root filesystem friendly (writes only to /tmp).
-ARG NODE_IMAGE=node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
+ARG NODE_IMAGE=node:22.23.3-bookworm-slim@sha256:3ed98443660ff48413b5af19ecefce3b9d50845a901a43420d47cc63a9fddbe9
 ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
 
 FROM ${NODE_IMAGE} AS build
