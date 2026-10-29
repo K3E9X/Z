@@ -295,6 +295,23 @@ in the Secret. External: the DSN comes from database.existingSecret.
 {{- end -}}
 {{- end -}}
 
+{{/* Production: every image the release runs is pinned by digest (docs/11 §3) */}}
+{{- define "z.validateDigests" -}}
+{{- $v := .Values -}}
+{{- $images := dict "server" $v.server.image "runners" $v.runners.image "litellm" $v.litellm.image -}}
+{{- if $v.ui.enabled }}{{ $_ := set $images "ui" $v.ui.image }}{{ end -}}
+{{- if $v.browser.enabled }}{{ $_ := set $images "browser" $v.browser.image }}{{ end -}}
+{{- if $v.egressProxy.enabled }}{{ $_ := set $images "egressProxy" $v.egressProxy.image }}{{ end -}}
+{{- if $v.postgres.embedded }}{{ $_ := set $images "postgres" $v.postgres.image }}{{ end -}}
+{{- $missing := list -}}
+{{- range $name, $img := $images -}}
+{{- if not $img.digest }}{{ $missing = append $missing (printf "%s.image.digest" $name) }}{{ end -}}
+{{- end -}}
+{{- if $missing -}}
+{{- fail (printf "env=production deploys images by digest only; set %s (sha256:...)" (join ", " $missing)) -}}
+{{- end -}}
+{{- end -}}
+
 {{/* Validation that must stop the render (called from server-deployment.yaml) */}}
 {{- define "z.validate" -}}
 {{- if not (has .Values.env (list "production" "staging" "development")) -}}
@@ -308,6 +325,7 @@ in the Secret. External: the DSN comes from database.existingSecret.
 {{- fail "env=production: runners.networkPolicy.enabled=false is refused (agent pods must stay network-isolated, docs/07 §3)" -}}
 {{- end -}}
 {{- include "z.validateLitellmEgress" . -}}
+{{- include "z.validateDigests" . -}}
 {{- if not .Values.networkPolicy.serverEgress.enabled -}}
 {{- fail "env=production: networkPolicy.serverEgress.enabled=false is refused; list what z-server must reach in networkPolicy.serverEgress.allow" -}}
 {{- end -}}

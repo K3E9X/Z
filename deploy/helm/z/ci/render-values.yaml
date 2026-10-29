@@ -1,7 +1,18 @@
 # CI render only (helm lint / helm template / kubeconform / kubescape / trivy), on top of values-k3s.yaml or
 # values-k8s.yaml. The defaults are env=production, whose checks fail the render until site values exist;
-# this file stands in for my-values.yaml with documentation addresses (RFC 5737). NEVER deploy with it.
+# this file stands in for my-values.yaml with placeholder digests (they exist in no registry) and
+# documentation addresses (RFC 5737). NEVER deploy with it.
 #   helm template z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml
+server:
+  image: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000001" }
+runners:
+  image: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000002" }
+ui:
+  image: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000003" }
+browser:
+  image: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000004" }
+egressProxy:
+  image: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000005" }
 networkPolicy:
   litellmEgress:
     - to: [{ ipBlock: { cidr: 192.0.2.0/24 } }]

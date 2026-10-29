@@ -28,16 +28,15 @@ file of the pod you exec into:
 Break-glass (Z_BREAKGLASS=true): its one-time password and TOTP URI are written to {{ $dir }}/breakglass of the
 pod that created them, the same way (grep the log for "written to", then kubectl exec <pod> -c server -- cat).
 {{- end }}
+{{- /* production renders only with every image pinned by digest (z.validateDigests) */}}
 {{- $missing := list }}
-{{- range $n, $img := dict "server" .Values.server.image "runners" .Values.runners.image "ui" .Values.ui.image "litellm" .Values.litellm.image "postgres" .Values.postgres.image }}
+{{- range $n, $img := dict "server" .Values.server.image "runners" .Values.runners.image "ui" .Values.ui.image "litellm" .Values.litellm.image "postgres" .Values.postgres.image "browser" .Values.browser.image "egressProxy" .Values.egressProxy.image }}
 {{- if not $img.digest }}{{ $missing = append $missing $n }}{{ end }}
 {{- end }}
 {{- if $missing }}
 
-WARNING: images without a digest: {{ join ", " $missing }}. Deploy by digest (<component>.image.digest).
-{{- if and (eq .Values.env "production") (not .Values.runners.image.digest) }}
-z-server REFUSES TO START with env=production until runners.image.digest is set (Z_RUNNER_IMAGE@sha256:...).
-{{- end }}
+WARNING (env={{ .Values.env }}): images without a digest: {{ join ", " $missing }}. Deploy by digest
+(<component>.image.digest); env=production refuses to render without them.
 {{- end }}
 {{- /* lookup is empty under `helm template` and without get on namespaces: then only the reminder shows */}}
 {{- $nsObj := lookup "v1" "Namespace" "" .Release.Namespace }}

@@ -16,9 +16,10 @@ hardening: `docs/07-security.md` §3.
 
 ## Install
 
-Images are published by CI as `ghcr.io/k3e9x/z-{server,runner,ui}` (tags `vX.Y.Z`, `sha-<short>`). Always
-deploy by digest: `server.image.digest`, `runners.image.digest`, `ui.image.digest`. With `env: production`
-(the default) z-server **refuses to start** until `runners.image.digest` is set.
+Images are published by CI as `ghcr.io/k3e9x/z-{server,runner,ui,browser}` (tags `vX.Y.Z`, `sha-<short>`).
+Always deploy by digest: with `env: production` (the default) the chart **refuses to render** unless every
+image it runs has one (`server`, `runners`, `litellm`, and `ui`, `browser`, `egressProxy`, `postgres` when
+enabled; LiteLLM and Postgres ship pinned), and z-server itself refuses a runner image without a digest.
 
 Put the site-specific values in your own file, e.g. `my-values.yaml`:
 
@@ -275,15 +276,20 @@ With `env: production` (the default) `helm template` / `helm install` fail, with
 
 - `networkPolicy.enabled`, `runners.networkPolicy.enabled` and `networkPolicy.serverEgress.enabled` are
   `true` (the schema refuses `false`, and the templates refuse it again under `--skip-schema-validation`);
-- `networkPolicy.litellmEgress` pins LiteLLM to the inference cluster (a CIDR and ports, not `0.0.0.0/0`).
+- `networkPolicy.litellmEgress` pins LiteLLM to the inference cluster (a CIDR and ports, not `0.0.0.0/0`);
+- every image of the release is pinned by digest (`<component>.image.digest`).
+
+`ci/render-values.yaml` (not packaged) satisfies these with placeholders so CI can lint and render the
+production defaults: `-f values-k3s.yaml -f ci/render-values.yaml`. Never deploy with it.
 
 In every environment `env` must be `production`, `staging` or `development`.
 
 ## Checks
 
 ```bash
-helm lint deploy/helm/z -f deploy/helm/z/values-k3s.yaml
-helm template z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml | kubeconform -strict -summary -ignore-missing-schemas
+helm lint deploy/helm/z -f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml
+helm template z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml \
+  | kubeconform -strict -summary -ignore-missing-schemas
 ```
 
 Same for `values-k8s.yaml`; `.github/workflows/helm.yml` runs these plus the ServiceMonitor path and the
