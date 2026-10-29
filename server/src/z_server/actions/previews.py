@@ -12,7 +12,6 @@ from z_common.models.actions import (
     DiffFile,
     DiffPreview,
     EventPreview,
-    FilePreview,
     IssuePreview,
     IssueUpdatePreview,
     JsonPreview,
@@ -104,7 +103,9 @@ def build(operation: str, payload: dict[str, Any], artifact_path: Path | None = 
     if operation == "gchat.messages.create":
         body = payload.get("body") or {}
         thread = (body.get("thread") or {}).get("name")
-        target = f"spaces/{payload.get('space', '')}" + (f" (reply in {thread})" if thread else "")
+        # Chat ignores thread.name without messageReplyOption: the message then starts a new thread
+        reply = f" (reply in {thread})" if thread and payload.get("messageReplyOption") else " (new thread)"
+        target = f"spaces/{payload.get('space', '')}{reply}"
         return ChatMessagePreview(
             kind="chat_message", platform="google_chat", target=target, text=str(body.get("text", ""))
         ).dump()
@@ -175,7 +176,9 @@ def _m365(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         ).dump()
     if operation == "m365.mail.reply":
         return CommentPreview(
-            kind="comment", target=f"Reply to mail {payload.get('message_id', '')}", body=str(body.get("comment", ""))
+            kind="comment",
+            target=f"Reply to the sender of mail {payload.get('message_id', '')}",
+            body=str(body.get("comment", "")),
         ).dump()
     if operation == "m365.calendar.events.create":
 
@@ -202,12 +205,5 @@ def _m365(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
             target=f"chat {payload.get('chat_id', '')}",
             text=str((body.get("body") or {}).get("content", "")),
         ).dump()
-    if operation == "m365.files.upload":
-        raw = payload.get("body")
-        return FilePreview(
-            kind="file",
-            name=str(payload.get("filename", "")),
-            size=len(raw.encode()) if isinstance(raw, str) else None,
-            destination=f"OneDrive folder {payload.get('parent_id', '')}",
-        ).dump()
+    # m365.files.upload stays a JSON preview: it shows the content, a file card would show only its name
     return None

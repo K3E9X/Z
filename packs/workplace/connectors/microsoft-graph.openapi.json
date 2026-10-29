@@ -160,7 +160,7 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 300,
-                        "pattern": "^[^\\r\\n]*$"
+                        "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
                       },
                       "body": {
                         "type": "object",
@@ -201,12 +201,12 @@
                                 "address": {
                                   "type": "string",
                                   "maxLength": 320,
-                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                                 },
                                 "name": {
                                   "type": "string",
                                   "maxLength": 200,
-                                  "pattern": "^[^\\r\\n]*$"
+                                  "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
                                 }
                               }
                             }
@@ -234,12 +234,12 @@
                                 "address": {
                                   "type": "string",
                                   "maxLength": 320,
-                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                                 },
                                 "name": {
                                   "type": "string",
                                   "maxLength": 200,
-                                  "pattern": "^[^\\r\\n]*$"
+                                  "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
                                 }
                               }
                             }
@@ -409,12 +409,12 @@
                             "address": {
                               "type": "string",
                               "maxLength": 320,
-                              "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                              "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                             },
                             "name": {
                               "type": "string",
                               "maxLength": 200,
-                              "pattern": "^[^\\r\\n]*$"
+                              "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
                             }
                           }
                         },

@@ -42,7 +42,7 @@ def test_m365_mail_event_chat_and_file_previews() -> None:
         "body": "Two incidents, both closed.",
     }
     reply = previews.build("m365.mail.reply", {"message_id": "AAMk1", "body": {"comment": "Done."}})
-    assert reply == {"kind": "comment", "target": "Reply to mail AAMk1", "body": "Done."}
+    assert reply == {"kind": "comment", "target": "Reply to the sender of mail AAMk1", "body": "Done."}
     event = previews.build(
         "m365.calendar.events.create",
         {
@@ -61,7 +61,7 @@ def test_m365_mail_event_chat_and_file_previews() -> None:
     chat = previews.build("m365.teams.messages.post", {"chat_id": "19:abc", "body": {"body": {"content": "On it"}}})
     assert chat == {"kind": "chat_message", "platform": "teams", "target": "chat 19:abc", "text": "On it"}
     file = previews.build("m365.files.upload", {"parent_id": "01ABC", "filename": "report.md", "body": "# Été"})
-    assert file == {"kind": "file", "name": "report.md", "size": 7, "destination": "OneDrive folder 01ABC"}
+    assert file["kind"] == "json" and file["data"]["body"] == "# Été"  # the content stays visible
 
 
 @pytest.mark.parametrize(
@@ -87,3 +87,14 @@ def test_an_event_in_another_calendar_says_which() -> None:
     assert shared["body"] == "(in the calendar secops@example.test)" and shared["start"] == "2026-11-09"
     own = previews.build("google.calendar.events.insert", {"calendarId": "primary", "body": event})
     assert "body" not in own
+
+
+def test_a_chat_reply_is_shown_only_when_it_happens() -> None:
+    body = {"text": "hi", "thread": {"name": "spaces/AAAA/threads/t1"}}
+    reply = previews.build(
+        "gchat.messages.create",
+        {"space": "AAAA", "messageReplyOption": "REPLY_MESSAGE_OR_FAIL", "body": body},
+    )
+    assert reply["target"] == "spaces/AAAA (reply in spaces/AAAA/threads/t1)"
+    ignored = previews.build("gchat.messages.create", {"space": "AAAA", "body": body})  # Chat ignores the thread
+    assert ignored["target"] == "spaces/AAAA (new thread)"

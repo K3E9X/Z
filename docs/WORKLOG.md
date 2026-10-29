@@ -109,6 +109,10 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   dump), readable previews, events idempotent by `transactionId`. learn.microsoft.com and graph.microsoft.com are
   blocked here; the official description `microsoftgraph/msgraph-metadata` (openapi/v1.0) on GitHub is reachable
   and was the reference. The `m365` pack connector is now tested end to end against the fake.
+- Independent review of the Google/M365 work (ADR 0028 consequences): fixed top-level keys merged into write
+  bodies past the preview (all OpenAPI writes), RFC 2047 encoded words decoded into hidden recipients, calendar
+  ownership by `organizer.self`, `..` calendar ids, Chat reply previews; M365 events no longer count as
+  idempotent. Lesson: a preview is only as good as the closed schema of everything the writer sends.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no
   operation could be approved (422). The pack linter now refuses it (the connector API already did).
 - Trap: `pkill -f <pattern>` with the pattern in the same command line kills the shell (exit 144): kill by PID.

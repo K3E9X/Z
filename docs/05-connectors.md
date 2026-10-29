@@ -95,7 +95,7 @@ never sends twice (ADR 0028).
   - **Application permissions** for shared resources (a team mailbox, a channel, a SharePoint site), restricted with Exchange **RBAC for Applications** (or application access policies) and Teams resource-specific consent so the app only reaches the mailboxes, teams and sites it needs.
 - Read scopes (`Mail.Read`, `Calendars.Read`, `Chat.Read`, `Files.Read.All`…) belong to `z-m365-read`; write scopes (`Mail.Send`, `ChannelMessage.Send`, `Calendars.ReadWrite`, `Files.ReadWrite`) to `z-m365-write`. Request the minimum; check Microsoft Graph docs for which Teams read APIs are protected or metered and need extra approval.
 - Previews in Review: a rendered mail (from, to, cc, subject, body, attachments), an event card, a Teams message with its target channel, a file with its destination.
-- The write bodies of the shipped Graph subset are closed schemas (no Bcc, reply-to, extra headers or attachments), so the preview shows everything the write does. Events carry Graph's `transactionId` (the action id) and are created once even after an executor crash; mails and Teams posts have no such key and end "outcome unknown" after a crash, never re-sent blindly.
+- The write bodies of the shipped Graph subset are closed schemas (no Bcc, reply-to, extra headers or attachments), so the preview shows everything the write does. Events carry Graph's `transactionId` (the action id) so Graph can drop redundant creates; as Graph does not document its answer to a repeated id, events, mails and Teams posts all end "outcome unknown" after an executor crash, never re-sent blindly. File uploads keep the JSON preview, which shows the content.
 - Default data class for M365 content: C2.
 
 ## 9. Credential scopes

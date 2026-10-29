@@ -186,7 +186,7 @@
                     "items": {
                       "type": "string",
                       "maxLength": 320,
-                      "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                      "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                     },
                     "minItems": 1,
                     "maxItems": 50
@@ -196,7 +196,7 @@
                     "items": {
                       "type": "string",
                       "maxLength": 320,
-                      "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                      "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                     },
                     "maxItems": 50
                   },
@@ -204,7 +204,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 300,
-                    "pattern": "^[^\\r\\n]*$"
+                    "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
                   },
                   "body": {
                     "type": "string",
@@ -219,7 +219,7 @@
                   "in_reply_to": {
                     "type": "string",
                     "maxLength": 998,
-                    "pattern": "^<[^\\s<>]+>$",
+                    "pattern": "^<[^\\s<>=?]+>$",
                     "description": "Message-ID header of the mail answered"
                   }
                 }
@@ -270,7 +270,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9_.@+\\-]{1,200}$"
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
             },
             "description": "primary, or a calendar id (an e-mail address)"
           },
@@ -361,7 +361,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9_.@+\\-]{1,200}$"
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
             },
             "description": "primary, or a calendar id"
           },
@@ -471,7 +471,7 @@
                         "email": {
                           "type": "string",
                           "maxLength": 320,
-                          "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\]+@[A-Za-z0-9.\\-]+$"
+                          "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
                         },
                         "optional": {
                           "type": "boolean"
@@ -497,7 +497,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9_.@+\\-]{1,200}$"
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
             },
             "description": "primary, or a calendar id"
           },
@@ -535,7 +535,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9_.@+\\-]{1,200}$"
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
             },
             "description": "primary, or a calendar id"
           },

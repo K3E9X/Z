@@ -220,6 +220,9 @@ def test_a_mail_is_built_by_z_previewed_sent_once(
         {**reply, "bcc": ["eve@example.test"]},  # no hidden recipient
         {**reply, "subject": "Hi\r\nBcc: eve@example.test"},  # no header injection
         {**reply, "to": ["Eve <eve@example.test>, mallory@example.test"]},  # one plain address per entry
+        # RFC 2047 encoded words are decoded when the headers are parsed: hidden recipients, unseen subject text
+        {**reply, "cc": ["=?utf-8?b?c3B5QGV2aWwuY29tLCBjb2xsZWFndWU=?=@corp.example"]},
+        {**reply, "subject": "=?utf-8?b?UTMgcmV2ZW51ZTogLTQwJQ==?="},
     ):
         refused = propose(runner, "google", "google.gmail.messages.send", {"body": sneaky})
         assert refused.status_code == 422, (sneaky, refused.text)
@@ -264,6 +267,8 @@ def test_an_event_is_created_once_and_a_planted_copy_is_ignored(
         runner, "google", "google.calendar.events.insert", {"calendarId": "primary", "body": {**event, "id": "x1234"}}
     )
     assert refused.status_code == 422  # the agent cannot choose ids or extended properties
+    for odd in ({"calendarId": "..", "body": event}, {"calendarId": "primary", "body": event, "colorId": "1"}):
+        assert propose(runner, "google", "google.calendar.events.insert", odd).status_code == 422, odd
     proposed = propose(
         runner,
         "google",
@@ -279,8 +284,11 @@ def test_an_event_is_created_once_and_a_planted_copy_is_ignored(
 
     # someone who learnt the action id sends an invitation carrying the marker: it is not this account's event
     seed = google_seed()
-    planted = {**seed["events"][0], "id": "planted1", "extendedProperties": {"private": {"z_action": action["id"]}}}
-    seed["events"].append(planted)
+    marker = {"extendedProperties": {"private": {"z_action": action["id"]}}, "summary": "Access review"}
+    planted = {**seed["events"][0], "id": "planted1", **marker}
+    # ...or a delegate creates it in this calendar: the account organises it (organizer.self) but did not create it
+    delegated = {**planted, "id": "planted2", "organizer": {"email": "alice@example.test"}}
+    seed["events"] += [planted, delegated]
     tools.seed({"google": seed})
 
     assert approve_and_apply(app, jars, action["id"])["applied"] == [action["id"]]
@@ -290,7 +298,7 @@ def test_an_event_is_created_once_and_a_planted_copy_is_ignored(
 
     recovered = crash_and_recover(app, action["id"])
     assert recovered["status"] == "applied" and recovered["result"]["recovered"] is True
-    assert recovered["result"]["id"] == write["data"]["id"] != "planted1"
+    assert recovered["result"]["id"] == write["data"]["id"] not in {"planted1", "planted2"}
     assert len(tools.writes("google.calendar.events.insert")) == 1
 
 
@@ -350,5 +358,26 @@ def test_the_mail_is_rfc_2822_with_the_marker() -> None:
     raw = Google.mime({"to": ["a@example.test"], "subject": "Été", "body": "Bonjour"}, "act_1").decode()
     assert "X-Z-Action: act_1" in raw and "\r\n" in raw and "Subject: =?utf-8?" in raw
     assert base64.urlsafe_b64encode(raw.encode())  # what goes into `raw`
-    with pytest.raises(WriteError):
-        Google.mime({"to": ["a@example.test"], "subject": "x\nBcc: e@example.test", "body": ""}, "act_1")
+    for bad in (
+        {"to": ["a@example.test"], "subject": "x\nBcc: e@example.test"},
+        {"to": ["a@example.test"], "subject": "=?utf-8?q?hidden?="},
+        {"to": ["=?utf-8?b?c3B5QGV2aWwuY29tLCBj?=@corp.example"], "subject": "s"},
+        {"to": ["a@example.test, b@example.test"], "subject": "s"},  # one address per entry, checked back
+    ):
+        with pytest.raises(WriteError):
+            Google.mime({**bad, "body": ""}, "act_1")
+
+
+def test_a_chat_reply_into_another_spaces_thread_is_refused() -> None:
+    import asyncio
+    from types import SimpleNamespace
+
+    from z_server.gateway.writers import GoogleChat, WriteError
+
+    action = SimpleNamespace(
+        id="act_1",
+        payload={"space": "AAAA", "body": {"text": "hi", "thread": {"name": "spaces/BBBB/threads/t1"}}},
+    )
+    op = SimpleNamespace(local_id="messages.create")
+    with pytest.raises(WriteError, match="not in the space"):
+        asyncio.run(GoogleChat().apply(None, None, op, action, {}))  # type: ignore[arg-type]

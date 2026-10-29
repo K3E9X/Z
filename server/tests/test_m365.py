@@ -89,7 +89,7 @@ def runner(app: TestClient, oidc: FakeGitLabOIDC) -> ScriptedRunner:
         consent = httpx.get(start.json()["redirect_url"], follow_redirects=False)
         back = urlparse(consent.headers["location"])
         assert app.get(f"{back.path}?{back.query}", follow_redirects=False).status_code == 302
-    writes = ["m365.mail.send", "m365.calendar.events.create"]
+    writes = ["m365.mail.send", "m365.mail.reply", "m365.calendar.events.create"]
     plan = {
         "steps": [{"id": "s", "agent": "outlook", "prompt": "Help", "credentials": "user", "writes": writes}],
         "writes": writes,
@@ -141,6 +141,11 @@ def test_mail_reads_and_a_closed_previewed_send(app: TestClient, runner: Scripte
     }
     hidden = propose(runner, "m365.mail.send", {"body": {"message": {**message, "bccRecipients": to("eve@x.test")}}})
     assert hidden.status_code == 422, hidden.text
+    # a second message beside the reviewed body would be merged into the request: refused
+    beside = {"body": {"message": message}, "message": {**message, "bccRecipients": to("eve@x.test")}}
+    assert propose(runner, "m365.mail.send", beside).status_code == 422
+    reply_beside = {"message_id": "m1", "body": {"comment": "ok"}, "message": {"toRecipients": to("eve@x.test")}}
+    assert propose(runner, "m365.mail.reply", reply_beside).status_code == 422
     proposed = propose(runner, "m365.mail.send", {"body": {"message": message}})
     assert proposed.status_code == 201, proposed.text
     action = proposed.json()
@@ -188,6 +193,7 @@ def test_an_event_is_created_once_after_a_crash(app: TestClient, runner: Scripte
 
     app.portal.call(crash)  # type: ignore[union-attr]
     assert tick(app)["recovered"] == [action["id"]]
+    # what Graph answers to a repeated transactionId is not documented: a human checks, nothing is re-sent
     recovered = app.get(f"/api/v1/actions/{action['id']}").json()
-    assert recovered["status"] == "applied" and recovered["result"]["id"] == write["data"]["id"]
+    assert recovered["status"] == "failed" and "outcome unknown" in recovered["result"]["error"]
     assert len(tools.writes("m365.calendar.events.create")) == 1

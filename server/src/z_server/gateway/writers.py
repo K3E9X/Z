@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from email import policy
+from email.headerregistry import Address
 from email.message import EmailMessage
 from typing import Any, Protocol
 from urllib.parse import quote
@@ -464,7 +465,10 @@ class Google:
 
     @staticmethod
     def _calendar(p: dict[str, Any]) -> str:
-        return quote(str(p.get("calendarId") or "primary"), safe="@")
+        calendar = str(p.get("calendarId") or "primary")
+        if not calendar.strip("."):  # . or .. would move the call to another endpoint
+            raise WriteError(f"calendarId cannot be {calendar!r}")
+        return quote(calendar, safe="@")
 
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -508,28 +512,41 @@ class Google:
                 params={"privateExtendedProperty": f"z_action={action.id}", "showDeleted": "true", "maxResults": 5},
             )
             _fail(inv, "idempotency lookup")
+            summary = (action.payload.get("body") or {}).get("summary")
             for event in (inv.body or {}).get("items") or [] if isinstance(inv.body, dict) else []:
-                own = (event.get("creator") or {}).get("self") or (event.get("organizer") or {}).get("self")
+                # creator.self only: on a shared calendar organizer.self is true for every event, and a delegate
+                # or a co-editor who learnt the action id could plant the marker; the summary must match too
+                own = (event.get("creator") or {}).get("self") is True
                 private = (event.get("extendedProperties") or {}).get("private") or {}
-                if own and private.get("z_action") == action.id:
+                if own and private.get("z_action") == action.id and event.get("summary") == summary:
                     return {"id": event.get("id"), "url": event.get("htmlLink"), "recovered": True}
             return None
         return None
 
     @staticmethod
     def mime(p: dict[str, Any], action_id: str) -> bytes:
+        """The RFC 2822 message of the reviewed fields, checked back after building: the recipients parsed from the
+        built headers must be exactly the reviewed ones (an RFC 2047 encoded word would be decoded into more)."""
+        recipients = {"To": list(p.get("to") or []), "Cc": list(p.get("cc") or [])}
+        texts = [str(p.get("subject", "")), str(p.get("in_reply_to") or ""), *recipients["To"], *recipients["Cc"]]
+        if any("=?" in t or "\r" in t or "\n" in t for t in texts):
+            raise WriteError("the mail cannot be built: encoded words and line breaks are refused in headers")
         message = EmailMessage(policy=policy.SMTP)
         try:
-            message["To"] = ", ".join(p["to"])
-            if p.get("cc"):
-                message["Cc"] = ", ".join(p["cc"])
+            for header, addresses in recipients.items():
+                if addresses:
+                    message[header] = [Address(addr_spec=str(a)) for a in addresses]
             message["Subject"] = p["subject"]
             if p.get("in_reply_to"):
                 message["In-Reply-To"] = p["in_reply_to"]
                 message["References"] = p["in_reply_to"]
             message[MAIL_MARKER] = action_id
             message.set_content(str(p.get("body") or ""))
-        except (ValueError, TypeError) as exc:  # a header with a line break, a malformed address
+            for header, addresses in recipients.items():
+                built = [a.addr_spec for a in message[header].addresses] if addresses else []
+                if built != addresses:
+                    raise WriteError(f"the mail cannot be built: {header} would go to {built}, reviewed {addresses}")
+        except (ValueError, TypeError, IndexError) as exc:  # a malformed address
             raise WriteError(f"the mail cannot be built: {exc}") from exc
         return message.as_bytes()
 
@@ -578,6 +595,9 @@ class GoogleChat:
         if op.local_id != "messages.create":
             return await Generic().apply(gw, connector, op, action, files)
         p = action.payload
+        thread = ((p.get("body") or {}).get("thread") or {}).get("name")
+        if thread and not str(thread).startswith(f"spaces/{p.get('space')}/threads/"):
+            raise WriteError(f"the thread {thread} is not in the space {p.get('space')}")
         params: dict[str, Any] = {"requestId": action.id}
         if p.get("messageReplyOption"):
             params["messageReplyOption"] = p["messageReplyOption"]
@@ -595,9 +615,10 @@ class GoogleChat:
 
 
 class Microsoft365:
-    """Microsoft Graph as the mission starter. An event is created with `transactionId = <action id>`: Graph does
-    not create a second event for a repeated transaction id, so creating it again after a crash is safe. Mails and
-    Teams posts have no such key: after a crash they end "outcome unknown" (never a blind second send)."""
+    """Microsoft Graph as the mission starter. An event carries `transactionId = <action id>`, which Graph uses to
+    avoid redundant creates on client retries. What Graph answers to a repeated id is not documented, so the
+    operation does not count as idempotent: after a crash, events, mails and Teams posts end "outcome unknown" for
+    a human to check (never a blind second write)."""
 
     async def lookup(
         self, gw: Gateway, connector: Connector, op: Operation, action: ProposedAction
@@ -659,6 +680,5 @@ def idempotent(op: Operation) -> bool:
     return (
         op.source_ref.split(" ", 1)[0].upper() in {"PUT", "DELETE"}
         or op.local_id in {"issues.update", "issues.transition"}
-        # a repeated Chat request id returns the first post; a repeated Graph transactionId the first event
-        or op.id in {"gchat.messages.create", "m365.calendar.events.create"}
+        or op.id == "gchat.messages.create"  # a repeated Chat request id returns the first post
     )

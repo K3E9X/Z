@@ -37,14 +37,19 @@ chat v1) and `accounts.google.com/.well-known/openid-configuration`.
    `calendar.events`, `chat.messages.create`) plus `gmail.metadata` for the crash check (headers and labels only).
    Every Gmail path is `users/me`: the person's own mailbox, never someone else's.
 3. **Z builds the mail.** `gmail.messages.send` takes `{to[], cc[], subject, body, thread_id, in_reply_to}` (one
-   plain address per entry, a one-line subject, no Bcc); the executor builds the RFC 2822 message and the
-   reviewer sees a `mail` preview of exactly those fields. Events show an `event` preview that says whether
+   plain address per entry, a one-line subject, no Bcc, no RFC 2047 encoded word anywhere: the mail library
+   decodes `=?…?=` into extra recipients or unseen text); the executor builds the RFC 2822 message, checks that the
+   recipients parsed back from it are exactly the reviewed ones, and the reviewer sees a `mail` preview of those
+   fields. Every OpenAPI write with a body refuses top-level keys besides its parameters and `body`: the HTTP
+   layer merged leftovers into the request, so a second `message` beside the reviewed one reached Microsoft Graph. Events show an `event` preview that says whether
    invitations go out (`sendUpdates`); Chat posts a `chat_message` preview with platform `google_chat`.
 4. **Idempotency.**
    - Gmail: an `X-Z-Action: <action id>` header; the check reads the latest 25 SENT mails (metadata only) and stops
      at mails older than the proposal. Only the account itself puts mail in SENT.
    - Calendar: the private extended property `z_action`, searched with `privateExtendedProperty`; only an event
-     this account created or organises counts (a private property belongs to one calendar's copy of an event).
+     this account created (`creator.self`, not `organizer.self`, which is true for every event of a shared
+     calendar) with the reviewed summary counts. On a shared calendar the check finds nothing and the action ends
+     "outcome unknown" after a crash, never a second event.
    - Chat: `requestId = <action id>`; the operation counts as idempotent, so recovery posts again and Chat returns
      the first message.
 5. **No `-` in connector names**, now also enforced by the pack linter (the connector API already refused it).
@@ -57,3 +62,7 @@ chat v1) and `accounts.google.com/.well-known/openid-configuration`.
   Sheets and Slides edits are not built either (read through export only).
 - A mail sent more than 25 sent mails before a crash is not found again: the action ends "outcome unknown" for a
   human to check, never a blind second send.
+- An independent security review of this change found the encoded-word and top-level-key bypasses, the
+  `organizer.self` ownership hole, `.`/`..` as a calendar id, a Chat preview claiming a reply Chat would not make
+  (no `messageReplyOption`) and a thread of another space; all fixed with tests. Microsoft 365 events carry Graph's
+  `transactionId` but do not count as idempotent: Graph does not document its answer to a repeated id.
