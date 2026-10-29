@@ -1,8 +1,8 @@
 # Deploying Z
 
 Status: Docker Compose (Postgres, LiteLLM, z-server, z-ui on :8080, docker-socket-proxy, hardened runners) and the
-Helm chart for k3s and Kubernetes (`deploy/helm/z`, kubernetes executor) are ready. The egress proxy for package
-mirrors and the z-browser worker are not built yet: runners reach only Z and LiteLLM.
+Helm chart for k3s and Kubernetes (`deploy/helm/z`, kubernetes executor) are ready, with two optional parts:
+the egress proxy (runners reach package mirrors only through it) and the z-browser worker (browser connectors).
 
 ## Docker Compose (local or single host)
 
@@ -22,6 +22,17 @@ curl -s http://127.0.0.1:8000/readyz   # z-server; the web app is http://127.0.0
 - Two database roles: `z` (owner, used only by `z-migrate`) and `z_app` (the server; it cannot update or delete
   audit events). They are created by `deploy/compose/postgres/init.sh` on the first start.
 - LiteLLM runs the official image pinned by digest (`v1.105.0`). It is the only component that reaches models.
+
+### Optional: package mirrors and browser connectors
+```bash
+# runners may install packages, only from these mirrors (squid allowlist)
+Z_EGRESS_MIRRORS=nexus.example.internal EGRESS_PROXY_URL=http://egress-proxy:3128 \
+  docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile egress up -d
+# browser connectors: set Z_BROWSER_URL=http://z-browser:8090 and Z_BROWSER_TOKEN (>= 16 chars) in .env
+docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile browser up -d
+```
+On Helm: `egressProxy.enabled` (with `config.z.egress.mirrors`) and `browser.enabled` (with `browser.egressTo`,
+the networks of the web apps your browser connectors open; nothing else is reachable).
 
 ### Verify without the inference cluster (test only)
 `tests/e2e/compose.fakes.yml` replaces inferX by the fake LLM and adds the fake GitLab OIDC provider:
