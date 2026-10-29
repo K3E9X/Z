@@ -1022,6 +1022,8 @@ paths:
             text/event-stream:
               schema:
                 $ref: events.schema.json
+        '204':
+          description: 'Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect.'
         default:
           description: Problem details
           content:
@@ -1238,6 +1240,8 @@ paths:
             text/event-stream:
               schema:
                 $ref: events.schema.json
+        '204':
+          description: 'Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect.'
         default:
           description: Problem details
           content:
@@ -5405,6 +5409,8 @@ paths:
             text/event-stream:
               schema:
                 $ref: '#/components/schemas/StreamMessage'
+        '204':
+          description: 'Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect.'
         default:
           description: Problem details
           content:

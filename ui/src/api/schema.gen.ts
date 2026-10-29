@@ -6348,6 +6348,13 @@ export interface operations {
                     "text/event-stream": components["schemas"]["events.schema"];
                 };
             };
+            /** @description Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Problem details */
             default: {
                 headers: {
@@ -6553,6 +6560,13 @@ export interface operations {
                 content: {
                     "text/event-stream": components["schemas"]["events.schema"];
                 };
+            };
+            /** @description Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Problem details */
             default: {
@@ -10862,6 +10876,13 @@ export interface operations {
                 content: {
                     "text/event-stream": components["schemas"]["StreamMessage"];
                 };
+            };
+            /** @description Nothing more will come (the mission has ended and every event after Last-Event-ID was sent): do not reconnect. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Problem details */
             default: {

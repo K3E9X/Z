@@ -1838,6 +1838,10 @@ def op(
             "description": "Server-sent events: `id` = seq (send Last-Event-ID to resume), `event` = type, `data` = JSON.",
             "content": {"text/event-stream": {"schema": resp or {"type": "string"}}},
         }
+        r["204"] = {
+            "description": "Nothing more will come (the mission has ended and every event after Last-Event-ID was "
+            "sent): do not reconnect.",
+        }
     elif resp_content:
         r[str(status)] = {"description": "OK", "content": resp_content}
     elif resp is None:
