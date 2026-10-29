@@ -1,0 +1,27 @@
+# Mattermost through its REST API v4. Two accounts keep read and write apart (bot accounts or personal access
+# tokens): the read token can see the channels agents may read; the write token belongs to the account that posts.
+# Add both accounts only to the channels Z should reach.
+name: mattermost
+kind: openapi
+display_name: Mattermost
+base_url: ${MATTERMOST_URL}
+spec: ./mattermost.openapi.json    # API v4 subset (operationIds = Z operation ids)
+operation_ids: from_operation_id
+auth:
+  read:  { type: bearer, secret: env:MATTERMOST_TOKEN_RO }
+  write: { type: bearer, secret: env:MATTERMOST_TOKEN_RW }
+health: { path: /api/v4/users/me }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "teams.get_by_name", class: read, exposed: true }
+    - { match: "channels.list", class: read, exposed: true }
+    - { match: "channels.get_by_name", class: read, exposed: true }
+    - { match: "posts.list", class: read, exposed: true }
+    - { match: "posts.get", class: read, exposed: true }
+    - { match: "threads.get", class: read, exposed: true }
+    - { match: "users.get_me", class: read, exposed: false }
+    - { match: "posts.create", class: write, exposed: true }
+    - { match: "posts.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 60 }
+data_class: C2
