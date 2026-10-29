@@ -50,6 +50,7 @@ class AppState:
     llm_keys: KeyAdmin
     hub: EventHub
     limiter: RateLimiter = field(default_factory=RateLimiter)
+    gateway: Any = None  # z_server.gateway.core.Gateway, set by the app lifespan
     _oidc: OIDCClient | None = None
     _oidc_key: tuple[str, str, str] | None = None
 

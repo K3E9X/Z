@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
+from starlette.routing import Route
 
 from z_server import __version__, errors
 from z_server.api import (
@@ -28,6 +29,8 @@ from z_server.api import (
 from z_server.crypto import AuditSigner, Sealer
 from z_server.db.session import make_engine, make_sessionmaker
 from z_server.events import EventHub
+from z_server.gateway.mcp_server import PATH as GATEWAY_PATH
+from z_server.gateway.mcp_server import GatewayEndpoint
 from z_server.llm.litellm import KeyAdmin, LiteLLMKeyAdmin
 from z_server.security import SecurityHeaders
 from z_server.settings import Settings
@@ -57,6 +60,7 @@ def create_app(
 ) -> FastAPI:
     """`workers=True` (z-server all) also runs the scheduler and the identity re-evaluation in this process."""
     settings.check()
+    gateway_endpoint = GatewayEndpoint(None)  # type: ignore[arg-type]  # bound to the Gateway in the lifespan
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -73,20 +77,28 @@ def create_app(
             hub=EventHub(settings.database_url),
         )
         app.state.z = state
+        from z_server.gateway.core import Gateway
+
+        state.gateway = Gateway.create(state)
+        gateway_endpoint.gateway = state.gateway
         await state.hub.start()
         if run_startup:
             await prepare(state)
         tasks: list[asyncio.Task[None]] = []
         if workers:
             from z_server.executors.factory import from_settings
-            from z_server.workers import identity, scheduler
+            from z_server.gateway import executor
+            from z_server.workers import health, identity, scheduler
 
             tasks = [
                 asyncio.create_task(scheduler.run_forever(state, from_settings(settings)), name="scheduler"),
                 asyncio.create_task(identity.run_forever(state), name="identity"),
+                asyncio.create_task(executor.run_forever(state), name="executor"),
+                asyncio.create_task(health.run_forever(state), name="health"),
             ]
         try:
-            yield
+            async with gateway_endpoint.run():
+                yield
         finally:
             for task in tasks:
                 task.cancel()
@@ -107,6 +119,7 @@ def create_app(
         openapi_url=None if settings.production else "/api/openapi.json",
     )
     errors.install(app)
+    app.router.routes.append(Route(GATEWAY_PATH, endpoint=gateway_endpoint, methods=["GET", "POST", "DELETE"]))
     app.add_middleware(SecurityHeaders)
     for router in ROUTERS:
         app.include_router(router)

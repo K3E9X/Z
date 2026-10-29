@@ -470,3 +470,17 @@ def test_init_process_propagates_exit_codes_and_forwards_signals(tmp_path: Path,
         assert proc.stdout is not None and proc.stdout.readline().strip() == "ready"
         proc.send_signal(15)
     assert proc.wait(30) == code
+
+
+def test_gateway_verdict_from_result_meta() -> None:
+    import mcp.types as mcp_types
+    from z_common.models.enums import JudgeVerdict
+    from z_runner.tools.gateway import verdict
+
+    def result(meta: dict[str, object] | None) -> mcp_types.CallToolResult:
+        return mcp_types.CallToolResult(content=[], _meta=meta)
+
+    assert verdict(result(None)) == (JudgeVerdict.clean, None)
+    assert verdict(result({"io.z/judge": "flagged", "io.z/artifact": "art_01X"})) == (JudgeVerdict.flagged, "art_01X")
+    assert verdict(result({"io.z/judge": "weird"}))[0] == JudgeVerdict.flagged
+    assert verdict(result({"io.z/artifact": "../etc"}))[1] is None

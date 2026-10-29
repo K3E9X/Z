@@ -50,7 +50,7 @@ def _step(mission: Mission, step_id: str) -> dict[str, Any]:
     raise KeyError(step_id)
 
 
-async def _gateway_tools(db: AsyncSession, profile: AgentProfile, mission: Mission) -> list[GatewayTool]:
+async def gateway_tools(db: AsyncSession, profile: AgentProfile, mission: Mission) -> list[GatewayTool]:
     patterns = profile.gateway_patterns
     if not patterns:
         return []
@@ -167,7 +167,7 @@ async def build(
             mode=workspace,
             archive_url=f"{base}/api/v1/internal/jobs/{job.id}/workspace" if workspace != WorkspaceMode.none else None,
         ),
-        tools=ToolSpec(local=local, builtins=builtins, gateway=await _gateway_tools(db, profile, mission)),
+        tools=ToolSpec(local=local, builtins=builtins, gateway=await gateway_tools(db, profile, mission)),
         limits=limits,
         model=job.model,
         escalate_model=profile.escalate_model,

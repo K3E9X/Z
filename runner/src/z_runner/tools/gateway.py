@@ -20,6 +20,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
 from z_common.models.api_internal import GatewayTool
+from z_common.models.enums import JudgeVerdict
 
 from z_runner.tools.base import ToolContext, ToolResult, ZTool, untrusted
 
@@ -109,6 +110,17 @@ class GatewayOperationTool(ZTool):
         text = ctx.redactor.text(result_text(result))
         ctx.progress.append(f"gateway:{self.operation_id}")
         summary = text.strip().splitlines()[0][:300] if text.strip() else "(empty result)"
-        if result.isError:
-            return ToolResult(text=untrusted(f"gateway:{self.operation_id}", text), ok=False, summary=summary)
-        return ToolResult(text=untrusted(f"gateway:{self.operation_id}", text), summary=summary)
+        judge, artifact = verdict(result)
+        wrapped = untrusted(f"gateway:{self.operation_id}", text)
+        return ToolResult(text=wrapped, ok=not result.isError, summary=summary, judge=judge, artifact_ref=artifact)
+
+
+def verdict(result: mcp_types.CallToolResult) -> tuple[JudgeVerdict, str | None]:
+    """The gateway's judge verdict and artifact reference travel in the result `_meta` (io.z/...)."""
+    meta = result.meta or {}
+    try:
+        judge = JudgeVerdict(str(meta.get("io.z/judge", "clean")))
+    except ValueError:
+        judge = JudgeVerdict.flagged  # unknown verdicts are treated as suspicious, never as clean
+    artifact = meta.get("io.z/artifact")
+    return judge, str(artifact) if isinstance(artifact, str) and artifact.startswith("art_") else None
