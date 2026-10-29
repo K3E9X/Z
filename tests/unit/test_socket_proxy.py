@@ -98,6 +98,7 @@ def test_names_and_routes() -> None:
 # ---------------------------------------------------------------- against the real Docker daemon
 
 DOCKER_SOCKET = "/var/run/docker.sock"
+TOKEN = "proxy-token-0123456789"
 
 
 def _docker(method: str, path: str, **kw: Any) -> httpx.Response:
@@ -127,7 +128,7 @@ def proxy() -> Iterator[tuple[str, str]]:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     policy = sp.Policy(images={image}, network=net)
-    server = ThreadingHTTPServer(("127.0.0.1", port), sp.make_handler(policy, sp.Upstream(DOCKER_SOCKET)))
+    server = ThreadingHTTPServer(("127.0.0.1", port), sp.make_handler(policy, sp.Upstream(DOCKER_SOCKET), TOKEN))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -139,7 +140,7 @@ def proxy() -> Iterator[tuple[str, str]]:
 
 def test_executor_through_the_proxy_on_real_docker(proxy: tuple[str, str]) -> None:
     url, image = proxy
-    executor = DockerExecutor(base_url=url, image=image, network="z_test_runners")
+    executor = DockerExecutor(base_url=url, image=image, network="z_test_runners", token=TOKEN)
 
     async def scenario() -> tuple[str, dict[str, Any]]:
         ref = await executor.launch("job_01PROXYTEST", {"Z_JOB_ID": "job_01PROXYTEST"})
@@ -153,7 +154,12 @@ def test_executor_through_the_proxy_on_real_docker(proxy: tuple[str, str]) -> No
     assert inspect["Config"]["User"] == "10001:10001" and host["NetworkMode"] == "z_test_runners"
     assert _docker("GET", f"/v1.43/containers/{ref}/json").status_code == 404  # removed
 
-    with httpx.Client(base_url=url) as c:
+    with httpx.Client(base_url=url) as anonymous:  # a neighbour on the network, without the token
+        assert anonymous.get("/_ping").status_code == 200  # the health check only
+        assert anonymous.post("/v1.43/containers/create", params={"name": "z-job-x"}, json={}).status_code == 401
+        assert anonymous.get(f"/v1.43/containers/{ref}/json").status_code == 401
+
+    with httpx.Client(base_url=url, headers={"Authorization": f"Bearer {TOKEN}"}) as c:
         body = executor.container_spec("job_01EVIL", {})
         body["HostConfig"]["Privileged"] = True
         body["HostConfig"]["Binds"] = ["/:/host"]
@@ -236,9 +242,11 @@ def test_cli_tool_runs_through_the_proxy_on_real_docker(proxy: tuple[str, str]) 
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     policy = sp.Policy(images={runner_image}, tool_images={tool}, network="z_test_runners")
-    server = ThreadingHTTPServer(("127.0.0.1", port), sp.make_handler(policy, sp.Upstream(DOCKER_SOCKET)))
+    server = ThreadingHTTPServer(("127.0.0.1", port), sp.make_handler(policy, sp.Upstream(DOCKER_SOCKET), TOKEN))
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    executor = DockerExecutor(base_url=f"http://127.0.0.1:{port}", image=runner_image, network="z_test_runners")
+    executor = DockerExecutor(
+        base_url=f"http://127.0.0.1:{port}", image=runner_image, network="z_test_runners", token=TOKEN
+    )
     code = "import json,os,sys; print(json.dumps({'uid': os.getuid(), 'tok': os.environ['T']})); print('diag', file=sys.stderr)"
     try:
         ok = asyncio.run(executor.run_tool(tool, ["python3", "-c", code], {"T": "tok"}, 60))
@@ -256,3 +264,10 @@ def test_cli_tool_runs_through_the_proxy_on_real_docker(proxy: tuple[str, str]) 
     assert len(big.stderr) == 4000
     leftovers = _docker("GET", "/v1.43/containers/json", params={"all": 1}).json()
     assert not [c for c in leftovers if any(n.startswith("/z-tool-") for n in c.get("Names") or [])]
+
+
+def test_inspect_answers_never_carry_the_job_token() -> None:
+    raw = json.dumps({"Id": "x", "Config": {"Env": ["Z_JOB_TOKEN=zj_secret"], "Labels": {"z.job": "1"}}}).encode()
+    cleaned = json.loads(sp.without_env(raw))
+    assert "Env" not in cleaned["Config"] and cleaned["Config"]["Labels"] == {"z.job": "1"}
+    assert sp.without_env(b"not json") == b"not json"

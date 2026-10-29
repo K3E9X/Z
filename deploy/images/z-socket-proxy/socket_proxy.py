@@ -17,10 +17,15 @@ Environment:
   Z_ALLOWED_RUNTIMES  optional extra OCI runtimes, e.g. runsc (gVisor)
   Z_MAX_MEMORY, Z_MAX_NANO_CPUS, Z_MAX_PIDS  ceilings (bytes, 1e-9 CPUs, processes)
   DOCKER_SOCKET       default /var/run/docker.sock;  LISTEN default 0.0.0.0:2375
+  Z_SOCKET_PROXY_TOKEN  required (>= 16 characters): every call but /_ping carries `Authorization: Bearer <token>`,
+                        so a neighbour on the network (LiteLLM, a browser worker) cannot drive the Docker API
+
+Container inspect answers never include `Config.Env`: it holds each running job's session token.
 """
 
 from __future__ import annotations
 
+import hmac
 import http.client
 import json
 import logging
@@ -247,7 +252,19 @@ def route(method: str, raw_path: str) -> tuple[str, str | None, str]:
     return "refused", None, raw_path
 
 
-def make_handler(policy: Policy, upstream: Upstream) -> type[BaseHTTPRequestHandler]:
+def without_env(data: bytes) -> bytes:
+    """A container inspect answer without `Config.Env` (job session tokens)."""
+    try:
+        doc = json.loads(data or b"null")
+    except ValueError:
+        return data
+    if isinstance(doc, dict) and isinstance(doc.get("Config"), dict):
+        doc["Config"].pop("Env", None)
+        return json.dumps(doc).encode()
+    return data
+
+
+def make_handler(policy: Policy, upstream: Upstream, token: str) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "z-socket-proxy"
         sys_version = ""
@@ -272,6 +289,13 @@ def make_handler(policy: Policy, upstream: Upstream) -> type[BaseHTTPRequestHand
 
         def _handle(self) -> None:
             kind, container, upstream_path = route(self.command, self.path)
+            if kind != "ping" and not hmac.compare_digest(
+                self.headers.get("Authorization", "").encode(), f"Bearer {token}".encode()
+            ):
+                log.warning("refused %s %s: missing or wrong token", self.command, self.path)
+                return self._send(
+                    401, b'{"message": "z-socket-proxy: unauthorized"}', {"Content-Type": "application/json"}
+                )
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY:
                 return self._refuse("body too large")
@@ -292,6 +316,8 @@ def make_handler(policy: Policy, upstream: Upstream) -> type[BaseHTTPRequestHand
             except Refused as exc:
                 return self._refuse(str(exc))
             status, headers, data = upstream.request(self.command, upstream_path, body)
+            if self.command == "GET" and urlsplit(upstream_path).path.endswith("/json"):
+                data = without_env(data)
             self._send(status, data, headers)
 
         def _require_runner(self, container: str) -> None:
@@ -319,8 +345,12 @@ def main() -> int:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
     policy = Policy.from_env()
     upstream = Upstream(os.environ.get("DOCKER_SOCKET", "/var/run/docker.sock"))
+    token = os.environ.get("Z_SOCKET_PROXY_TOKEN", "")
+    if len(token) < 16:
+        log.error("Z_SOCKET_PROXY_TOKEN must be set (at least 16 characters)")
+        return 2
     host, _, port = os.environ.get("LISTEN", "0.0.0.0:2375").rpartition(":")
-    server = ThreadingHTTPServer((host, int(port)), make_handler(policy, upstream))
+    server = ThreadingHTTPServer((host, int(port)), make_handler(policy, upstream, token))
     log.info("z-socket-proxy on %s:%s, images %s, network %s", host, port, sorted(policy.images), policy.network)
     server.serve_forever()
     return 0

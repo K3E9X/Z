@@ -27,16 +27,30 @@ async def prepare(state: AppState) -> None:
     if created is not None:
         announce_bootstrap(created)
     if breakglass is not None:
-        log.warning("BREAK-GLASS enabled. One-time password: %s  TOTP: %s", breakglass.password, breakglass.totp_uri)
+        reveal(
+            "Z_BREAKGLASS_SECRET_FILE",
+            "break-glass account enabled",
+            f"break-glass: one-time password {breakglass.password} TOTP {breakglass.totp_uri} (shown once)\n",
+        )
+
+
+def reveal(file_env: str, what: str, secret_text: str) -> None:
+    """A one-time secret for the operator. Kubernetes: written to the file named by `file_env` (a memory-backed
+    volume read with kubectl exec), never to the logs a log pipeline ships. Compose: printed once on stdout, read
+    with `docker compose logs` on the host."""
+    target = os.environ.get(file_env)
+    if target:
+        path = Path(target)
+        path.write_text(secret_text)
+        path.chmod(0o600)
+        log.warning("%s; secret written to %s (read it once, then delete the file)", what, target)
+    else:
+        print(secret_text.strip(), flush=True)
 
 
 def announce_bootstrap(secret: local.CreatedSecret) -> None:
-    """Compose: printed once. Kubernetes: written to Z_BOOTSTRAP_SECRET_FILE (mounted from the z-bootstrap Secret)."""
-    target = os.environ.get("Z_BOOTSTRAP_SECRET_FILE")
-    if target:
-        path = Path(target)
-        path.write_text(secret.password)
-        path.chmod(0o600)
-        log.warning("bootstrap account %s created; password written to %s", secret.name, target)
-    else:
-        print(f"bootstrap: user {secret.name} one-time password {secret.password} (valid 24 h, shown once)", flush=True)
+    reveal(
+        "Z_BOOTSTRAP_SECRET_FILE",
+        f"bootstrap account {secret.name} created (valid 24 h)",
+        f"bootstrap: user {secret.name} one-time password {secret.password} (valid 24 h, shown once)\n",
+    )

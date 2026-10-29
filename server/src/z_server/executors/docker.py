@@ -44,6 +44,7 @@ class DockerExecutor:
     limits: DockerLimits = field(default_factory=DockerLimits)
     tool_limits: ToolLimits = field(default_factory=ToolLimits)
     name: str = "docker"
+    token: str = ""  # Z_SOCKET_PROXY_TOKEN: the proxy refuses calls without it
     _client: httpx.AsyncClient | None = None
 
     def client(self) -> httpx.AsyncClient:
@@ -52,7 +53,8 @@ class DockerExecutor:
                 transport = httpx.AsyncHTTPTransport(uds=self.base_url.removeprefix("unix://"))
                 self._client = httpx.AsyncClient(transport=transport, base_url="http://docker", timeout=30)
             else:
-                self._client = httpx.AsyncClient(base_url=self.base_url.rstrip("/"), timeout=30)
+                headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+                self._client = httpx.AsyncClient(base_url=self.base_url.rstrip("/"), timeout=30, headers=headers)
         return self._client
 
     def container_spec(self, job_id: str, env: dict[str, str]) -> dict[str, Any]:

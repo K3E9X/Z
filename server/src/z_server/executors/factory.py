@@ -20,6 +20,7 @@ def from_settings(settings: Settings) -> Executor:
             image=settings.runner_image,
             network=str(docker.get("network", "z_runners")),
             runtime=docker.get("runtime") or None,
+            token=settings.socket_proxy_token,
         )
     if settings.executor == "process":
         if settings.production:
