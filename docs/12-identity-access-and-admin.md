@@ -65,7 +65,7 @@ Automated tests do not use passwords at all: they sign in through `tests/fakes/f
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | See missions, agents, playbooks, usage | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Start, pause, guide, cancel missions; answer questions | | ✓ | ✓ | ✓ | | ✓ |
-| Approve / reject writes (team connectors) | | | ✓ | | | ✓ |
+| Approve / reject writes (missions of their team) | | | ✓ | | | ✓ |
 | Approve destructive actions (second approver) | | | ✓ | | | ✓ |
 | Create / edit agents, skills, playbooks, objectives; apply learning proposals | | | | ✓ | | ✓ |
 | Read the full audit log, export it | | | | | ✓ | ✓ |
@@ -74,7 +74,7 @@ Automated tests do not use passwords at all: they sign in through `tests/fakes/f
 
 Rules on top of the matrix:
 - **Separation of duties**: with `four_eyes: true` on a playbook, the mission starter cannot approve its writes. Destructive actions need two distinct approvers. An admin cannot approve their own role change (a second admin must).
-- **Approver scope**: an approver approves only for connectors attached to their team (or org-wide if bound at org scope).
+- **Approver scope**: `actions:approve` is checked on the **mission's team** (the team the mission was started for): a team-scoped approver approves only actions of their team's missions; an org-scoped approver approves everywhere. Connectors have no team in the data model, so there is no per-connector approver scope (ADR 0012). If connectors get team attachments later, the check becomes the intersection (not built yet).
 - Everyone can see their own sessions, tokens and personal connections.
 
 ### Default group mapping (`config/z.yaml` → `auth.group_mapping`)
@@ -105,7 +105,7 @@ Mappings edited in the Admin UI are stored in the database and override the file
 | Tab | What admins do |
 |---|---|
 | **Users** | List (name, GitLab username, teams, effective roles with their source, last sign-in, 2FA-enforced, status); open a user: bindings, sessions, tokens, connections, recent activity; add a manual role (with expiry), suspend, revoke all sessions |
-| **Teams** | Teams, members (from GitLab groups + manual), team budgets, team connectors |
+| **Teams** | Teams, GitLab groups, members (from GitLab groups + manual), monthly team token budget. Teams own missions, agents and playbooks; connectors are org-wide and have no team (ADR 0012) |
 | **Roles and permissions** | Built-in roles (read-only) and custom roles; permission matrix; "who can do X?" lookup |
 | **Group mapping** | GitLab group path → role and scope, team mapping, allowed groups, no-match policy; **dry run** showing who gains or loses access before saving |
 | **Sign-in** | OIDC settings (issuer, client, scopes, claim), test login, JWKS status, session lifetimes, step-up policy, local accounts (bootstrap state, test accounts, break-glass) |
