@@ -28,6 +28,7 @@ from textual.containers import VerticalScroll
 from textual.message import Message
 from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
+from textual.worker import Worker, WorkerState
 
 from z_cli import __version__, contract, credentials, sse
 from z_cli import state as state_mod
@@ -305,6 +306,15 @@ class SessionApp(App[int]):
         with contextlib.suppress(Exception):
             self.query_one("#status", Static).update(t)
 
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """A failing task never takes the session down: it is reported in the transcript."""
+        if event.state == WorkerState.ERROR and event.worker.error is not None:
+            error = event.worker.error
+            if isinstance(error, CliError):
+                self.say(_err(error))
+            else:
+                self.say(Text(f"✕ {type(error).__name__}: {error}", style="z.err"))
+
     # ---------------------------------------------------------------- transcript
 
     def say(self, renderable: RenderableType, markdown: str | None = None) -> Static:
@@ -373,7 +383,7 @@ class SessionApp(App[int]):
 
     # ---------------------------------------------------------------- context (catalog, health, counts)
 
-    @work(exclusive=True, group="context")
+    @work(exclusive=True, group="context", exit_on_error=False)
     async def load_context(self) -> None:
         api = self.api
         if api is None:
@@ -395,7 +405,7 @@ class SessionApp(App[int]):
             self.inference = exc.message
         self.query_one("#welcome", Static).update(self.welcome())
 
-    @work(exclusive=True, group="counts")
+    @work(exclusive=True, group="counts", exit_on_error=False)
     async def counts_loop(self) -> None:
         while True:
             await self.refresh_counts()
@@ -472,7 +482,7 @@ class SessionApp(App[int]):
             self.say(Text("Not signed in: type /login first.", style="z.wait"))
         return self.api
 
-    @work(group="missions")
+    @work(group="missions", exit_on_error=False)
     async def start_mission(self, text: str) -> None:
         api = self._need_api()
         if api is None:
@@ -564,6 +574,8 @@ class SessionApp(App[int]):
                     self.offer_decisions(mission_id)
         except CliError as exc:
             self.say(_err(exc))
+        except Exception as exc:  # noqa: BLE001 - a broken stream must not take the session down
+            self.say(Text(f"✕ live updates of {mission_id} stopped: {type(exc).__name__}: {exc}", style="z.err"))
         block.redraw()
         if view.terminal:
             self.markdown.append(_plain(mission_tree(view)))
@@ -572,7 +584,7 @@ class SessionApp(App[int]):
             self.update_status()
             await self.refresh_counts()
 
-    @work(group="decisions")
+    @work(group="decisions", exit_on_error=False)
     async def offer_decisions(self, mission_id: str) -> None:
         api = self.api
         if api is None:
@@ -612,7 +624,7 @@ class SessionApp(App[int]):
             await decisions.decide(api, InlinePresenter(self), mission_id=mission_id)
             await self.refresh_counts()
 
-    @work(group="missions")
+    @work(group="missions", exit_on_error=False)
     async def guide(self, mission_id: str, text: str) -> None:
         api = self._need_api()
         if api is None:
@@ -642,7 +654,7 @@ class SessionApp(App[int]):
 
     # ---------------------------------------------------------------- shell
 
-    @work(group="shell")
+    @work(group="shell", exit_on_error=False)
     async def run_shell(self, command: str) -> None:
         if not command:
             return
@@ -705,7 +717,7 @@ class SessionApp(App[int]):
             self.say(Text(f"Unknown command {cmd} (type /help).", style="z.wait"))
             return
         self.say(Text(text, style="z.d"))
-        self.run_worker(handler(arg), group="slash", exclusive=False)
+        self.run_worker(handler(arg), group="slash", exclusive=False, exit_on_error=False)
 
     async def cmd_help(self, arg: str) -> None:
         rows = Text()
@@ -1043,7 +1055,7 @@ class SessionApp(App[int]):
         if self.completion_open:
             self.hide_completion()
             return
-        self.run_worker(self.interrupt(), group="interrupt", exclusive=True)
+        self.run_worker(self.interrupt(), group="interrupt", exclusive=True, exit_on_error=False)
 
     async def interrupt(self) -> None:
         focus = self.blocks.get(self.focus_id or "")
@@ -1163,7 +1175,7 @@ class SessionApp(App[int]):
         area = self.query_one("#input", PromptArea)
         box = self.query_one("#complete", OptionList)
         if message.key == "help":
-            self.run_worker(self.cmd_help(""), group="slash")
+            self.run_worker(self.cmd_help(""), group="slash", exit_on_error=False)
             return
         if self.completion_open:
             if message.key in {"up", "down"}:

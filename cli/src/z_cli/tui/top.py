@@ -25,6 +25,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import DataTable, Static
+from textual.worker import Worker, WorkerState
 
 from z_cli import contract, sse
 from z_cli.client import AsyncApi
@@ -354,7 +355,7 @@ class TopApp(App[int]):
 
     # ---------------------------------------------------------------- data
 
-    @work(exclusive=True, group="poll")
+    @work(exclusive=True, group="poll", exit_on_error=False)
     async def poll(self) -> None:
         while True:
             await self.refresh_data()
@@ -441,8 +442,11 @@ class TopApp(App[int]):
         except CliError as exc:
             self.model.error = exc.message
             self.render_all()
+        except Exception as exc:  # noqa: BLE001 - one broken stream must not stop the dashboard
+            self.model.error = f"stream {mission_id}: {type(exc).__name__}: {exc}"
+            self.render_all()
 
-    @work(exclusive=True, group="global-stream")
+    @work(exclusive=True, group="global-stream", exit_on_error=False)
     async def global_stream(self) -> None:
         try:
             async for message in sse.astream(self.api, "/stream"):
@@ -459,6 +463,14 @@ class TopApp(App[int]):
         except CliError as exc:
             self.model.stream_note = f"global stream: {exc.message[:40]}"
         self.render_all()
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.ERROR and event.worker.error is not None:
+            error = event.worker.error
+            text = error.message if isinstance(error, CliError) else f"{type(error).__name__}: {error}"
+            self.notify(text, severity="error", timeout=10)
+            if event.worker.group == "poll":
+                self.poll()  # keep the dashboard alive
 
     # ---------------------------------------------------------------- rendering
 
@@ -542,13 +554,13 @@ class TopApp(App[int]):
     def action_refresh(self) -> None:
         self._wake.set()
 
-    @work(group="decide")
+    @work(group="decide", exit_on_error=False)
     async def action_approve(self) -> None:
         row = self.selected()
         await decisions.decide(self.api, ModalPresenter(self), mission_id=row.mission_id if row else None)
         self._wake.set()
 
-    @work(group="control")
+    @work(group="control", exit_on_error=False)
     async def action_pause(self) -> None:
         row = self.selected()
         if row is None or row.mission_id is None:
@@ -569,7 +581,7 @@ class TopApp(App[int]):
             ModalPresenter(self).error(exc)
         self._wake.set()
 
-    @work(group="control")
+    @work(group="control", exit_on_error=False)
     async def action_stop(self) -> None:
         row = self.selected()
         if row is None or row.mission_id is None:
@@ -587,7 +599,7 @@ class TopApp(App[int]):
             ModalPresenter(self).error(exc)
         self._wake.set()
 
-    @work(group="control")
+    @work(group="control", exit_on_error=False)
     async def action_take_over(self) -> None:
         row = self.selected()
         if row is None or row.job_id is None:
@@ -610,7 +622,7 @@ class TopApp(App[int]):
             )
         )
 
-    @work(group="prompt")
+    @work(group="prompt", exit_on_error=False)
     async def action_filter(self) -> None:
         text = await self.push_screen_wait(
             PromptScreen("Filter rows (agent, mission, state); empty clears", value=self.model.filter)
@@ -619,7 +631,7 @@ class TopApp(App[int]):
             self.model.filter = text.strip()
             self.render_all()
 
-    @work(group="prompt")
+    @work(group="prompt", exit_on_error=False)
     async def action_command(self) -> None:
         text = await self.push_screen_wait(PromptScreen(":", "review · refresh · filter <text> · theme <name> · quit"))
         if not text:
