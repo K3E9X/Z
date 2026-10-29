@@ -110,4 +110,23 @@ describe('ConnectorBuilder', () => {
       spec: '{"data": {"__schema": {"types": []}}}',
     })
   })
+
+  it('drafts REST operations from pasted documentation when there is no spec', async () => {
+    const user = userEvent.setup()
+    await render('openapi')
+    await user.type(await screen.findByLabelText('Name (slug)'), 'tickets')
+    const list = screen.getByRole('button', { name: 'List operations' })
+    expect(list).toBeDisabled()
+    await user.click(screen.getByLabelText('…or paste the API documentation'))
+    await user.paste('GET /tickets lists tickets.')
+    await user.click(list)
+    await waitFor(() => expect(imports).toHaveLength(1))
+    expect(imports[0]).toMatchObject({ source: 'docs', name: 'tickets', docs: 'GET /tickets lists tickets.' })
+  })
+
+  it('explains that database connectors are declared in YAML', async () => {
+    await render('database')
+    expect(await screen.findByText(/declared SELECT queries only/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'List operations' })).toBeDisabled()
+  })
 })

@@ -398,10 +398,10 @@ export function ConnectorBuilder() {
               )}
             </Field>
           )}
-          {(kind === 'database' || kind === 'webhook') && (
+          {kind === 'openapi' && !spec && !specUrl && (
             <Field
-              label="API documentation or notes"
-              hint="The builder agent drafts the declared operations from it; you review every one"
+              label="…or paste the API documentation"
+              hint="Without a spec, a model drafts REST operations from the documentation (read as data); you review every method, path and class"
             >
               {(id, d) => (
                 <Textarea
@@ -413,6 +413,13 @@ export function ConnectorBuilder() {
                 />
               )}
             </Field>
+          )}
+          {(kind === 'database' || kind === 'webhook') && (
+            <p className="m-0 text-text-2">
+              {kind === 'database'
+                ? 'Database connectors run declared SELECT queries only: write them in the connector YAML of a pack (docs/05, ADR 0020) and seed it, or create it with POST /connectors.'
+                : 'Inbound webhooks are declared in the connector YAML of a pack (docs/05): the signature scheme and its secret reference.'}
+            </p>
           )}
           {kind === 'cli' && (
             <Field
@@ -454,7 +461,13 @@ export function ConnectorBuilder() {
             <Button
               variant="primary"
               busy={busy}
-              disabled={!name || (kind === 'browser' && !baseUrl)}
+              disabled={
+                !name ||
+                (kind === 'browser' && !baseUrl) ||
+                kind === 'database' ||
+                kind === 'webhook' ||
+                (kind === 'openapi' && !spec && !specUrl && !docs.trim())
+              }
               onClick={() => void importDraft()}
             >
               List operations
