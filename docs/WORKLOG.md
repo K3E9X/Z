@@ -42,12 +42,21 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
 - Open requests from the CLI report (need contract changes): a CLI step-up flow (POST /auth/step-up refuses CLI
   sessions, so admin writes from the CLI fail with exit 4 in OIDC mode) and GET /questions/{id}.
 
+- B1 (night run): draftPlan (planner model via the platform key, validated, repaired once, ordered), sessions
+  (server-side conversations; the CLI uses them for every prompt, `z -c`, `z --resume`, `z --session`,
+  `/resume`), saveMissionAsPlaybook, honest take-over (503), objectives and assignments with suggestions in
+  Review, read-only auto-start within budget and the `report_objective` endpoint; fake Jira JQL understands
+  date comparisons. Fixed: plans with forward or circular dependencies hung forever; Review showed every
+  suggestion to everyone; test Postgres containers leaked their volumes (7 GB, disk full).
+
 Lessons / traps:
 - Never run plain `uv sync` at the root (`package = false` uninstalls the workspace packages): use
   `uv sync --all-packages`.
 - This sandbox blocks deb.debian.org: build the runner with
   `--build-arg RUNTIME_IMAGE=python:3.12-bookworm` here (real builds use the pinned slim image + apt mirror).
 - After a container restart: `(dockerd > /tmp/dockerd.log 2>&1 &)`.
+- "No space left on device": `docker volume prune -f && docker builder prune -f` (anonymous volumes of
+  old test containers pile up).
 - Compose e2e: `cd deploy/compose && DOCKER_GID=$(stat -c %g /var/run/docker.sock) docker compose --env-file
   ../../.env -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml -f ../../tests/e2e/compose.e2e.yml up -d
   --wait`, then `uv run pytest -m e2e tests/e2e`.

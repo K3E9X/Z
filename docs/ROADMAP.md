@@ -8,14 +8,14 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Item | Workstream | Status |
 |---|---|---|
 | Contracts frozen (`contracts-v1`) | A | done |
-| Missions, plans, fan-out, scheduler, resume | B1 | doing (API, scheduler, runner protocol and review done and tested; draft-plan, take-over and save-as-playbook pending) |
-| Runner with OpenHands backend, guardrails, code and document tools | B2 | todo |
-| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | todo |
-| CLI: subcommands, headless, interactive session | B4 | todo |
-| Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | todo |
+| Missions, plans, fan-out, scheduler, resume | B1 | done (draft-plan with the planner model, sessions, save-as-playbook; take-over answers 503 until the P1 terminal) |
+| Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
+| Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper done; personal OAuth, channels, browser pending) |
+| CLI: subcommands, headless, interactive session | B4 | done (saved sessions `z -c`, `z --resume`, `z --session`) |
+| Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | doing (sub-agent) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | doing (deterministic judge stage, key allowlists per class and raise on C2+ done; z-judge model stage, evals, memory approval pending) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | doing (seeded and lint-clean; evals to complete) |
-| Inference monitor (inferX health on the Inference screen) | B1 | todo |
+| Inference monitor (inferX health on the Inference screen) | B1 | done (API: LiteLLM health, model info, Prometheus/DCGM queries; web pending) |
 | Named agents (rename, handle, avatar, duplicate) | B1, B5 | doing (API done; web pending) |
 | GitLab OIDC sign-in, sessions, step-up, deprovisioning | B1 | done (tested with the fake provider; real GitLab pending) |
 | RBAC (roles, scoped bindings, group mapping, separation of duties) | B1 | done (incl. approval rules: four-eyes, two approvers for destructive) |
@@ -30,12 +30,12 @@ Build order (decided with the user): base first, then one verified slice at a ti
 |---|---|
 | Learning loop: signals, proposals, shadow replay, apply/rollback | todo |
 | Connector kinds GraphQL, CLI, database, browser, webhook; connector builder | todo |
-| `z top`, sessions, `z mcp serve`, themes | todo |
+| `z top`, sessions, `z mcp serve`, themes | doing (`z top`, sessions and themes done; `z mcp serve` pending) |
 | Tasks, Playbooks, Agents and skills, Learning, Mobile screens | todo |
 | Trace replay, Evals, Analytics screens | todo |
 | Agent builder | todo |
 | `workplace` pack | todo |
-| Objectives and assignments (proactive agents) | todo |
+| Objectives and assignments (proactive agents) | done (API, z and connector metrics, suggestions in Review, read-only auto-start within budget, `report_objective` endpoint; web tab pending) |
 | Microsoft 365 (Outlook, Teams, SharePoint, OneDrive), Google Workspace, Slack, Mattermost connectors | todo |
 | Channels: Teams bot, Slack, Mattermost, inbound email | todo |
 | Personal (delegated) connections | todo |

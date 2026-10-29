@@ -52,6 +52,26 @@ Building B1 (missions, scheduler, runner protocol, review) required decisions th
     an action found `applying` after a crash is looked up first, re-applied only when the operation is
     idempotent, otherwise failed as "outcome unknown" for a human to check. Never a blind retry of a POST.
 
+17. **Plan order**: `depends_on` may only name earlier steps (checked by the shared `MissionPlan` and `Playbook`
+    models). The scheduler walks steps in order, so a forward reference or a cycle left missions pending
+    forever. The planner sorts the model's steps topologically and rejects cycles.
+18. **Planner**: one `@agent` → one step, no model call; it may propose the exposed writes of the `#connectors`
+    the user tagged. Otherwise the planner model (`inference.planner_model`, default `z-heavy`) is called with
+    the platform virtual key (`z-platform`, internal aliases only, sealed in the settings table, 30 days) and
+    shown only enabled agents and exposed, approved write operations; its JSON is validated and repaired once.
+    Its tokens are platform usage (`agent = z:planner`) attributed to the user and their team.
+19. **Sessions**: a message is a request; problems the user can act on (unknown agent, planner unavailable,
+    budget) become the assistant's reply so the conversation keeps its history. A refused start rolls back in a
+    savepoint, the platform key creation does not.
+20. **Objectives**: z metrics are computed from Z data (approvals, failed missions, incoming tasks) and from
+    Jira over the agent's `jira_project` assignments (stale and overdue issues, counted through the read
+    search up to 1000, because Jira Cloud's `/search/jql` has no total and the count endpoint is a POST the
+    platform classifier treats as a write). Allowed playbooks whose required inputs cannot be filled from the
+    metric params or scope are skipped with a note, falling back to a free-form suggestion. Auto-start
+    (read-only playbooks only) runs as the owner, and running missions reserve their whole token budget
+    against `budget_per_period`.
+21. **Take-over** answers 503 with what to do instead until the web terminal (P1) exists.
+
 ## Consequences
 The review inbox, CLI and web follow these rules; B3 implements the clone helper and the executor that applies
 approved actions; B6 adds the model stage of the judge on top of the same verdict shape.
