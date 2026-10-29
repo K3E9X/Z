@@ -129,6 +129,18 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   by a worktree sub-agent). Still open: DNS tunnelling from runners (docs/07 §3), connectors are not attached to
   teams so "an approver approves only for their team's connectors" (docs/12 §2) is enforced by mission team only,
   LiteLLM mission keys have no budget of their own, Z_SECRET_KEY and the salt key cannot be rotated in place.
+- End-to-end QA on compose (sub-agent, real UI with Playwright, API and CLI): the e2e suite, sign-in of every role
+  through the fake GitLab, a playbook mission proposed -> approved by a second person -> applied once in the fake
+  Jira with the write token and audited, the inferX key panel, four-eyes, budget exceeded, cancel and a z-server
+  restart mid-mission all worked. Fixed from it: judge blocks invisible to people (now a Review question and a
+  judge.blocked audit event), a start request lowering a playbook's class, tool calls after cancel, the endless SSE
+  reconnect on ended missions (204), duplicate artifact events, the Playbooks -> Use defaults, the CLI's web link
+  (Z_WEB_URL). Left (cosmetic): stale plan step state after a mission ends, the raw `{{ inputs.x }}` prompt in
+  Mission control's "Now" column, team ids in admin role badges, `down -v` leaving the exited runner and the
+  z_runners network (remove with `docker rm` / `docker network rm z_runners`).
+- The hardened compose stack was then run for real: e2e suite green; proxy 401 without its token; LiteLLM cannot
+  resolve the proxy; no infrastructure secret in z-server; Postgres uid 999 with no way out; LiteLLM uid 65534 on
+  its own non-superuser role.
 - Trap: a test hardcoded a seeded agent version; bumping the pack (ADR 0030) broke it after the push. Tests read
   the seeded version now.
 - Personal connections now record the account of each grant (`openid email`, ID token claims) and refuse read
