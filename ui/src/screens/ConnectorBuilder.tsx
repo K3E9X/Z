@@ -22,6 +22,38 @@ const STEPS: { id: Step; label: string }[] = [
   { id: 'test', label: 'Test and save' },
 ]
 const RANK: Record<string, number> = { read: 0, write: 1, destructive: 2 }
+/** Starting point for a browser connector: one read flow behind a form login (docs/05 §1). */
+const FLOW_TEMPLATE = JSON.stringify(
+  {
+    declared: [
+      {
+        id: 'records.search',
+        description: 'Records whose name contains a text',
+        flow: 'search',
+        input_schema: {
+          type: 'object',
+          required: ['q'],
+          properties: { q: { type: 'string', maxLength: 64 } },
+        },
+      },
+    ],
+    flows: {
+      search: {
+        start_url: 'login',
+        steps: [
+          { action: 'fill', selector: '#username', value: '{{auth.username}}' },
+          { action: 'fill', selector: '#password', value: '{{auth.password}}' },
+          { action: 'click', selector: 'button[type=submit]' },
+          { action: 'wait_for_url', url: '**/home' },
+          { action: 'goto', url: 'records?q={{args.q}}' },
+          { action: 'extract_table', selector: 'table', name: 'records' },
+        ],
+      },
+    },
+  },
+  null,
+  2,
+)
 
 function Stepper({ step }: { step: Step }) {
   const idx = STEPS.findIndex((s) => s.id === step)
@@ -63,6 +95,9 @@ export function ConnectorBuilder() {
   const [spec, setSpec] = useState('')
   const [docs, setDocs] = useState('')
   const [mcpCmd, setMcpCmd] = useState('')
+  const [flowsJson, setFlowsJson] = useState(FLOW_TEMPLATE)
+  const [readUser, setReadUser] = useState('')
+  const [writeUser, setWriteUser] = useState('')
   const [dataClass, setDataClass] = useState<DataClass>('C2')
   const [draft, setDraft] = useState<ConnectorDraft | null>(null)
   const [ops, setOps] = useState<Operation[]>([])
@@ -75,9 +110,30 @@ export function ConnectorBuilder() {
   const [notServed, setNotServed] = useState<string | null>(null)
 
   const source =
-    kind === 'mcp' ? 'mcp' : kind === 'graphql' ? 'graphql' : spec || specUrl ? 'openapi' : 'docs'
+    kind === 'browser'
+      ? 'browser'
+      : kind === 'mcp'
+        ? 'mcp'
+        : kind === 'graphql'
+          ? 'graphql'
+          : spec || specUrl
+            ? 'openapi'
+            : 'docs'
+
+  const browserBody = (): { flows: never; declared: never } | null => {
+    try {
+      const parsed = JSON.parse(flowsJson) as { flows?: unknown; declared?: unknown }
+      if (!parsed.flows || !Array.isArray(parsed.declared)) throw new Error('missing')
+      return { flows: parsed.flows as never, declared: parsed.declared as never }
+    } catch {
+      toast.error(new Error('The flows must be JSON with "declared" (a list) and "flows" (an object)'))
+      return null
+    }
+  }
 
   const importDraft = async () => {
+    const flows = kind === 'browser' ? browserBody() : null
+    if (kind === 'browser' && !flows) return
     setBusy(true)
     setNotServed(null)
     try {
@@ -98,6 +154,7 @@ export function ConnectorBuilder() {
                     : { transport: 'stdio', command: mcpCmd }) as never,
                 }
               : {}),
+            ...(flows ?? {}),
             data_class: dataClass,
           },
         }),
@@ -113,23 +170,10 @@ export function ConnectorBuilder() {
     }
   }
 
-  const record = async () => {
-    setBusy(true)
-    try {
-      const s = await unwrap(
-        api.POST('/connectors/record-browser', {
-          body: { connector: name, start_url: baseUrl, name: display || name },
-        }),
-      )
-      window.open(s.viewer_url, '_blank', 'noopener,noreferrer')
-      toast.info('Recording in a sandboxed browser. The flow becomes a named operation when you stop.')
-    } catch (e) {
-      if (isNotServed(e)) setNotServed('POST /connectors/record-browser')
-      else toast.error(e)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const credential = (secret: string, username: string) =>
+    kind === 'browser'
+      ? { type: 'basic', secret, ...(username ? { username } : {}) }
+      : { type: authType, secret }
 
   const save = async () => {
     if (!draft) return
@@ -137,10 +181,14 @@ export function ConnectorBuilder() {
     try {
       const manifest = {
         ...draft.manifest,
-        auth: {
-          ...(readSecret ? { read: { type: authType, secret: readSecret } } : {}),
-          ...(writeSecret ? { write: { type: authType, secret: writeSecret } } : {}),
-        },
+        // nothing entered: keep the references the draft proposes (env:<NAME>_..._RO / _RW)
+        auth:
+          readSecret || writeSecret
+            ? {
+                ...(readSecret ? { read: credential(readSecret, readUser) } : {}),
+                ...(writeSecret ? { write: credential(writeSecret, writeUser) } : {}),
+              }
+            : draft.manifest.auth,
       }
       const c = await stepUp.run(() => unwrap(api.POST('/connectors', { body: manifest as never })), {
         what: 'Adding a connector',
@@ -245,7 +293,7 @@ export function ConnectorBuilder() {
             </Field>
           </div>
           <Field
-            label={kind === 'browser' ? 'Start URL of the web app' : 'Base URL'}
+            label={kind === 'browser' ? 'Base URL of the web app' : 'Base URL'}
             hint="Admin-entered URLs are checked against loopback, link-local and cluster ranges by the server"
           >
             {(id, d) => (
@@ -316,19 +364,36 @@ export function ConnectorBuilder() {
               )}
             </Field>
           )}
-          <div className="flex gap-2">
-            {kind === 'browser' ? (
-              <Button
-                variant="primary"
-                busy={busy}
-                disabled={!name || !baseUrl}
-                onClick={() => void record()}
-              >
-                Record a flow
-              </Button>
-            ) : (
-              <Button variant="primary" busy={busy} disabled={!name} onClick={() => void importDraft()}>
-                List operations
+          {kind === 'browser' && (
+            <Field
+              label="Flows and operations (JSON)"
+              hint="Each operation names a flow. Arguments ({{args.x}}) only fill values and URLs; {{auth.username}} and {{auth.password}} are typed by the worker. Steps: goto, click, fill, select, check, press, wait_for, wait_for_url, extract_text, extract_table, extract_attribute, assert_text, assert_visible, screenshot."
+            >
+              {(id, d) => (
+                <Textarea
+                  id={id}
+                  aria-describedby={d}
+                  rows={16}
+                  value={flowsJson}
+                  onChange={(e) => setFlowsJson(e.target.value)}
+                  className="font-mono text-[12px]"
+                  spellCheck={false}
+                />
+              )}
+            </Field>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!name || (kind === 'browser' && !baseUrl)}
+              onClick={() => void importDraft()}
+            >
+              List operations
+            </Button>
+            {kind === 'browser' && (
+              <Button disabled title="Record the flow in a sandboxed browser instead of writing it">
+                Record in a browser · soon
               </Button>
             )}
           </div>
@@ -425,41 +490,90 @@ export function ConnectorBuilder() {
             References to your secrets backend, never values. The read credential goes to the tool gateway;
             the write credential only to the action executor.
           </p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Auth type">
-              {(id) => (
-                <Select id={id} value={authType} onChange={(e) => setAuthType(e.target.value)}>
-                  {['bearer', 'api_key', 'basic', 'oauth', 'mtls', 'none'].map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field label="Read secret reference">
-              {(id) => (
-                <Input
-                  id={id}
-                  value={readSecret}
-                  onChange={(e) => setReadSecret(e.target.value)}
-                  placeholder="env:LOGOS_TOKEN_RO"
-                  className="font-mono text-sm"
-                />
-              )}
-            </Field>
-            <Field label="Write secret reference">
-              {(id) => (
-                <Input
-                  id={id}
-                  value={writeSecret}
-                  onChange={(e) => setWriteSecret(e.target.value)}
-                  placeholder="vault:kv/z/logos#rw"
-                  className="font-mono text-sm"
-                />
-              )}
-            </Field>
-          </div>
+          {kind === 'browser' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Read account (user name)" hint="A read-only account of the web app">
+                {(id, d) => (
+                  <Input
+                    id={id}
+                    aria-describedby={d}
+                    value={readUser}
+                    onChange={(e) => setReadUser(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+              <Field label="Read password reference">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={readSecret}
+                    onChange={(e) => setReadSecret(e.target.value)}
+                    placeholder="env:FWCONSOLE_READ_PASSWORD"
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+              <Field label="Write account (user name)" hint="Used only by the action executor">
+                {(id, d) => (
+                  <Input
+                    id={id}
+                    aria-describedby={d}
+                    value={writeUser}
+                    onChange={(e) => setWriteUser(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+              <Field label="Write password reference">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={writeSecret}
+                    onChange={(e) => setWriteSecret(e.target.value)}
+                    placeholder="vault:kv/z/fwconsole#rw"
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Auth type">
+                {(id) => (
+                  <Select id={id} value={authType} onChange={(e) => setAuthType(e.target.value)}>
+                    {['bearer', 'api_key', 'basic', 'oauth', 'mtls', 'none'].map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field label="Read secret reference">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={readSecret}
+                    onChange={(e) => setReadSecret(e.target.value)}
+                    placeholder="env:LOGOS_TOKEN_RO"
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+              <Field label="Write secret reference">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={writeSecret}
+                    onChange={(e) => setWriteSecret(e.target.value)}
+                    placeholder="vault:kv/z/logos#rw"
+                    className="font-mono text-sm"
+                  />
+                )}
+              </Field>
+            </div>
+          )}
           {readSecret && writeSecret && readSecret === writeSecret && (
             <div className="text-meta text-err">Read and write must be different credentials.</div>
           )}

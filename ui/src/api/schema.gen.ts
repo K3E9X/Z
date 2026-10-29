@@ -3244,9 +3244,10 @@ export interface components {
             manifest?: components["schemas"]["connector.schema"];
             enabled?: boolean;
         };
+        /** @description browser: `flows` and the `declared` operations that name them (docs/05 §1). */
         ConnectorImport: {
             /** @enum {string} */
-            source: "openapi" | "graphql" | "mcp" | "docs";
+            source: "openapi" | "graphql" | "mcp" | "docs" | "browser";
             name: components["schemas"]["Slug"];
             display_name?: string;
             base_url?: string;
@@ -3254,6 +3255,10 @@ export interface components {
             spec?: Record<string, unknown> | string;
             mcp?: components["schemas"]["McpServer"];
             docs?: string;
+            flows?: {
+                [key: string]: components["schemas"]["BrowserFlow"];
+            };
+            declared?: components["schemas"]["DeclaredOperation"][];
             data_class?: components["schemas"]["DataClass"];
         };
         ConnectorDraft: {
@@ -4561,6 +4566,26 @@ export interface components {
         CredentialPurpose: "read" | "write";
         /** @description Operation id inside a connector file, without the connector prefix (e.g. merge_requests.create, fetch). */
         LocalOperationId: string;
+        BrowserStep: {
+            /** @enum {string} */
+            action: "goto" | "click" | "fill" | "select" | "check" | "uncheck" | "press" | "wait_for" | "wait_for_url" | "extract_text" | "extract_table" | "extract_attribute" | "assert_text" | "assert_visible" | "screenshot";
+            /** @description Playwright selector; never contains a placeholder. */
+            selector?: string;
+            /** @description goto, wait_for_url: relative to base_url or absolute on an allowed host. */
+            url?: string;
+            value?: string;
+            key?: string;
+            /** @description extract_*: output key; screenshot: file name. */
+            name?: string;
+            attribute?: string;
+            all?: boolean;
+            /** @enum {string} */
+            state?: "visible" | "hidden" | "attached" | "detached";
+            full_page?: boolean;
+            /** @description A failure of this step does not fail the flow. */
+            optional?: boolean;
+            timeout_ms?: number;
+        };
         /** @description Reference to a secret in a secrets backend, never the value. */
         SecretRef: string;
         OAuthFlow: {
@@ -4626,10 +4651,18 @@ export interface components {
             query?: string;
             /** @description cli: argv template. */
             command?: string[];
-            /** @description browser: recorded flow reference. */
+            /** @description browser: the name of a flow in `flows`. */
             flow?: string;
             input_schema?: Record<string, unknown>;
             output_hint?: string;
+        };
+        BrowserFlow: {
+            description?: string;
+            start_url?: string;
+            /** @description Hosts besides base_url's the page may load (exact or *.example.com); every other request is blocked. */
+            allowed_hosts?: string[];
+            timeout_s?: number;
+            steps: components["schemas"]["BrowserStep"][];
         };
         /** @description read is used by the gateway for agent calls; write by the action executor only. They are always different credentials. */
         AuthSet: {
@@ -4685,6 +4718,10 @@ export interface components {
             config?: Record<string, unknown>;
             /** @description rest, graphql, cli, database, browser: operations declared explicitly. */
             declared?: components["schemas"]["DeclaredOperation"][];
+            /** @description browser kind: named flows replayed by the z-browser worker; a declared operation names one in `flow`. Agent arguments ({{args.x}}) only fill values and URLs, credentials ({{auth.username}}, {{auth.password}}) are only typed into fields. */
+            flows?: {
+                [key: string]: components["schemas"]["BrowserFlow"];
+            };
             auth?: components["schemas"]["AuthSet"];
             oauth?: components["schemas"]["OAuthApps"];
             operations?: components["schemas"]["OperationPolicy"];
@@ -4719,10 +4756,38 @@ export interface components {
                     query?: string;
                     /** @description cli: argv template. */
                     command?: string[];
-                    /** @description browser: recorded flow reference. */
+                    /** @description browser: the name of a flow in `flows`. */
                     flow?: string;
                     input_schema?: Record<string, unknown>;
                     output_hint?: string;
+                };
+                BrowserStep: {
+                    /** @enum {string} */
+                    action: "goto" | "click" | "fill" | "select" | "check" | "uncheck" | "press" | "wait_for" | "wait_for_url" | "extract_text" | "extract_table" | "extract_attribute" | "assert_text" | "assert_visible" | "screenshot";
+                    /** @description Playwright selector; never contains a placeholder. */
+                    selector?: string;
+                    /** @description goto, wait_for_url: relative to base_url or absolute on an allowed host. */
+                    url?: string;
+                    value?: string;
+                    key?: string;
+                    /** @description extract_*: output key; screenshot: file name. */
+                    name?: string;
+                    attribute?: string;
+                    all?: boolean;
+                    /** @enum {string} */
+                    state?: "visible" | "hidden" | "attached" | "detached";
+                    full_page?: boolean;
+                    /** @description A failure of this step does not fail the flow. */
+                    optional?: boolean;
+                    timeout_ms?: number;
+                };
+                BrowserFlow: {
+                    description?: string;
+                    start_url?: string;
+                    /** @description Hosts besides base_url's the page may load (exact or *.example.com); every other request is blocked. */
+                    allowed_hosts?: string[];
+                    timeout_s?: number;
+                    steps: components["schemas"]["BrowserStep"][];
                 };
                 SimpleAuth: {
                     /** @enum {string} */
