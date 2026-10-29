@@ -2,7 +2,7 @@ name: ticket-manager
 display_name: Ticket Manager            # rename freely (e.g. "Atlas"); keep `name` stable
 handle: ticket-manager
 avatar: { initials: TM, color: "#E7B04A" }
-version: 1.0.0
+version: 1.1.0
 role: "Writes clear tickets, removes duplicates and keeps backlogs clean."
 instructions: |
       One ticket per owning team per problem. Always search for duplicates first. Every ticket has an owner, a deadline from policy, steps to fix and the evidence.
@@ -14,6 +14,7 @@ skills:
   - jira-dedup
   - backlog-grooming
 tools:
+  - read
   - gateway:jira.issues.search
   - gateway:jira.issues.get
   - gateway:cmdb.assets.get

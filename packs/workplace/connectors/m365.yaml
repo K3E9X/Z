@@ -13,10 +13,10 @@ oauth:
   write_app: { client_id: <z-m365-write-client-id>, secret: vault:z/m365/write-client-secret }
 auth:
   read:
-    user:    { flow: authorization_code_pkce, app: read_app, scopes: [Mail.Read, Calendars.Read, Chat.Read, ChannelMessage.Read.All, Files.Read.All, OnlineMeetingTranscript.Read.All] }
+    user:    { flow: authorization_code_pkce, app: read_app, scopes: [Mail.Read, Calendars.Read, Chat.Read, ChannelMessage.Read.All, Files.Read.All, OnlineMeetingTranscript.Read.All, Tasks.Read] }
     service: { flow: client_credentials, app: read_app }    # shared mailboxes, channels, sites; scope with Exchange RBAC for Applications / RSC
   write:
-    user:    { flow: authorization_code_pkce, app: write_app, scopes: [Mail.Send, Calendars.ReadWrite, ChatMessage.Send, ChannelMessage.Send, Files.ReadWrite] }
+    user:    { flow: authorization_code_pkce, app: write_app, scopes: [Mail.Send, Calendars.ReadWrite, ChatMessage.Send, ChannelMessage.Send, Files.ReadWrite, Tasks.ReadWrite] }
     service: { flow: client_credentials, app: write_app }
 operations:
   default_exposed: false
@@ -27,10 +27,12 @@ operations:
     - { match: "teams.messages.list", class: read, exposed: true }
     - { match: "teams.transcripts.get", class: read, exposed: true }
     - { match: "files.get", class: read, exposed: true }
+    - { match: "todo.lists.list", class: read, exposed: true }
     - { match: "mail.send", class: write, exposed: true }
     - { match: "mail.reply", class: write, exposed: true }
     - { match: "calendar.events.create", class: write, exposed: true }
     - { match: "teams.messages.post", class: write, exposed: true }
     - { match: "files.upload", class: write, exposed: true }
+    - { match: "todo.tasks.create", class: write, exposed: true }
     - { match: "mail.delete", class: destructive, exposed: false }
 data_class: C2

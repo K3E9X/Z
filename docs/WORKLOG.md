@@ -80,7 +80,7 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   schema from the case's json_schema check (or a generic object), literal-text fixtures, the agent's connectors
   attached, skill cases filtered by their mark, contract schemas with their $refs, changes.patch in `files`
   workspaces, and case missions stuck on needs_attention end as failed instead of holding the run.
-- Pack design gaps reported, not changed (they change agent behaviour; to decide with the owners): no output
+- Pack design gaps reported (decided later in ADR 0029): no output
   schemas for the archi-isp and workplace agents (checks use report.md), no `read` tool for assistant, researcher
   and the core agents (cases pass data inline), no edit/documents tool for ticket-manager and vuln-analyst (no
   report.md), the browser-flows "CSV artifact" step has no tool, meeting-prep "tasks" has no m365 operation.
@@ -113,6 +113,10 @@ Status by workstream lives in `docs/ROADMAP.md`; decisions in `docs/adr/`.
   bodies past the preview (all OpenAPI writes), RFC 2047 encoded words decoded into hidden recipients, calendar
   ownership by `organizer.self`, `..` calendar ids, Chat reply previews; M365 events no longer count as
   idempotent. Lesson: a preview is only as good as the closed schema of everything the writer sends.
+- Pack design gaps closed (ADR 0029, the owner asked for autonomous decisions): only dev-engineer could write
+  report.md and the runner never asked for it, so 80 report-based eval cases could not pass. Now every job is
+  asked for its report and may write it; `read` for agents that receive files; browser-agent `documents`;
+  Microsoft To Do in the m365 subset for meeting-prep.
 - Personal connections now record the account of each grant (`openid email`, ID token claims) and refuse read
   and write grants of different accounts; the identity field had never been filled.
 - Trap: connector slugs allow `-` but operation ids do not: a hyphenated pack connector seeded fine and then no

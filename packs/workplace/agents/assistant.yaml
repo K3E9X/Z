@@ -13,11 +13,13 @@ skills:
   - inbox-triage
   - meeting-prep
 tools:
+  - read
   - gateway:m365.mail.list
   - gateway:m365.mail.get
   - gateway:m365.calendar.events.list
   - gateway:m365.teams.messages.list
   - gateway:m365.teams.transcripts.get
+  - gateway:m365.todo.lists.list
   - gateway:google.gmail.messages.list
   - gateway:google.gmail.messages.get
   - gateway:google.gmail.threads.get

@@ -591,6 +591,123 @@
           }
         }
       }
+    },
+    "/me/todo/lists": {
+      "get": {
+        "operationId": "todo.lists.list",
+        "summary": "My Microsoft To Do task lists (id, displayName, wellknownListName)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/todo/lists/{list_id}/tasks": {
+      "post": {
+        "operationId": "todo.tasks.create",
+        "summary": "Add a task to one of my Microsoft To Do lists",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_=\\-]{1,300}$"
+            },
+            "description": "id from todo.lists.list"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                  },
+                  "body": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
+                    "properties": {
+                      "contentType": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "html"
+                        ]
+                      },
+                      "content": {
+                        "type": "string",
+                        "maxLength": 10000
+                      }
+                    }
+                  },
+                  "dueDateTime": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "normal",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

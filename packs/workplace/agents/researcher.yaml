@@ -12,6 +12,7 @@ escalate_model: z-heavy
 skills:
   - research
 tools:
+  - read
   - gateway:confluence.pages.*
   - gateway:m365.files.get
   - gateway:google.drive.files.list
