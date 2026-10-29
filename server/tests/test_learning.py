@@ -327,6 +327,41 @@ def test_eval_missions_capture_writes_and_answer_questions(
     assert runner.control()["state"] == "run"
     assert app.get("/api/v1/review").json()["counts"]["all"] == 0  # nothing waits for a human
     assert app.get("/api/v1/signals").json()["items"] == []  # eval runs teach the learner nothing
+    assert runner.complete(output={"created": ["SECOPS-1"]}).status_code == 200
+
+    # checks address the whole job result (eval-case.schema.json): output, actions, questions, ...
+    from z_common.models.manifests import Check
+    from z_server import evals
+    from z_server.db.models import Job, Mission
+
+    checks = {
+        "operation": {"type": "field_equals", "path": "actions[0].operation", "value": "jira.issues.create"},
+        "payload": {"type": "regex", "path": "actions[0].payload.summary", "pattern": "^Eval"},
+        "question": {"type": "contains", "path": "questions[0].text", "value": "Which project"},
+        "output": {"type": "field_equals", "path": "output.created[0]", "value": "SECOPS-1"},
+        "no_report": {"type": "field_equals", "path": "report", "value": None},
+        "missing": {"type": "contains", "path": "actions[1].summary", "value": "x"},
+    }
+
+    async def grade(st: Any) -> dict[str, bool]:
+        async with st.sessions() as db:
+            job = await db.get(Job, job_id)
+            mission = await db.get(Mission, job.mission_id)
+            ctx = await evals.result_context(db, mission, job)
+            assert ctx["actions"][0]["status"] == "rejected" and ctx["tool_calls"] == []
+            return {
+                name: (await evals.check(db, st, "ticketing", Check.model_validate(c), mission, job, ctx))[0]
+                for name, c in checks.items()
+            }
+
+    assert call(app, grade) == {
+        "operation": True,
+        "payload": True,
+        "question": True,
+        "output": True,
+        "no_report": True,
+        "missing": False,
+    }
 
 
 def test_signals_come_from_review_and_guardrails(app: TestClient, jars: dict[str, dict[str, str]]) -> None:

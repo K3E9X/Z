@@ -354,10 +354,79 @@ def resolve(data: Any, path: str) -> Any:
     return value
 
 
+MAX_TEXT = 200_000  # characters of report and diff kept for checks
+
+
+def _text(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")[:MAX_TEXT]
+    except OSError:
+        return ""
+
+
+async def result_context(db: AsyncSession, mission: Mission, job: Job | None) -> dict[str, Any]:
+    """The job result that check paths address (contracts/eval-case.schema.json): {output, report, actions[],
+    questions[], artifacts[], tool_calls[], diff}. Actions are the captured proposals, never applied."""
+    artifacts_rows = list(
+        (
+            await db.execute(
+                select(Artifact)
+                .where(Artifact.mission_id == mission.id, Artifact.job_id.is_not(None))
+                .order_by(Artifact.created_at)
+            )
+        ).scalars()
+    )
+    actions = list(
+        (
+            await db.execute(
+                select(ProposedAction)
+                .where(ProposedAction.mission_id == mission.id)
+                .order_by(ProposedAction.created_at)
+            )
+        ).scalars()
+    )
+    questions = list(
+        (await db.execute(select(Question).where(Question.mission_id == mission.id).order_by(Question.id))).scalars()
+    )
+    calls = list(
+        (
+            await db.execute(
+                select(Event).where(Event.mission_id == mission.id, Event.type == "tool_call").order_by(Event.seq)
+            )
+        ).scalars()
+    )
+    report = next((a for a in reversed(artifacts_rows) if a.name == "report.md"), None)
+    patches = [a for a in artifacts_rows if a.kind == "patch" or a.name.endswith((".patch", ".diff"))]
+    return {
+        "output": job.output if job else None,
+        "report": _text(report.storage_path) if report else None,
+        "actions": [
+            {
+                "operation": a.operation,
+                "summary": a.summary,
+                "payload": a.payload,
+                "class": a.op_class,
+                "status": a.status,
+            }
+            for a in actions
+        ],
+        "questions": [{"text": q.text, "options": q.options, "answer": q.answer} for q in questions],
+        "artifacts": [{"name": a.name, "kind": a.kind, "size": a.size} for a in artifacts_rows],
+        "tool_calls": [{k: (e.payload or {}).get(k) for k in ("tool", "operation", "args")} for e in calls],
+        "diff": "\n".join(_text(a.storage_path) for a in patches)[:MAX_TEXT] or None,
+    }
+
+
 async def check(
-    db: AsyncSession, state: AppState, pack: str | None, item: Check, mission: Mission, job: Job | None
+    db: AsyncSession,
+    state: AppState,
+    pack: str | None,
+    item: Check,
+    mission: Mission,
+    job: Job | None,
+    ctx: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
-    ctx = {"output": job.output if job else None}
+    ctx = ctx if ctx is not None else await result_context(db, mission, job)
     kind = item.type
     if kind == "json_schema":
         try:
@@ -472,8 +541,9 @@ async def finish(db: AsyncSession, state: AppState, run: EvalRun) -> None:
             .first()
         )
         graded = []
+        ctx = await result_context(db, mission, job)
         for item in case.checks:
-            ok, detail = await check(db, state, pack, item, mission, job)
+            ok, detail = await check(db, state, pack, item, mission, job, ctx)
             graded.append({"type": item.type, "ok": ok, "detail": detail[:300]})
         if mission.status != MissionStatus.succeeded.value:
             graded.insert(
