@@ -16,7 +16,7 @@ from sqlalchemy import delete, or_, select
 from z_common.models import api_ops as m
 from z_common.models.enums import DataClass
 
-from z_server import events, usage
+from z_server import events, inference_credential, usage
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.db.models import Budget, Event, Mission, Playbook, ProposedAction, Provider
 from z_server.errors import Problem
@@ -150,6 +150,38 @@ async def create_provider(ctx: CtxDep, body: m.ProviderWrite) -> m.Provider:
             "enabled": row.enabled,
         }
     )
+
+
+@router.operation("getInferenceCredential")
+async def get_inference_credential(ctx: CtxDep) -> m.InferenceCredential:
+    return m.InferenceCredential.model_validate(await inference_credential.status(ctx.db, ctx.state))
+
+
+@router.operation("putInferenceCredential")
+async def put_inference_credential(ctx: CtxDep, body: m.InferenceCredentialWrite) -> m.InferenceCredential:
+    """ADR 0027: the key goes to the LiteLLM gateway only; the audit keeps its fingerprint, never the key."""
+    out = await inference_credential.replace(ctx.db, ctx.state, ctx.user.username, body.api_key, body.test)
+    check = out.get("check") or {}
+    await ctx.audit(
+        "inference.credential.replaced",
+        "setting",
+        inference_credential.SETTING,
+        after={"fingerprint": out["fingerprint"], "checked": bool(check), "check_ok": check.get("ok")},
+    )
+    return m.InferenceCredential.model_validate(out)
+
+
+@router.operation("testInferenceCredential")
+async def test_inference_credential(ctx: CtxDep) -> m.InferenceCredential:
+    out = await inference_credential.retest(ctx.db, ctx.state)
+    check = out.get("check") or {}
+    await ctx.audit(
+        "inference.credential.tested",
+        "setting",
+        inference_credential.SETTING,
+        after={"model": check.get("model"), "ok": check.get("ok")},
+    )
+    return m.InferenceCredential.model_validate(out)
 
 
 @router.operation("inferenceHealth")

@@ -235,6 +235,28 @@ class ProviderWrite(ZModel):
     enabled: bool
 
 
+class InferenceCredentialCheck(ZModel):
+    ok: bool
+    model: str
+    detail: str
+    checked_at: datetime
+
+
+class InferenceCredential(ZModel):
+    """The inferX key the LiteLLM gateway uses (ADR 0027): its status only, never the key."""
+
+    source: Literal["ui", "env", "none", "unknown"]
+    fingerprint: str | None = None
+    updated_at: datetime | None = None
+    updated_by: str | None = None
+    check: InferenceCredentialCheck | None = None
+
+
+class InferenceCredentialWrite(ZModel):
+    api_key: Annotated[str, StringConstraints(pattern=r"^ixk_[0-9a-fA-F]{64}$")] = Field(repr=False)
+    test: bool = True
+
+
 class HoursSaved(ZModel):
     playbook: str
     completed: int
