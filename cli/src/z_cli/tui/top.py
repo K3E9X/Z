@@ -265,7 +265,7 @@ def edit_with_suspend(app: App[Any], payload: dict[str, Any]) -> dict[str, Any] 
         path = Path(fh.name)
     try:
         with app.suspend():
-            subprocess.run([*shlex.split(editor), str(path)], check=False)  # noqa: S603 - the user's editor
+            subprocess.run([*shlex.split(editor), str(path)], check=False)  # noqa: S603  # nosemgrep: the local user's own $VISUAL/$EDITOR, argv without a shell
         data = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError) as exc:
         app.notify(f"payload not changed: {exc}", severity="error")
