@@ -1394,7 +1394,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inbound teams messages */
+        /**
+         * Inbound teams messages
+         * @description Bot Framework activity. Authenticated by the Bot Connector JWT (issuer https://api.botframework.com, audience = the channel app_id, serviceUrl claim = activity serviceUrl, keys from the OpenID metadata).
+         */
         post: operations["channelTeamsInbound"];
         delete?: never;
         options?: never;
@@ -1411,7 +1414,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inbound slack messages */
+        /**
+         * Inbound slack messages
+         * @description Slash command (form) or Events API (JSON). Authenticated by X-Slack-Signature: v0=<hex HMAC-SHA256 of 'v0:{X-Slack-Request-Timestamp}:{body}'> with the signing secret (5 min skew).
+         */
         post: operations["channelSlackInbound"];
         delete?: never;
         options?: never;
@@ -1428,7 +1434,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inbound mattermost messages */
+        /**
+         * Inbound mattermost messages
+         * @description Slash command or outgoing webhook (form or JSON). Authenticated by the `token` field equal to the channel's token.
+         */
         post: operations["channelMattermostInbound"];
         delete?: never;
         options?: never;
@@ -1445,7 +1454,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inbound email messages */
+        /**
+         * Inbound email messages
+         * @description A mail relay posts {from, to, subject, text, attachments[{name, content_type, content_b64}]}. Authenticated by X-Z-Signature like webhooks.
+         */
         post: operations["channelEmailInbound"];
         delete?: never;
         options?: never;
@@ -3147,6 +3159,12 @@ export interface components {
         WebhookAccepted: {
             task_id?: string | null;
             mission_id?: string | null;
+        };
+        ChannelReply: {
+            text?: string;
+            /** @enum {string} */
+            response_type?: "ephemeral" | "in_channel";
+            challenge?: string;
         };
         Session: {
             id: components["schemas"]["Id"];
@@ -7926,9 +7944,19 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": Record<string, unknown>;
+                "application/x-www-form-urlencoded": Record<string, unknown>;
             };
         };
         responses: {
+            /** @description Reply shown in the chat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelReply"];
+                };
+            };
             /** @description OK */
             202: {
                 headers: {
@@ -7959,9 +7987,19 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": Record<string, unknown>;
+                "application/x-www-form-urlencoded": Record<string, unknown>;
             };
         };
         responses: {
+            /** @description Reply shown in the chat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelReply"];
+                };
+            };
             /** @description OK */
             202: {
                 headers: {

@@ -860,6 +860,13 @@ schemas = {
         ["kind"],
     ),
     "WebhookAccepted": obj({"task_id": nul(S), "mission_id": nul(S)}),
+    "ChannelReply": obj(
+        {
+            "text": S,
+            "response_type": {"type": "string", "enum": ["ephemeral", "in_channel"]},
+            "challenge": S,
+        }
+    ),
     "Session": obj(
         {
             "id": ID,
@@ -2663,6 +2670,12 @@ op(
     status=201,
     step_up=True,
 )
+CHANNEL_AUTH = {
+    "teams": "Bot Framework activity. Authenticated by the Bot Connector JWT (issuer https://api.botframework.com, audience = the channel app_id, serviceUrl claim = activity serviceUrl, keys from the OpenID metadata).",
+    "slack": "Slash command (form) or Events API (JSON). Authenticated by X-Slack-Signature: v0=<hex HMAC-SHA256 of 'v0:{X-Slack-Request-Timestamp}:{body}'> with the signing secret (5 min skew).",
+    "mattermost": "Slash command or outgoing webhook (form or JSON). Authenticated by the `token` field equal to the channel's token.",
+    "email": "A mail relay posts {from, to, subject, text, attachments[{name, content_type, content_b64}]}. Authenticated by X-Z-Signature like webhooks.",
+}
 for ch, p in [
     ("teams", "/channels/teams/messages"),
     ("slack", "/channels/slack/events"),
@@ -2680,7 +2693,17 @@ for ch, p in [
         req={"type": "object"},
         resp=ref("WebhookAccepted"),
         status=202,
+        desc=CHANNEL_AUTH[ch],
     )
+# Slack and Mattermost slash commands post form fields and show the 200 reply to the user (any other status is
+# shown as an error); Slack's Events API checks the endpoint with a url_verification challenge echoed in a 200.
+for p in ("/channels/slack/events", "/channels/mattermost/hook"):
+    o = paths[p]["post"]
+    o["requestBody"]["content"]["application/x-www-form-urlencoded"] = {"schema": {"type": "object"}}
+    o["responses"]["200"] = {
+        "description": "Reply shown in the chat",
+        "content": {"application/json": {"schema": ref("ChannelReply")}},
+    }
 # ---- inference & usage
 op(
     "get",

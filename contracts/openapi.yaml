@@ -3026,6 +3026,8 @@ paths:
       x-permission: hmac
       x-owner: B3
       x-audit: true
+      description: Bot Framework activity. Authenticated by the Bot Connector JWT (issuer https://api.botframework.com, audience = the channel app_id, serviceUrl claim = activity serviceUrl, keys from the
+        OpenID metadata).
       requestBody:
         required: true
         content:
@@ -3055,10 +3057,14 @@ paths:
       x-permission: hmac
       x-owner: B3
       x-audit: true
+      description: 'Slash command (form) or Events API (JSON). Authenticated by X-Slack-Signature: v0=<hex HMAC-SHA256 of ''v0:{X-Slack-Request-Timestamp}:{body}''> with the signing secret (5 min skew).'
       requestBody:
         required: true
         content:
           application/json:
+            schema:
+              type: object
+          application/x-www-form-urlencoded:
             schema:
               type: object
       responses:
@@ -3074,6 +3080,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '200':
+          description: Reply shown in the chat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelReply'
       security: []
   /channels/mattermost/hook:
     post:
@@ -3084,10 +3096,14 @@ paths:
       x-permission: hmac
       x-owner: B3
       x-audit: true
+      description: Slash command or outgoing webhook (form or JSON). Authenticated by the `token` field equal to the channel's token.
       requestBody:
         required: true
         content:
           application/json:
+            schema:
+              type: object
+          application/x-www-form-urlencoded:
             schema:
               type: object
       responses:
@@ -3103,6 +3119,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '200':
+          description: Reply shown in the chat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelReply'
       security: []
   /channels/email/inbound:
     post:
@@ -3113,6 +3135,7 @@ paths:
       x-permission: hmac
       x-owner: B3
       x-audit: true
+      description: A mail relay posts {from, to, subject, text, attachments[{name, content_type, content_b64}]}. Authenticated by X-Z-Signature like webhooks.
       requestBody:
         required: true
         content:
@@ -7291,6 +7314,17 @@ components:
           oneOf:
           - *id001
           - type: 'null'
+      additionalProperties: false
+    ChannelReply:
+      type: object
+      properties:
+        text: *id001
+        response_type:
+          type: string
+          enum:
+          - ephemeral
+          - in_channel
+        challenge: *id001
       additionalProperties: false
     Session:
       type: object
