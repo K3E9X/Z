@@ -126,6 +126,50 @@ class TakeOverSession(ZModel):
     mode: str
 
 
+TakeOverOrigin = Literal["staged", "agent", "human"]
+
+
+class TakeOverFile(ZModel):
+    path: str
+    size: int
+    origin: TakeOverOrigin
+    deleted: bool
+
+
+class TakeOverWorkspace(ZModel):
+    job_id: str
+    mode: Literal["read_only", "read_write"]
+    by: str
+    expires_at: datetime
+    files: list[TakeOverFile]
+    truncated: bool
+
+
+class TakeOverFileContent(ZModel):
+    path: str
+    encoding: Literal["utf-8", "base64"]
+    content: str
+    size: int
+    origin: TakeOverOrigin
+
+
+class TakeOverEdit(ZModel):
+    path: Annotated[str, StringConstraints(min_length=1, max_length=512)]
+    content: Annotated[str, StringConstraints(max_length=1_500_000)]
+    encoding: Literal["utf-8", "base64"] = "utf-8"
+
+
+class TakeOverFinish(ZModel):
+    resume: bool = True
+
+
+class TakeOverResult(ZModel):
+    job_id: str
+    edited: list[str]
+    restarted: bool
+    resumed: bool
+
+
 class SaveAsPlaybook(ZModel):
     name: Slug
     description: str | None = None
