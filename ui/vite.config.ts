@@ -18,6 +18,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': { target: apiTarget, changeOrigin: false, ws: false },
+      '/healthz': { target: apiTarget, changeOrigin: false },
     },
   },
   preview: {
