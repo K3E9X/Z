@@ -56,7 +56,8 @@ def _step(mission: Mission, step_id: str) -> dict[str, Any]:
 
 async def gateway_tools(db: AsyncSession, profile: AgentProfile, mission: Mission) -> list[GatewayTool]:
     patterns = profile.gateway_patterns
-    if not patterns:
+    browser = "browser" in profile.tools  # the flows of browser connectors attached to the mission (docs/04 §2)
+    if not patterns and not browser:
         return []
     rows = (
         await db.execute(
@@ -72,7 +73,7 @@ async def gateway_tools(db: AsyncSession, profile: AgentProfile, mission: Missio
     ).all()
     tools = []
     for op, connector in rows:
-        matched = any(
+        matched = (browser and connector.kind == "browser" and connector.name in mission.connectors) or any(
             (p == "@read" and connector.name in mission.connectors) or p == op.id or glob_match(p, op.id)
             for p in patterns
         )

@@ -34,6 +34,8 @@ class Settings:
     breakglass: bool = False
     test_account_passwords: str = ""
     oidc_client_secret: str = ""
+    browser_url: str = ""  # the z-browser worker (browser connectors); empty: not deployed
+    browser_token: str = ""
     config: dict[str, Any] = field(default_factory=dict, compare=False)
 
     @property
@@ -49,6 +51,8 @@ class Settings:
         problems = []
         if len(self.secret_key) < 32:
             problems.append("Z_SECRET_KEY must be at least 32 characters")
+        if self.browser_url and len(self.browser_token) < 16:
+            problems.append("Z_BROWSER_TOKEN must be set (at least 16 characters) with Z_BROWSER_URL")
         if self.production:
             if self.auth_mode == "dev":
                 problems.append("auth.mode dev is refused when Z_ENV=production")
@@ -94,6 +98,8 @@ def from_env(env: dict[str, str] | None = None) -> Settings:
         breakglass=e.get("Z_BREAKGLASS", "false").lower() == "true",
         test_account_passwords=e.get("Z_TEST_ACCOUNT_PASSWORDS", ""),
         oidc_client_secret=e.get("OIDC_CLIENT_SECRET", ""),
+        browser_url=e.get("Z_BROWSER_URL", "").rstrip("/"),
+        browser_token=e.get("Z_BROWSER_TOKEN", ""),
         config=config,
     )
 

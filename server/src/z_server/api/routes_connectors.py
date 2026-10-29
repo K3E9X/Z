@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from sqlalchemy import func, select
+from z_common.connectors import browser
 from z_common.contracts import validator as contract_validator
 from z_common.models import api_catalog as m
 from z_common.models.enums import OperationClass
@@ -241,6 +242,7 @@ async def _validated_manifest(ctx: Ctx, manifest: dict[str, Any]) -> dict[str, A
         f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: does not match the connector schema ({e.validator})"
         for e in contract_validator("connector.schema.json").iter_errors(manifest)
     ]
+    problems += browser.connector_problems(manifest)
     if problems:
         raise Problem("validation", "; ".join(sorted(set(problems))[:5]))
     if manifest.get("base_url") and "${" not in str(manifest["base_url"]):
@@ -404,6 +406,39 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
         except Exception as exc:
             raise Problem("validation", str(exc)) from exc
         warnings += more
+    elif body.source == "browser":
+        if not body.flows or not body.declared:
+            raise Problem("validation", "browser import needs flows and the declared operations that name them")
+        if not body.base_url:
+            raise Problem("validation", "browser import needs base_url (the web app)")
+        prefix = body.name.upper().replace("-", "_")
+        manifest.update(
+            {
+                "kind": "browser",
+                "flows": {k: v.dump() for k, v in body.flows.items()},
+                "declared": [d.dump() for d in body.declared],
+                # form logins: separate read and write accounts, typed by the worker into {{auth.*}} fields
+                "auth": {
+                    "read": {
+                        "type": "basic",
+                        "username": f"${{{prefix}_READ_USER}}",
+                        "secret": f"env:{prefix}_READ_PASSWORD",
+                    },
+                    "write": {
+                        "type": "basic",
+                        "username": f"${{{prefix}_WRITE_USER}}",
+                        "secret": f"env:{prefix}_WRITE_PASSWORD",
+                    },
+                },
+            }
+        )
+        problems = browser.connector_problems(manifest)
+        if problems:
+            raise Problem("validation", "; ".join(problems[:5]))
+        specs = admin.operation_specs(manifest, None)
+        warnings.append("every flow runs exactly as reviewed: check what each step clicks before exposing it")
+        if not ctx.state.settings.browser_url:
+            warnings.append("the z-browser worker is not configured (Z_BROWSER_URL): flows cannot run yet")
     else:
         raise Problem("unavailable", f"import from {body.source} is not available on this server yet")
     manifest["operations"] = {
@@ -445,10 +480,10 @@ async def import_connector(ctx: CtxDep, body: m.ConnectorImport) -> m.ConnectorD
 
 @router.operation("recordBrowserFlow", status_code=201)
 async def record_browser_flow(ctx: CtxDep, body: dict[str, Any]) -> m.Connector:
-    """Browser connectors are recorded and replayed by the z-browser worker, which is not part of this build:
-    say so instead of pretending (docs/05 browser connectors)."""
+    """Flows are replayed by the z-browser worker; interactive recording is not part of this build yet: say so
+    instead of pretending (docs/05 §1, ADR 0016)."""
     raise Problem(
         "unavailable",
-        "recording a browser flow needs the z-browser worker, which is not deployed yet; "
-        "use an OpenAPI, REST or MCP connector for this application",
+        "interactive recording is not available yet; write the flow in the connector's `flows` "
+        "(steps such as fill, click, extract_table) and submit it for review",
     )

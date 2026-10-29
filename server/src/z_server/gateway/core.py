@@ -24,7 +24,7 @@ from z_common.redaction import Redactor
 from z_server import artifacts, audit, events, judge, judge_model
 from z_server.crypto import token_hash
 from z_server.db.models import Connector, Job, Mission, Operation
-from z_server.gateway import adf, mcp_client, oauth
+from z_server.gateway import adf, browser, mcp_client, oauth
 from z_server.gateway import http as http_invoker
 from z_server.gateway.auth import AuthError, AuthMaterial, Purpose, material
 from z_server.gateway.limits import CallStats, SlidingWindow, replica_share
@@ -57,6 +57,7 @@ class Invocation:
     identity: str | None
     secrets: list[str] = field(default_factory=list)
     error: str | None = None
+    files: list[tuple[str, bytes]] = field(default_factory=list)  # browser screenshots, stored as artifacts
 
 
 @dataclass
@@ -164,6 +165,11 @@ class Gateway:
                     auth.identity,
                     auth.secrets,
                     "tool returned an error" if res.isError else None,
+                )
+            if connector.kind == "browser":
+                run = await browser.run(self.state, connector, op, args, auth, timeout_s)
+                return Invocation(
+                    run.ok, None, run.body, run.latency_ms, auth.identity, auth.secrets, run.error, run.files
                 )
             return Invocation(
                 False,
@@ -299,6 +305,8 @@ class Gateway:
         if mission.llm_key_enc:
             known.append(service.mission_key(self.state, mission))
         redactor = Redactor(known)
+        if inv.files and isinstance(inv.body, dict):
+            inv.body["screenshots"] = await self._store_files(job, mission, connector, inv.files)
         body = redactor.value(shape(inv.body))
         text = (
             body if isinstance(body, str) else json.dumps(body, ensure_ascii=False, separators=(",", ":"), default=str)
@@ -313,6 +321,38 @@ class Gateway:
             self.state, text, judge.scan(text), owner=(mission.created_by, mission.team_id or "")
         )
         return await self._finish(job, mission, connector, op, inv, args, text, body, verdict)
+
+    async def _store_files(
+        self, job: Job, mission: Mission, connector: Connector, files: list[tuple[str, bytes]]
+    ) -> list[dict[str, str]]:
+        """Screenshots become artifacts of the tool's data class (password fields are masked by the worker)."""
+        refs = []
+        async with self.state.sessions() as db, db.begin():
+            row_mission = await db.get(Mission, mission.id)
+            current = row_mission.data_class if row_mission is not None else mission.data_class
+            for name, data in files:
+                row = await artifacts.create(
+                    db,
+                    self.state.settings.artifacts_dir,
+                    mission_id=mission.id,
+                    job_id=job.id,
+                    kind="screenshot",
+                    name=name,
+                    data=data,
+                    data_class=max(current, connector.data_class),
+                    content_type="image/png",
+                )
+                await events.append(
+                    db,
+                    mission.id,
+                    "artifact",
+                    {"artifact_id": row.id, "kind": "screenshot", "name": row.name},
+                    job_id=job.id,
+                    agent=job.agent_name,
+                    step_id=job.step_id,
+                )
+                refs.append({"name": row.name, "screenshot_ref": row.id})
+        return refs
 
     async def _finish(
         self,

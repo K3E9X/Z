@@ -27,6 +27,7 @@ class AuthMaterial:
     headers: dict[str, str] = field(default_factory=dict)
     identity: str | None = None
     secrets: list[str] = field(default_factory=list)  # values to redact from anything that leaves the gateway
+    login: dict[str, str] = field(default_factory=dict)  # basic: username and password, for browser form logins
 
 
 def auth_config(manifest: dict[str, Any], purpose: Purpose) -> dict[str, Any] | None:
@@ -70,4 +71,6 @@ async def material(manifest: dict[str, Any], purpose: Purpose, resolver: SecretR
     if not username:
         raise AuthError("basic auth needs a username (for Jira Cloud: the account e-mail)")
     token = base64.b64encode(f"{username}:{secret}".encode()).decode()
-    return AuthMaterial({"Authorization": f"Basic {token}"}, username, [secret, token])
+    return AuthMaterial(
+        {"Authorization": f"Basic {token}"}, username, [secret, token], {"username": username, "password": secret}
+    )
