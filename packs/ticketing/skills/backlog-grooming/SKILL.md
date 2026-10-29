@@ -2,6 +2,7 @@
 name: backlog-grooming
 description: Find stale, duplicate and incomplete tickets and propose fixes.
 version: 1.0.0
+evals: evals/backlog-grooming.jsonl
 ---
 
 1. List open tickets older than the threshold (default 60 days) or with no owner or no due date.

@@ -2,6 +2,7 @@
 name: jira-dedup
 description: Find existing tickets for the same problem before proposing a new one.
 version: 1.0.0
+evals: evals/jira-dedup.jsonl
 ---
 
 1. Search open issues in the target project with the CVE or the key words of the title and the asset name.

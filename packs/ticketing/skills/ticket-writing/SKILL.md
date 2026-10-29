@@ -2,6 +2,7 @@
 name: ticket-writing
 description: Write a ticket a team can act on without asking questions.
 version: 1.0.0
+evals: evals/ticket-writing.jsonl
 ---
 
 Ticket body, in this order:
