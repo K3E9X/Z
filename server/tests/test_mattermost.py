@@ -141,8 +141,7 @@ def test_a_reply_is_proposed_previewed_applied_once(
     use_jar(app, jars["carol"])
     approved = app.post(f"/api/v1/actions/{action['id']}/approve", json={}, headers=csrf(app))
     assert approved.status_code == 200, approved.text
-    report = executor_tick(app)
-    assert report["applied"] == [action["id"]], app.get(f"/api/v1/actions/{action["id"]}").json()["result"]
+    assert executor_tick(app)["applied"] == [action["id"]]
     [write] = tools.writes("mattermost.posts.create")
     assert write["token_kind"] == "write" and write["data"]["root_id"] == ROOT
     assert write["data"]["props"] == {"z_action": action["id"]}
