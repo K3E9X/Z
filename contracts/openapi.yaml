@@ -2967,6 +2967,147 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /connectors/recordings/{id}:
+    get:
+      operationId: getBrowserRecording
+      tags:
+      - connectors
+      summary: State of a browser recording
+      x-permission: connectors:manage
+      x-owner: B3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowserRecordingState'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: cancelBrowserRecording
+      tags:
+      - connectors
+      summary: Cancel a recording
+      x-permission: connectors:manage
+      x-owner: B3
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /connectors/recordings/{id}/screen:
+    get:
+      operationId: getBrowserRecordingScreen
+      tags:
+      - connectors
+      summary: Screenshot of the recorded page (password fields masked)
+      x-permission: connectors:manage
+      x-owner: B3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /connectors/recordings/{id}/input:
+    post:
+      operationId: sendBrowserRecordingInput
+      tags:
+      - connectors
+      summary: Act on the recorded page and record the step
+      x-permission: connectors:manage
+      x-owner: B3
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrowserRecordingInput'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowserRecordingState'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /connectors/recordings/{id}/finish:
+    post:
+      operationId: finishBrowserRecording
+      tags:
+      - connectors
+      summary: End a recording and get the draft flow
+      x-permission: connectors:manage
+      x-owner: B3
+      x-audit: true
+      description: 'Nothing is saved: add the flow and an operation naming it to the connector (PATCH /connectors/{id}); it goes through exposure review like any flow change.'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowserRecordingDraft'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /connectors/{id}/operations:
     get:
       operationId: listOperations
@@ -7988,11 +8129,18 @@ components:
           $ref: common.schema.json#/$defs/Slug
         start_url: *id001
         name: *id001
+        purpose:
+          type: string
+          enum:
+          - read
+          - write
+          default: read
       required:
       - connector
       - start_url
       - name
       additionalProperties: false
+      description: Record on a browser connector, signed in with its read (or write) account; the recording acts in the real application.
     BrowserRecordingSession:
       type: object
       properties:
@@ -8003,6 +8151,116 @@ components:
       - id
       - viewer_url
       - expires_at
+      additionalProperties: false
+    BrowserRecordingState:
+      type: object
+      properties:
+        id: *id004
+        connector:
+          $ref: common.schema.json#/$defs/Slug
+        name: *id001
+        purpose:
+          type: string
+          enum:
+          - read
+          - write
+        url: *id001
+        title: *id001
+        steps:
+          type: array
+          items:
+            $ref: connector.schema.json#/$defs/BrowserStep
+        blocked_hosts:
+          type: array
+          items: *id001
+        viewport:
+          type: object
+          properties:
+            width: *id006
+            height: *id006
+          required:
+          - width
+          - height
+          additionalProperties: false
+        expires_at: *id005
+      required:
+      - id
+      - connector
+      - name
+      - purpose
+      - url
+      - title
+      - steps
+      - blocked_hosts
+      - viewport
+      - expires_at
+      additionalProperties: false
+    BrowserRecordingInput:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - click
+          - type
+          - credential
+          - press
+          - goto
+          - extract
+          - assert
+          - screenshot
+          - undo
+        x:
+          type: number
+        y:
+          type: number
+        text:
+          type: string
+          maxLength: 4000
+        arg:
+          type: string
+          pattern: ^[A-Za-z_][A-Za-z0-9_]{0,40}$
+        field:
+          type: string
+          enum:
+          - username
+          - password
+        key:
+          type: string
+          enum:
+          - Enter
+          - Tab
+          - Escape
+          - ArrowDown
+          - ArrowUp
+          - Space
+        url:
+          type: string
+          maxLength: 2000
+        what:
+          type: string
+          enum:
+          - text
+          - table
+          - link
+        name:
+          type: string
+          pattern: ^[A-Za-z_][A-Za-z0-9_]{0,40}$
+      required:
+      - kind
+      additionalProperties: false
+      description: x and y are in page pixels (viewport of the state). credential types the connector's username or password into the focused field and records {{auth.*}}; type with arg records {{args.<arg>}}.
+    BrowserRecordingDraft:
+      type: object
+      properties:
+        flow:
+          $ref: connector.schema.json#/$defs/BrowserFlow
+        blocked_hosts:
+          type: array
+          items: *id001
+      required:
+      - flow
+      - blocked_hosts
       additionalProperties: false
     PersonalConnection:
       type: object

@@ -1065,9 +1065,53 @@ schemas = {
         {"operations": arr(obj({"id": ext(C + "OperationId"), "exposed": B}, ["id", "exposed"]))}, ["operations"]
     ),
     "BrowserRecording": obj(
-        {"connector": ext(C + "Slug"), "start_url": S, "name": S}, ["connector", "start_url", "name"]
+        {
+            "connector": ext(C + "Slug"),
+            "start_url": S,
+            "name": S,
+            "purpose": {"type": "string", "enum": ["read", "write"], "default": "read"},
+        },
+        ["connector", "start_url", "name"],
+        desc="Record on a browser connector, signed in with its read (or write) account; the recording acts in the real application.",
     ),
     "BrowserRecordingSession": obj({"id": ID, "viewer_url": S, "expires_at": TS}, ["id", "viewer_url", "expires_at"]),
+    "BrowserRecordingState": obj(
+        {
+            "id": ID,
+            "connector": ext(C + "Slug"),
+            "name": S,
+            "purpose": {"type": "string", "enum": ["read", "write"]},
+            "url": S,
+            "title": S,
+            "steps": arr(ext("connector.schema.json#/$defs/BrowserStep")),
+            "blocked_hosts": arr(S),
+            "viewport": obj({"width": I, "height": I}, ["width", "height"]),
+            "expires_at": TS,
+        },
+        ["id", "connector", "name", "purpose", "url", "title", "steps", "blocked_hosts", "viewport", "expires_at"],
+    ),
+    "BrowserRecordingInput": obj(
+        {
+            "kind": {
+                "type": "string",
+                "enum": ["click", "type", "credential", "press", "goto", "extract", "assert", "screenshot", "undo"],
+            },
+            "x": {"type": "number"},
+            "y": {"type": "number"},
+            "text": {"type": "string", "maxLength": 4000},
+            "arg": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,40}$"},
+            "field": {"type": "string", "enum": ["username", "password"]},
+            "key": {"type": "string", "enum": ["Enter", "Tab", "Escape", "ArrowDown", "ArrowUp", "Space"]},
+            "url": {"type": "string", "maxLength": 2000},
+            "what": {"type": "string", "enum": ["text", "table", "link"]},
+            "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,40}$"},
+        },
+        ["kind"],
+        desc="x and y are in page pixels (viewport of the state). credential types the connector's username or password into the focused field and records {{auth.*}}; type with arg records {{args.<arg>}}.",
+    ),
+    "BrowserRecordingDraft": obj(
+        {"flow": ext("connector.schema.json#/$defs/BrowserFlow"), "blocked_hosts": arr(S)}, ["flow", "blocked_hosts"]
+    ),
     "PersonalConnection": obj(
         {
             "id": ID,
@@ -2696,6 +2740,64 @@ op(
     req=ref("BrowserRecording"),
     resp=ref("BrowserRecordingSession"),
     status=201,
+)
+REC = "/connectors/recordings/{id}"
+op(
+    "get",
+    REC,
+    "getBrowserRecording",
+    "connectors:manage",
+    "B3",
+    "State of a browser recording",
+    "connectors",
+    resp=ref("BrowserRecordingState"),
+    params=["id"],
+)
+op(
+    "get",
+    REC + "/screen",
+    "getBrowserRecordingScreen",
+    "connectors:manage",
+    "B3",
+    "Screenshot of the recorded page (password fields masked)",
+    "connectors",
+    params=["id"],
+    resp_content={"image/jpeg": {"schema": {"type": "string", "format": "binary"}}},
+)
+op(
+    "post",
+    REC + "/input",
+    "sendBrowserRecordingInput",
+    "connectors:manage",
+    "B3",
+    "Act on the recorded page and record the step",
+    "connectors",
+    req=ref("BrowserRecordingInput"),
+    resp=ref("BrowserRecordingState"),
+    params=["id"],
+)
+op(
+    "post",
+    REC + "/finish",
+    "finishBrowserRecording",
+    "connectors:manage",
+    "B3",
+    "End a recording and get the draft flow",
+    "connectors",
+    resp=ref("BrowserRecordingDraft"),
+    params=["id"],
+    desc="Nothing is saved: add the flow and an operation naming it to the connector (PATCH /connectors/{id}); it goes through exposure review like any flow change.",
+)
+op(
+    "delete",
+    REC,
+    "cancelBrowserRecording",
+    "connectors:manage",
+    "B3",
+    "Cancel a recording",
+    "connectors",
+    params=["id"],
+    status=204,
 )
 op(
     "get",
