@@ -250,6 +250,11 @@ class SessionApp(App[int]):
         self.load_context()
         self.counts_loop()
 
+    def on_resize(self, event: events.Resize) -> None:
+        """Inline apps share the terminal: keep the input and status line on screen whatever its height."""
+        with contextlib.suppress(Exception):
+            self.query_one("#transcript", VerticalScroll).styles.max_height = max(5, event.size.height - 9)
+
     def welcome(self) -> Panel:
         body = Text()
         body.append("✻ ", style="z.acc")
@@ -1175,7 +1180,7 @@ class SessionApp(App[int]):
                     return
                 row, start, word = self._token(area)
                 self.hide_completion()
-                if message.key == "enter" and word == choice:
+                if message.key == "enter" and (word == choice or word in SLASH or word in self._completion_items):
                     area.post_message(PromptArea.Submitted(area.text))
                     return
                 lines = area.text.split("\n")
