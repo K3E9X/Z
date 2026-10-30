@@ -101,6 +101,9 @@ class MissionRequest:
     budget: dict[str, Any]
     session_id: str | None
     trigger_id: str | None = None
+    # testAgent: a read-only trial of this one agent, which may be disabled (a new agent is tried before it is
+    # offered to anyone). Only the testAgent route sets it; every other start refuses disabled agents.
+    trial_agent: str | None = None
 
 
 async def _strictest_autonomy(db: AsyncSession, plan: MissionPlan, *requested: Autonomy | None) -> Autonomy:
@@ -123,7 +126,9 @@ async def create(db: AsyncSession, state: AppState, user: Principal, request: Mi
         raise Problem(
             "validation", "a free-form mission needs a plan (draft one with POST /missions/draft-plan) or an @agent"
         )
-    await _check_plan_agents(db, plan)
+    if request.trial_agent is not None:
+        _check_trial(request, plan)
+    await _check_plan_agents(db, plan, trial_agent=request.trial_agent)
     from z_server.llm import policy
 
     config = state.config
@@ -182,14 +187,25 @@ async def create(db: AsyncSession, state: AppState, user: Principal, request: Mi
     return mission
 
 
-async def _check_plan_agents(db: AsyncSession, plan: MissionPlan) -> None:
+def _check_trial(request: MissionRequest, plan: MissionPlan) -> None:
+    """A trial is one step of the trial agent, read-only, without writes, playbook or connectors of its own."""
+    if (
+        request.playbook is not None
+        or request.autonomy != Autonomy.read_only
+        or request.connectors
+        or [s.agent for s in plan.steps] != [request.trial_agent]
+        or any(s.writes for s in plan.steps)
+        or plan.writes
+    ):
+        raise Problem("validation", "a trial mission is one read-only step of the agent under trial")
+
+
+async def _check_plan_agents(db: AsyncSession, plan: MissionPlan, *, trial_agent: str | None = None) -> None:
     names = {s.agent for s in plan.steps}
-    found = {
-        a
-        for (a,) in (
-            await db.execute(select(Agent.name).where(Agent.name.in_(names), Agent.status != "disabled"))
-        ).all()
-    }
+    usable = Agent.status != "disabled"
+    if trial_agent is not None:  # the one exception: the agent of a trial mission (testAgent), even if disabled
+        usable = usable | (Agent.name == trial_agent)
+    found = {a for (a,) in (await db.execute(select(Agent.name).where(Agent.name.in_(names), usable))).all()}
     missing = sorted(names - found)
     if missing:
         raise Problem("validation", f"unknown or disabled agents in the plan: {', '.join(missing)}")

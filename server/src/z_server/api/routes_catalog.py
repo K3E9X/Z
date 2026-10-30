@@ -5,8 +5,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from z_common.models import api_catalog as m
+from z_common.models import api_missions
 from z_common.models.manifests import AgentProfile
 
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
@@ -232,6 +234,71 @@ async def duplicate_agent(ctx: CtxDep, id: str, body: m.AgentDuplicate) -> m.Age
     out = await agent_out(ctx, agent)
     await ctx.audit("agent.duplicated", "agent", agent.id, after={**out.dump(), "from": source.id})
     return out
+
+
+TRIAL_PREFIX = "Trial: "
+TRIAL_BUDGET = {"max_tokens": 200_000, "timeout_s": 900}
+
+
+class AgentTest(BaseModel):
+    """contracts AgentTest."""
+
+    model_config = ConfigDict(extra="forbid")
+    prompt: str = Field(min_length=1, max_length=4000)
+    inputs: dict[str, Any] | None = None
+
+
+@router.operation("testAgent", status_code=201)
+async def trial_agent(ctx: CtxDep, id: str, body: AgentTest) -> api_missions.Mission:
+    """A read-only trial mission: one step with this agent (also a disabled one), no writes, no connectors beyond
+    the agent's own read tools, the platform's default data class, a small budget and timeout."""
+    from z_common.models.enums import Autonomy
+    from z_common.models.manifests import MissionPlan, PlanStep
+
+    from z_server.api.routes_missions import mission_out  # routes_missions imports this module
+    from z_server.missions import service
+
+    agent = await find_agent(ctx, id)
+    ctx.require("agents:write", agent.owner_team_id)
+    title = f"{TRIAL_PREFIX}{agent.display_name}"[:200]
+    request = service.MissionRequest(
+        title=title,
+        prompt=body.prompt,
+        playbook=None,
+        inputs=body.inputs or {},
+        plan=MissionPlan(steps=[PlanStep(id="trial", agent=agent.name, prompt=body.prompt)]),
+        connectors=[],
+        data_class=None,  # the platform default
+        autonomy=Autonomy.read_only,
+        plan_first=False,
+        budget=dict(TRIAL_BUDGET),
+        session_id=None,
+        trial_agent=agent.name,
+    )
+    mission = await service.create(ctx.db, ctx.state, ctx.user, request)
+    team = await _team_name(ctx, agent.owner_team_id)
+    await ctx.audit(
+        "mission.created",
+        "mission",
+        mission.id,
+        team=mission.team_id,
+        after={
+            "title": mission.title,
+            "trial_of": agent.name,
+            "data_class": mission.data_class,
+            "autonomy": "read_only",
+        },
+    )
+    await service.start(ctx.db, ctx.state, mission)
+    await ctx.audit("mission.started", "mission", mission.id, team=mission.team_id)
+    await ctx.audit(
+        "agent.tested",
+        "agent",
+        agent.id,
+        team=team,
+        after={"mission": mission.id, "agent_status": agent.status, "prompt_length": len(body.prompt)},
+    )
+    return await mission_out(ctx, mission)
 
 
 @router.operation("listAgentVersions")
