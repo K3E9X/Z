@@ -11,7 +11,8 @@ email (SMTP). Webhook URLs carry their own token, so they are secret references 
 above it the message only says that something waits in Z, with the link. A notification never approves: links
 open Z, where approval needs the Z session (and step-up, four eyes, two approvers as the rules say).
 
-Digests (ADR 0034) use the same outbox and SMTP server, as mails addressed to one person (`DIRECT_KINDS`).
+Digests and the answer to a reply to a Z mail (ADR 0034) use the same outbox and SMTP server, as mails addressed to
+one person (`DIRECT_KINDS`); question mails carry a reply tag when an e-mail channel can receive the reply.
 """
 
 from __future__ import annotations
@@ -60,8 +61,8 @@ KINDS = (
     "connector_unhealthy",
     "breakglass_used",
 )
-# Mails to one person, never to admin targets (ADR 0034).
-DIRECT_KINDS = ("digest",)
+# Mails to one person, never to admin targets (ADR 0034): digests and the answer to a reply to a Z mail.
+DIRECT_KINDS = ("digest", "mail_reply")
 TARGET_KINDS = ("slack", "mattermost", "teams", "webhook", "email")
 MAX_ATTEMPTS = 6
 BATCH = 50
@@ -227,6 +228,7 @@ TITLES = {
     "connector_unhealthy": "Connector unreachable",
     "breakglass_used": "Break-glass sign-in",
     "digest": "Digest",
+    "mail_reply": "Your reply",
 }
 
 
@@ -240,7 +242,7 @@ async def compose(db: AsyncSession, state: AppState, row: NotificationOutbox, ta
     hidden = f"Details are in Z (data class {row.data_class})."
     msg: dict[str, Any] = {"title": TITLES[row.kind], "text": "", "facts": [], "note": "", "link": base}
     msg["link_label"] = "Open in Z"
-    if row.kind in DIRECT_KINDS:  # composed when enqueued, already capped (digests.py)
+    if row.kind in DIRECT_KINDS:  # composed when enqueued, already capped (digests.py, mail_replies.py)
         msg.update(
             {
                 "title": str(p.get("title") or TITLES[row.kind]),
@@ -267,6 +269,13 @@ async def compose(db: AsyncSession, state: AppState, row: NotificationOutbox, ta
         elif row.kind == "question_asked":
             msg["text"] = str(ep.get("text") or "") if shown else hidden
             msg["link_label"] = "Answer in Z"
+            if shown and ep.get("options"):
+                msg["facts"].append(("Options", " / ".join(str(o) for o in ep["options"])))
+            if target.get("kind") == "email" and ep.get("question_id") and await _mail_replies_on(db):
+                from z_server import mail_replies
+
+                msg["reply_tag"] = mail_replies.subject_tag(state.settings.secret_key, str(ep["question_id"]))
+                msg["note"] = "Reply to this e-mail with your answer on the first line, or answer in Z."
         else:
             msg["text"] = title if shown else hidden
             if row.kind == "mission_failed" and ep.get("to"):
@@ -287,6 +296,14 @@ async def compose(db: AsyncSession, state: AppState, row: NotificationOutbox, ta
         msg["note"] = "Every action of this session is audited."
         msg["link"] = f"{base}/history?actor=z-breakglass"
     return msg
+
+
+async def _mail_replies_on(db: AsyncSession) -> bool:
+    """Replies can answer questions only when an e-mail channel receives them (docs/05 §10)."""
+    from z_server.db.models import Channel
+
+    found = await db.execute(select(Channel.id).where(Channel.kind == "email", Channel.enabled.is_(True)).limit(1))
+    return found.first() is not None
 
 
 def _escape(text: str) -> str:
@@ -372,10 +389,9 @@ async def deliver(
                 password = await resolver.resolve(str(smtp["password_ref"]))
             except SecretError as exc:
                 raise DeliveryError("the smtp password reference is unavailable") from exc
+        subject = f"[Z] {msg['title']}" + (f" {msg['reply_tag']}" if msg.get("reply_tag") else "")
         try:
-            await asyncio.to_thread(
-                _send_mail, smtp, password, list(target["to"]), f"[Z] {msg['title']}", plain(msg, "text")
-            )
+            await asyncio.to_thread(_send_mail, smtp, password, list(target["to"]), subject, plain(msg, "text"))
         except (OSError, smtplib.SMTPException) as exc:
             raise DeliveryError(f"smtp: {type(exc).__name__}") from exc
         return

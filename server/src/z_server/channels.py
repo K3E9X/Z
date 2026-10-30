@@ -5,7 +5,8 @@ HMAC for the mail relay), mapped to a Z user (unknown or disallowed people canno
 the judge (channel content is untrusted data), then:
 - chat: a mention of `@agent` (or the channel's default agent) starts a mission as that person, with their
   rights; blocked content becomes a task for a human instead;
-- email: a task with the mail and its attachments, never an automatic start.
+- email: a task with the mail and its attachments, never an automatic start; a reply to a Z mail about a
+  question answers it, with the person's rights (mail_replies.py, ADR 0034).
 Replies go back where the message came from (the slash command answer, the Slack/Teams thread). Approvals
 stay in the Z app; destructive and two-approver actions are never approved from a chat (docs/05 §10).
 """
@@ -30,7 +31,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import DataClass, JudgeVerdict
 
-from z_server import audit, judge
+from z_server import audit, judge, mail_replies
 from z_server.auth import identity
 from z_server.db.models import Agent, Channel, Task, Team, User
 from z_server.errors import Problem
@@ -308,6 +309,9 @@ async def handle(db: AsyncSession, state: AppState, channel: Channel, inbound: I
                 after={"reason": "team not allowed"},
             )
             return Outcome(reply="This channel is not open to your team.")
+    if channel.kind == "email" and (raw := mail_replies.tag_in(inbound.subject)) is not None:
+        # a reply to a Z mail answers the question it names (ADR 0034); every other mail stays a task
+        return Outcome(reply=await mail_replies.answer(db, state, channel, user, principal, raw, inbound.text))
     text = inbound.text.strip()[:MAX_TEXT]
     verdict = judge.scan(
         "\n".join([inbound.subject or "", text, *[str(a.get("name", "")) for a in inbound.attachments]])
