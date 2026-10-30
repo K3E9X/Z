@@ -409,6 +409,28 @@ async def list_skill_versions(ctx: CtxDep, id: str) -> list[m.SkillVersion]:
     ]
 
 
+@router.operation("getSkillVersion")
+async def get_skill_version(ctx: CtxDep, id: str, version: str) -> dict[str, Any]:
+    """One version of a skill with its SKILL.md (SkillVersionDetail), e.g. to diff two versions."""
+    skill = await _skill(ctx, id)
+    row = (
+        await ctx.db.execute(
+            select(SkillVersion).where(SkillVersion.skill_id == skill.id, SkillVersion.version == version)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise Problem("not-found", f"skill {skill.name} has no version {version}")
+    summary = m.SkillVersion(
+        version=row.version,
+        checksum=row.checksum,
+        created_at=row.created_at,
+        created_by=row.created_by,
+        origin=row.origin,
+        proposal_id=row.proposal_id,
+    )
+    return {**summary.dump(), "content": row.content}
+
+
 @router.operation("rollbackSkill")
 async def rollback_skill(ctx: CtxDep, id: str, body: m.SkillRollback) -> m.Skill:
     skill = await _skill(ctx, id)
