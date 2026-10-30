@@ -7,11 +7,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import Response
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from z_common.models import api_identity as m
 
 from z_server import guardrails as platform_guardrails
-from z_server import rbac
+from z_server import maintenance, rbac
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.api.paging import page
 from z_server.api.views import audit_out, session_out, token_out, user_out
@@ -744,3 +745,39 @@ async def admin_test_notification(ctx: CtxDep, body: dict[str, Any]) -> Response
     await ctx.audit("admin.notification_tested", "notification_target", target_id)
     await notifications.send_test(ctx.state, ctx.db, target_id)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- maintenance mode
+
+
+class MaintenanceWrite(BaseModel):
+    """contracts MaintenanceWrite."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool
+    message: str | None = Field(default=None, max_length=500)
+
+
+@router.operation("getMaintenance")
+async def get_maintenance(ctx: CtxDep) -> dict[str, Any]:
+    return await maintenance.read(ctx.db)
+
+
+@router.operation("setMaintenance")
+async def set_maintenance(ctx: CtxDep, body: MaintenanceWrite) -> dict[str, Any]:
+    before = await maintenance.read(ctx.db)
+    after = await maintenance.write(ctx.db, body.enabled, (body.message or "").strip() or None, ctx.user.username)
+    await ctx.audit(
+        "admin.maintenance_on" if after["enabled"] else "admin.maintenance_off",
+        "maintenance",
+        None,
+        before=before,
+        after=after,
+    )
+
+    async def _forget() -> None:
+        maintenance.forget(ctx.state)
+
+    ctx.after_commit.append(_forget)
+    maintenance.forget(ctx.state)
+    return after

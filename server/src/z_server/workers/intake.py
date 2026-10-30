@@ -1,5 +1,6 @@
 """Intake loop (docs/05 §11): fires due schedule triggers, polls Jira for labelled issues, and checks due
-objectives (docs/04 §3), including those whose cadence is an event that just fired.
+objectives (docs/04 §3), including those whose cadence is an event that just fired. In maintenance mode it
+does nothing: due schedules, labelled issues and objectives are handled once it ends.
 
 Jira: every `interval_s` (default 300) the trigger searches `project = <p> AND labels = "<label>"` (or its own
 `jql`) with the connector's read account, newest first, and creates one task per issue it has not seen.
@@ -13,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from z_server import objectives
+from z_server import maintenance, objectives
 from z_server.db.models import Connector, Operation, Trigger
 from z_server.gateway.core import shape
 from z_server.intake import service as intake
@@ -26,7 +27,9 @@ JIRA_DEFAULT_INTERVAL_S = 300
 
 async def fire_schedules(state: AppState, at: datetime | None = None) -> list[str]:
     now = at or datetime.now(UTC)
-    fired = []
+    fired: list[str] = []
+    if (await maintenance.current(state))["enabled"]:
+        return fired  # due schedules fire once when maintenance ends (next_fire_at is left as it is)
     async with state.sessions() as db, db.begin():
         due = list(
             (
@@ -59,6 +62,8 @@ async def fire_schedules(state: AppState, at: datetime | None = None) -> list[st
 async def poll_jira(state: AppState, at: datetime | None = None) -> list[str]:
     now = at or datetime.now(UTC)
     created: list[str] = []
+    if (await maintenance.current(state))["enabled"]:
+        return created  # labelled issues are picked up when maintenance ends
     async with state.sessions() as db:
         triggers = list(
             (await db.execute(select(Trigger).where(Trigger.kind == "jira", Trigger.enabled.is_(True)))).scalars()
@@ -108,7 +113,8 @@ async def run_forever(state: AppState, interval_s: float = 30.0) -> None:
         try:
             fired = await fire_schedules(state)
             created = await poll_jira(state)
-            await objectives.tick(state)
+            if not (await maintenance.current(state))["enabled"]:  # objectives are checked when it ends
+                await objectives.tick(state)
             if fired:
                 await objectives.on_event(state, "schedule")
             if created:

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from z_common.models import api_identity as m
 
-from z_server import audit
+from z_server import audit, maintenance
 from z_server.api.framework import API_PREFIX, CSRF_COOKIE, SESSION_COOKIE, ContractRouter, Ctx, CtxDep
 from z_server.api.views import session_out, token_out, user_out
 from z_server.auth import gitlab, identity, local
@@ -367,6 +367,9 @@ async def _me(ctx: Ctx, *, principal_user: User, principal: Any, session: AuthSe
                 text=BANNERS[principal_user.local_kind],
             )
         )
+    switch = await maintenance.current(ctx.state)
+    if switch["enabled"]:
+        banners.append(m.Banner(kind="maintenance", text=maintenance.text(switch)))
     workspace = ctx.state.config.get("workspace", {})
     expires = session.expires_at if session else identity.now() + timedelta(hours=12)
     return m.Me(

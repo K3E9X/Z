@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import TERMINAL_JOB, Autonomy, DataClass, JobStatus, MissionStatus, StepStatus
 from z_common.models.manifests import MissionPlan, PlanStep, StepJobs
 
-from z_server import audit, events
+from z_server import audit, events, maintenance
 from z_server.db.models import Agent, AgentVersion, Job, Mission, Playbook, ProposedAction, Question, Team
 from z_server.errors import Problem
 from z_server.ids import new_id
@@ -211,6 +211,7 @@ async def start(db: AsyncSession, state: AppState, mission: Mission) -> None:
         raise Problem("conflict", f"mission is {mission.status}")
     from z_server import usage
 
+    await maintenance.refuse_starts(db)
     await usage.check_start(
         db, mission, utcnow(), int(state.config.get("budgets", {}).get("org_monthly_tokens") or 0) or None
     )
@@ -345,6 +346,7 @@ REOPENABLE = {MissionStatus.failed.value, MissionStatus.timed_out.value}
 async def retry_job(db: AsyncSession, state: AppState, mission: Mission, job: Job) -> None:
     """A new attempt from the last checkpoint. A mission that failed because of this job is reopened with a new
     model key (the old one was deleted when it ended)."""
+    await maintenance.refuse_starts(db)
     if MissionStatus(mission.status).terminal:
         if mission.status not in REOPENABLE:
             raise Problem("conflict", f"mission is {mission.status}")

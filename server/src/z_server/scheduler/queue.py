@@ -9,6 +9,7 @@
 - Lease: every runner call extends it. An expired lease means the runner died: the job is re-queued with
   attempt+1 and `resume_from_step` = its last checkpoint (backoff), or failed after `max_attempts`.
 - Deadlines: a running job past `deadline_at` ends `timed_out`; a mission past its deadline too.
+- Maintenance mode: nothing is claimed while it is on (queued jobs wait); the watchdog keeps supervising.
 - Restart: a job requeued with its runner still referenced (take-over) is not claimed until `reap` has stopped
   that runner.
 """
@@ -27,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JobStatus, MissionStatus
 from z_common.redaction import Redactor
 
-from z_server import usage
+from z_server import maintenance, usage
 from z_server.crypto import new_token, token_hash
 from z_server.db.models import Job, Mission
 from z_server.executors import Executor, ExecutorError
@@ -89,6 +90,8 @@ async def claim(state: AppState, worker: str) -> list[tuple[str, dict[str, str]]
         # one claim at a time across replicas, so the global, mission and fan-out caps hold (each replica would
         # otherwise count the same running jobs and both start up to the cap)
         await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": CLAIM_LOCK_KEY})
+        if (await maintenance.read(db))["enabled"]:
+            return out  # maintenance mode: queued jobs wait, running ones finish
         running = (
             await db.execute(select(Job.mission_id, Job.step_id).where(Job.status == JobStatus.running.value))
         ).all()

@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from z_common.models.enums import JudgeVerdict
 
-from z_server import audit, judge
+from z_server import audit, judge, maintenance
 from z_server.auth import identity
 from z_server.db.models import Playbook, Task, Trigger, User
 from z_server.errors import Problem
@@ -189,6 +189,8 @@ async def fire(
     principal = await identity.build_principal(db, owner, state.config_auth, kind="trigger")
     if not principal.can("missions:start", (principal.teams and sorted(principal.teams)[0]) or None):
         return Fired(task, None, "not started: the trigger owner cannot start missions")
+    if (await maintenance.read(db))["enabled"]:
+        return Fired(task, None, "not started: maintenance mode is on")
     try:
         inputs = render_value(
             trigger.inputs or {}, {"event": event, "trigger": {"id": trigger.id, "name": trigger.name}}
