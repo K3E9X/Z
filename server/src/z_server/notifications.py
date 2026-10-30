@@ -10,6 +10,8 @@ email (SMTP). Webhook URLs carry their own token, so they are secret references 
 (summaries, questions, mission titles) is sent only up to the target's `content_up_to` data class (default C1);
 above it the message only says that something waits in Z, with the link. A notification never approves: links
 open Z, where approval needs the Z session (and step-up, four eyes, two approvers as the rules say).
+
+Digests (ADR 0034) use the same outbox and SMTP server, as mails addressed to one person (`DIRECT_KINDS`).
 """
 
 from __future__ import annotations
@@ -58,6 +60,8 @@ KINDS = (
     "connector_unhealthy",
     "breakglass_used",
 )
+# Mails to one person, never to admin targets (ADR 0034).
+DIRECT_KINDS = ("digest",)
 TARGET_KINDS = ("slack", "mattermost", "teams", "webhook", "email")
 MAX_ATTEMPTS = 6
 BATCH = 50
@@ -78,7 +82,7 @@ def enqueue(
     event_seq: int | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    if kind not in KINDS:
+    if kind not in KINDS and kind not in DIRECT_KINDS:
         raise ValueError(f"unknown notification kind {kind}")
     db.add(
         NotificationOutbox(
@@ -130,15 +134,21 @@ async def _personal(db: AsyncSession, row: NotificationOutbox) -> tuple[str, dic
     """(delivery id, email target) for the mission owner's own preferences, when they want this kind."""
     from z_server.db.models import User
 
-    if row.mission_id is None or row.kind not in PERSONAL_KINDS:
-        return None
-    mission = await db.get(Mission, row.mission_id)
-    if mission is None or not mission.created_by:
-        return None
-    prefs = await personal_prefs(db, mission.created_by)
-    if not prefs["enabled"] or row.kind not in prefs["events"]:
-        return None
-    user = await db.get(User, mission.created_by)
+    if row.kind in DIRECT_KINDS:  # addressed to one person; a digest only while they still want email
+        user_id = str((row.payload or {}).get("user_id") or "")
+        if not user_id or (row.kind == "digest" and not (await personal_prefs(db, user_id))["enabled"]):
+            return None
+    else:
+        if row.mission_id is None or row.kind not in PERSONAL_KINDS:
+            return None
+        mission = await db.get(Mission, row.mission_id)
+        if mission is None or not mission.created_by:
+            return None
+        prefs = await personal_prefs(db, mission.created_by)
+        if not prefs["enabled"] or row.kind not in prefs["events"]:
+            return None
+        user_id = mission.created_by
+    user = await db.get(User, user_id)
     if user is None or not user.email or "\n" in user.email or user.status != "active":
         return None
     return f"user:{user.id}", {
@@ -216,6 +226,7 @@ TITLES = {
     "budget_alert": "Budget alert",
     "connector_unhealthy": "Connector unreachable",
     "breakglass_used": "Break-glass sign-in",
+    "digest": "Digest",
 }
 
 
@@ -229,6 +240,18 @@ async def compose(db: AsyncSession, state: AppState, row: NotificationOutbox, ta
     hidden = f"Details are in Z (data class {row.data_class})."
     msg: dict[str, Any] = {"title": TITLES[row.kind], "text": "", "facts": [], "note": "", "link": base}
     msg["link_label"] = "Open in Z"
+    if row.kind in DIRECT_KINDS:  # composed when enqueued, already capped (digests.py)
+        msg.update(
+            {
+                "title": str(p.get("title") or TITLES[row.kind]),
+                "text": str(p.get("text") or ""),
+                "facts": [(str(k), str(v)) for k, v in p.get("facts") or []],
+                "note": str(p.get("note") or ""),
+                "link": str(p.get("link") or base),
+                "link_label": str(p.get("link_label") or "Open in Z"),
+            }
+        )
+        return msg
     if row.mission_id:
         mission = await db.get(Mission, row.mission_id)
         event = await db.get(Event, (row.mission_id, row.event_seq)) if row.event_seq is not None else None

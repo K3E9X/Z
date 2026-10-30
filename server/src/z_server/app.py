@@ -133,6 +133,7 @@ def create_app(
             from z_server.workers import (
                 audit,
                 channels,
+                digests,
                 health,
                 identity,
                 intake,
@@ -152,6 +153,7 @@ def create_app(
                 asyncio.create_task(channels.run_forever(state), name="channels"),
                 asyncio.create_task(audit.run_forever(state), name="audit"),
                 asyncio.create_task(notifications.run_forever(state), name="notifications"),
+                asyncio.create_task(digests.run_forever(state), name="digests"),
                 asyncio.create_task(retention.run_forever(state), name="retention"),
             ]
         try:
