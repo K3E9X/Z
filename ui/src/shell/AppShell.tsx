@@ -24,7 +24,8 @@ function LiveBanner() {
   )
 }
 
-function AccountBanners() {
+/** Banners of GET /me: local account, break-glass, maintenance mode, budget. */
+export function AccountBanners() {
   const me = useCurrentMe()
   if (me.banners.length === 0) return null
   return (
@@ -37,7 +38,16 @@ function AccountBanners() {
             b.kind === 'breakglass' ? 'bg-err-bg text-err' : 'bg-wait-bg text-wait'
           }`}
         >
-          <Icon name={b.kind === 'local_account' || b.kind === 'breakglass' ? 'key' : 'bell'} size={12} />
+          <Icon
+            name={
+              b.kind === 'local_account' || b.kind === 'breakglass'
+                ? 'key'
+                : b.kind === 'maintenance'
+                  ? 'pause'
+                  : 'bell'
+            }
+            size={12}
+          />
           {b.text}
         </div>
       ))}

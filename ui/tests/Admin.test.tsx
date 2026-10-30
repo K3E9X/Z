@@ -45,11 +45,11 @@ describe('Admin', () => {
     expect(visibleNav(NAV, auditor()).map((n) => n.label)).toContain('Admin')
   })
 
-  it('shows Notifications to guardrails:manage and Teams read-only without teams:manage', async () => {
+  it('shows Notifications and Platform to guardrails:manage, and Teams read-only without teams:manage', async () => {
     const me = makeMe(['guardrails:manage', 'teams:read'])
     await renderRoute('/admin', '/admin?tab=teams', Admin, { me, others: ['/history', '/settings'] })
     expect(await screen.findByText('secops')).toBeInTheDocument()
-    expect(tabs()).toEqual(['Teams', 'Notifications'])
+    expect(tabs()).toEqual(['Teams', 'Notifications', 'Platform'])
     expect(screen.queryByRole('button', { name: 'New team' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
   })

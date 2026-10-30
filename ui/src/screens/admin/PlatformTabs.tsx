@@ -3,13 +3,13 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, unwrap } from '@/api/client'
 import { isNotServed } from '@/api/problem'
-import { qk, useAgents, useChannels, useGuardrails, useTeams } from '@/api/queries'
-import type { AuditVerify, AuthSettings } from '@/api/types'
+import { qk, useAgents, useChannels, useGuardrails, useMaintenance, useTeams } from '@/api/queries'
+import type { AuditVerify, AuthSettings, Maintenance } from '@/api/types'
 import { Dialog } from '@/components/Dialog'
 import { NotServed, QueryState } from '@/components/states'
 import { Dot } from '@/components/StatusMark'
 import { useToast } from '@/components/toast'
-import { Button, Checkbox, DefList, Field, Input, Select } from '@/components/ui'
+import { Button, Checkbox, DefList, Field, Input, Select, Textarea, Toggle } from '@/components/ui'
 import { dateTime, relative, titleCase } from '@/lib/format'
 import { useCan } from '@/lib/auth'
 import { StepUpCancelled, useStepUp } from '@/shell/stepup'
@@ -764,6 +764,87 @@ function ChannelDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
+/** Maintenance mode (docs/12 §3): while on, no mission or job starts and everyone signed in sees the message. */
+function MaintenanceSection() {
+  const canRead = useCan('guardrails:read')
+  const canManage = useCan('guardrails:manage')
+  const q = useMaintenance(canRead || canManage)
+  const qc = useQueryClient()
+  const [draft, setDraft] = useState<{ enabled: boolean; message: string } | null>(null)
+  if (!canRead && !canManage) return null
+  const saved = q.data ? { enabled: q.data.enabled, message: q.data.message ?? '' } : null
+  const s = draft ?? saved
+  const state = (m: Maintenance) =>
+    m.enabled
+      ? `On${m.since ? ` since ${relative(m.since)}` : ''}${m.by ? ` · turned on by ${m.by}` : ''}`
+      : 'Off'
+  return (
+    <section aria-label="Maintenance mode" className="flex flex-col gap-2">
+      <h3 className="m-0 text-[15px] font-semibold">Maintenance mode</h3>
+      <QueryState query={q} what="Maintenance mode" endpoint="GET /admin/maintenance" compact>
+        {() =>
+          !q.data || !saved || !s ? null : (
+            <div className="flex flex-col gap-3">
+              {draft && (
+                <PendingChange
+                  title="Maintenance mode"
+                  before={saved}
+                  after={draft}
+                  onDiscard={() => setDraft(null)}
+                  onSave={async () => {
+                    const out = await unwrap(
+                      api.PUT('/admin/maintenance', {
+                        body: { enabled: draft.enabled, message: draft.message.trim() },
+                      }),
+                    )
+                    qc.setQueryData(qk.maintenance, out)
+                    // The banner every signed-in user sees comes with GET /me.
+                    await qc.invalidateQueries({ queryKey: qk.me })
+                    setDraft(null)
+                  }}
+                />
+              )}
+              <div className="flex items-center gap-3 text-ui">
+                {canManage ? (
+                  <Toggle
+                    checked={s.enabled}
+                    onChange={(v) => setDraft({ ...s, enabled: v })}
+                    label="Maintenance mode"
+                  />
+                ) : (
+                  <Dot tone={q.data.enabled ? 'wait' : 'idle'} />
+                )}
+                <span className={q.data.enabled ? 'text-wait' : ''}>{state(q.data)}</span>
+              </div>
+              {canManage ? (
+                <Field label="Message shown to everyone" hint="Up to 500 characters.">
+                  {(id, d) => (
+                    <Textarea
+                      id={id}
+                      aria-describedby={d}
+                      rows={2}
+                      maxLength={500}
+                      value={s.message}
+                      onChange={(e) => setDraft({ ...s, message: e.target.value })}
+                      placeholder="Z is being upgraded. New missions start again at 14:00."
+                    />
+                  )}
+                </Field>
+              ) : (
+                q.data.message && <p className="m-0 text-ui text-text-2">“{q.data.message}”</p>
+              )}
+              <p className="m-0 text-meta text-text-3">
+                While it is on, no mission or job starts; running jobs finish. Everyone signed in sees the
+                message.{canManage ? '' : ' Changing it needs the guardrails:manage permission.'}
+              </p>
+            </div>
+          )
+        }
+      </QueryState>
+    </section>
+  )
+}
+
 export function PlatformTab() {
   const canChannels = useCan('connectors:manage')
   const guardrails = useGuardrails()
@@ -816,6 +897,7 @@ export function PlatformTab() {
           Budgets, providers and the routing policy live in <Link to="/inference">Inference and usage</Link>.
         </p>
       </section>
+      <MaintenanceSection />
       <section aria-label="Channels" className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h3 className="m-0 text-[15px] font-semibold">Channels</h3>
@@ -879,8 +961,7 @@ export function PlatformTab() {
           <NotServed what="The health summary" endpoint="GET /healthz through the UI origin" compact />
         )}
         <p className="m-0 text-meta text-text-3">
-          Retention per data class is set in config/z.yaml (retention.*) and applied hourly. There is no
-          maintenance mode yet.
+          Retention per data class is set in config/z.yaml (retention.*) and applied hourly.
         </p>
       </section>
       {adding && <ChannelDialog onClose={() => setAdding(false)} />}

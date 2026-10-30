@@ -29,7 +29,8 @@ const TABS: { id: Tab; label: string; anyOf: PermissionName[] }[] = [
   // audit settings: users:manage; chain verification: audit:export
   { id: 'audit', label: 'Audit log', anyOf: ['users:manage', 'audit:export'] },
   { id: 'notifications', label: 'Notifications', anyOf: ['guardrails:manage'] },
-  { id: 'platform', label: 'Platform', anyOf: ['users:manage'] },
+  // maintenance mode: guardrails:manage
+  { id: 'platform', label: 'Platform', anyOf: ['users:manage', 'guardrails:manage'] },
 ]
 /** The bootstrap admin only sees Sign-in and Group mapping (docs/12 §1). */
 const BOOTSTRAP_TABS: Tab[] = ['signin', 'mapping']

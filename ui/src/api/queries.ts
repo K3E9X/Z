@@ -76,6 +76,7 @@ export const qk = {
   analytics: (params: Record<string, unknown>) => ['analytics', params] as const,
   audit: (params: Record<string, unknown>) => ['audit', params] as const,
   guardrails: ['guardrails'] as const,
+  maintenance: ['maintenance'] as const,
   teams: ['teams'] as const,
   admin: {
     users: (params: Record<string, unknown>) => ['admin', 'users', params] as const,
@@ -502,6 +503,14 @@ export function useAudit(params: AuditParams, cursor?: string) {
 
 export function useGuardrails() {
   return useQuery({ queryKey: qk.guardrails, queryFn: () => unwrap(api.GET('/settings/guardrails')) })
+}
+
+export function useMaintenance(enabled = true) {
+  return useQuery({
+    queryKey: qk.maintenance,
+    queryFn: () => unwrap(api.GET('/admin/maintenance')),
+    enabled,
+  })
 }
 
 export function useTeams(enabled = true) {
