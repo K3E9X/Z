@@ -68,9 +68,13 @@ z agents create --describe "an agent that keeps our Jira SECOPS backlog clean"
 z objectives [list|show|add|pause] --agent @vega
 z assign @vega jira_project:SECOPS group:infra/
 z connect m365                            # personal delegated connection to Microsoft 365 (browser opens)
-z skills [list|show|versions|rollback <skill> --to <version>]   # diff: not built yet
-z playbooks [list|show|run]                 # save-from <mission>: not built yet (API: POST /missions/{id}/save-as-playbook)
-z connectors [list|show|operations|test <name>|approve-exposure|set-operation]   # import, record-browser: not built yet (web: Connector builder, Browser recorder)
+z skills [list|show|versions|rollback <skill> --to <version>]
+z skills diff <skill> [--from V] [--to V]   # unified diff of two versions' SKILL.md (default: previous -> current)
+z playbooks [list|show|run]
+z playbooks save-from <mission> --name <slug> [--title …] [--domain …]   # the mission's plan becomes a playbook
+z connectors [list|show|operations|test <name>|approve-exposure|set-operation]
+z connectors import <file|url> [--kind openapi|graphql|mcp|docs|cli|browser] [--name …]   # a draft: nothing saved or exposed
+z connectors record-browser <connector> [--start-url …] [--follow]   # starts a recording, prints its web app URL (you record there)
 z usage --by agent|model|mission|team --since 7d
 z inference status
 z eval <agent|skill> --models z-fast,z-heavy
