@@ -1,11 +1,10 @@
 """End to end on the compose stack (marker e2e): z-server all -> z-socket-proxy -> runner container ->
 LiteLLM -> fake LLM. Start the stack first (see compose.e2e.yml), then: uv run pytest -m e2e tests/e2e.
-Without a stack the tests skip, except in CI (CI or Z_E2E_REQUIRED set), where they fail."""
+Without a stack the tests skip, except in CI (CI or Z_E2E_REQUIRED set), where they fail (conftest.py)."""
 
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -15,9 +14,9 @@ import httpx
 import pytest
 import yaml
 
+from tests.e2e.stack import LLM
+
 pytestmark = pytest.mark.e2e
-Z = os.environ.get("Z_E2E_URL", "http://127.0.0.1:8000")  # z-server (the web app is z-ui on :8080)
-LLM = os.environ.get("Z_E2E_LLM_URL", "http://127.0.0.1:8090")
 LITELLM_CONFIG = Path(__file__).resolve().parents[2] / "config" / "litellm.yaml"  # mounted into the litellm container
 
 
@@ -37,18 +36,6 @@ SUMMARY = {
 
 def step(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return {"tool_calls": [{"name": name, "arguments": arguments}]}
-
-
-@pytest.fixture(scope="module")
-def api() -> httpx.Client:
-    try:
-        httpx.get(f"{Z}/readyz", timeout=3).raise_for_status()
-    except httpx.HTTPError as exc:
-        # in CI the stack was started by the job: an unreachable z-server is a failure, not a reason to skip
-        if os.environ.get("CI") or os.environ.get("Z_E2E_REQUIRED"):
-            pytest.fail(f"compose stack not ready at {Z}/readyz: {exc}")
-        pytest.skip("compose stack not running")
-    return httpx.Client(base_url=f"{Z}/api/v1", timeout=30)
 
 
 def wait(api: httpx.Client, mission_id: str, until: set[str], timeout_s: float = 240) -> dict[str, Any]:

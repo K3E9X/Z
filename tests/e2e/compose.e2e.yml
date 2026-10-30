@@ -19,3 +19,12 @@ services:
       JIRA_READ_TOKEN: ro-jira
       JIRA_WRITE_EMAIL: z-write@example.test
       JIRA_WRITE_TOKEN: rw-jira
+      DEFECTDOJO_URL: http://fake-tools:8091/defectdojo
+      DEFECTDOJO_TOKEN_RO: ro-defectdojo
+      CMDB_URL: http://fake-tools:8091/cmdb
+      CMDB_TOKEN_RO: ro-cmdb
+      LOGOS_URL: http://fake-tools:8091/logos
+      LOGOS_TOKEN_RO: ro-logos
+      LOGOS_TOKEN_RW: rw-logos
+      # the local test accounts of config/z.example.yaml (non-production only): an operator and a team approver
+      Z_TEST_ACCOUNT_PASSWORDS: tester=e2e-tester-e2e-tester;tester-approver=e2e-approver-e2e-approver
