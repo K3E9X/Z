@@ -45,6 +45,7 @@ export const qk = {
   skills: (params: Record<string, unknown> = {}) => ['skills', params] as const,
   skill: (id: string) => ['skill', id] as const,
   skillVersions: (id: string) => ['skill', id, 'versions'] as const,
+  skillVersion: (id: string, version: string) => ['skill', id, 'versions', version] as const,
   playbooks: (params: Record<string, unknown> = {}) => ['playbooks', params] as const,
   playbook: (id: string) => ['playbook', id] as const,
   tasks: ['tasks'] as const,
@@ -272,6 +273,19 @@ export function useSkillVersions(id: string | null) {
     queryKey: qk.skillVersions(id ?? ''),
     queryFn: () => unwrap(api.GET('/skills/{id}/versions', { params: { path: { id: id ?? '' } } })),
     enabled: !!id,
+  })
+}
+
+export function useSkillVersion(id: string, version: string | null) {
+  return useQuery({
+    queryKey: qk.skillVersion(id, version ?? ''),
+    queryFn: () =>
+      unwrap(
+        api.GET('/skills/{id}/versions/{version}', { params: { path: { id, version: version ?? '' } } }),
+      ),
+    enabled: !!version,
+    // A version never changes once written.
+    staleTime: Infinity,
   })
 }
 

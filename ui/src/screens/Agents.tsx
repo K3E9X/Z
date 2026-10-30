@@ -13,6 +13,7 @@ import {
   useObjectives,
   useSkill,
   useSkills,
+  useSkillVersion,
   useSkillVersions,
 } from '@/api/queries'
 import type { Agent, AgentProfile, MemoryFact, Skill } from '@/api/types'
@@ -466,6 +467,81 @@ function ProfileTab({ agent }: { agent: Agent }) {
   )
 }
 
+/** Diff of the SKILL.md of two versions (GET /skills/{id}/versions/{version}). */
+function SkillCompare({
+  id,
+  versions,
+  from,
+  to,
+  onChange,
+  onClose,
+}: {
+  id: string
+  versions: string[]
+  from: string
+  to: string
+  onChange: (from: string, to: string) => void
+  onClose: () => void
+}) {
+  const a = useSkillVersion(id, from)
+  const b = useSkillVersion(id, to)
+  const failed = a.error ?? b.error
+  return (
+    <section
+      aria-label="Compare versions"
+      className="flex flex-col gap-3 rounded-panel border border-line px-4 py-3.5"
+    >
+      <div className="flex flex-wrap items-center gap-2 text-ui">
+        <span className="font-medium">Compare</span>
+        <Select
+          aria-label="From version"
+          value={from}
+          onChange={(e) => onChange(e.target.value, to)}
+          className="w-[120px] font-mono"
+        >
+          {versions.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </Select>
+        <span className="text-text-3">→</span>
+        <Select
+          aria-label="To version"
+          value={to}
+          onChange={(e) => onChange(from, e.target.value)}
+          className="w-[120px] font-mono"
+        >
+          {versions.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </Select>
+        <span className="flex-1" />
+        <Button size="xs" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+      {failed ? (
+        <QueryState
+          query={{ isPending: false, error: failed }}
+          what="Skill version"
+          endpoint="GET /skills/{id}/versions/{version}"
+        >
+          {() => null}
+        </QueryState>
+      ) : !a.data || !b.data ? (
+        <Skeleton className="h-24" />
+      ) : from === to ? (
+        <span className="text-meta text-text-3">Choose two different versions.</span>
+      ) : (
+        <DiffViewer files={diffTexts('SKILL.md', a.data.content, b.data.content)} maxHeight={360} />
+      )}
+    </section>
+  )
+}
+
 function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const skill = useSkill(id)
   const versions = useSkillVersions(id)
@@ -473,6 +549,17 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
+  const [compare, setCompare] = useState<{ from: string; to: string } | null>(null)
+  const versionList = (versions.data ?? []).map((v) => v.version)
+  /** Compare a version with the current one (or, for the current one, with the version before it). */
+  const startCompare = (v: string) => {
+    const current = skill.data?.version ?? versionList[0] ?? v
+    if (v !== current) setCompare({ from: v, to: current })
+    else {
+      const i = versionList.indexOf(v)
+      setCompare({ from: versionList[i + 1] ?? versionList[i - 1] ?? v, to: v })
+    }
+  }
   const rollback = async (v: string) => {
     setBusy(v)
     try {
@@ -527,6 +614,16 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                         {v.created_by ? ` · ${v.created_by}` : ''}
                       </span>
                       <span className="flex-1" />
+                      {versionList.length > 1 && (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          aria-label={`Compare ${v.version}`}
+                          onClick={() => startCompare(v.version)}
+                        >
+                          Compare
+                        </Button>
+                      )}
                       {v.version === skill.data?.version ? (
                         <span className="text-meta text-ok">current</span>
                       ) : (
@@ -546,6 +643,16 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
               )}
             </QueryState>
           </section>
+          {compare && (
+            <SkillCompare
+              id={id}
+              versions={versionList}
+              from={compare.from}
+              to={compare.to}
+              onChange={(from, to) => setCompare({ from, to })}
+              onClose={() => setCompare(null)}
+            />
+          )}
         </div>
       )}
     </Dialog>
