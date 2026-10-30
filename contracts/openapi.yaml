@@ -1823,6 +1823,40 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /agents/{id}/test:
+    post:
+      operationId: testAgent
+      tags:
+      - agents
+      summary: Try an agent on a sample mission, read-only
+      x-permission: agents:write
+      x-owner: B1
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTest'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /agents/{id}/versions:
     get:
       operationId: listAgentVersions
@@ -1982,6 +2016,38 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SkillVersion'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /skills/{id}/versions/{version}:
+    get:
+      operationId: getSkillVersion
+      tags:
+      - skills
+      summary: One version of a skill with its content
+      x-permission: skills:read
+      x-owner: B1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillVersionDetail'
         default:
           description: Problem details
           content:
@@ -2919,6 +2985,79 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ApproveExposure'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connector'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /connectors/{id}/credentials/{purpose}:
+    put:
+      operationId: setConnectorCredential
+      tags:
+      - connectors
+      summary: Type a connector secret (read or write) in the web app; sealed, never returned
+      x-permission: connectors:manage
+      x-owner: B3
+      x-audit: true
+      x-step-up: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: purpose
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialValue'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connector'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: clearConnectorCredential
+      tags:
+      - connectors
+      summary: 'Forget a typed secret: the connector uses its manifest reference again'
+      x-permission: connectors:manage
+      x-owner: B3
+      x-audit: true
+      x-step-up: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: purpose
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: OK
@@ -3986,6 +4125,129 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/maintenance:
+    get:
+      operationId: getMaintenance
+      tags:
+      - admin
+      summary: Maintenance mode
+      x-permission: guardrails:read
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Maintenance'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      operationId: setMaintenance
+      tags:
+      - admin
+      summary: Turn maintenance mode on or off
+      x-permission: guardrails:manage
+      x-owner: B1
+      x-audit: true
+      x-step-up: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceWrite'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Maintenance'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /me/audit-searches:
+    get:
+      operationId: listAuditSearches
+      tags:
+      - audit
+      summary: My saved audit log searches
+      x-permission: audit:read
+      x-owner: B1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditSearch'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      operationId: createAuditSearch
+      tags:
+      - audit
+      summary: Save an audit log search
+      x-permission: audit:read
+      x-owner: B1
+      x-audit: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditSearchWrite'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditSearch'
+        default:
+          description: Problem details
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /me/audit-searches/{id}:
+    delete:
+      operationId: deleteAuditSearch
+      tags:
+      - audit
+      summary: Delete a saved audit log search
+      x-permission: audit:read
+      x-owner: B1
+      x-audit: true
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
         default:
           description: Problem details
           content:
@@ -7068,6 +7330,61 @@ components:
       required:
       - to_version
       additionalProperties: false
+    SkillVersionDetail:
+      type: object
+      properties:
+        version:
+          $ref: common.schema.json#/$defs/SemVer
+        checksum: *id001
+        created_at: *id005
+        created_by:
+          oneOf:
+          - *id001
+          - type: 'null'
+        origin: *id001
+        proposal_id:
+          oneOf:
+          - *id001
+          - type: 'null'
+        content:
+          type: string
+          description: The SKILL.md of this version.
+      required:
+      - version
+      - checksum
+      - created_at
+      - origin
+      - content
+      additionalProperties: false
+    AgentTest:
+      type: object
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        inputs:
+          type: object
+      required:
+      - prompt
+      additionalProperties: false
+      description: A read-only trial mission with this agent (it may be disabled, so a new agent is tried before it is offered to anyone); no write is ever proposed.
+    CredentialValue:
+      type: object
+      properties:
+        value:
+          type: string
+          minLength: 1
+          maxLength: 16384
+          writeOnly: true
+        username:
+          type: string
+          maxLength: 255
+          description: 'For basic auth: the account the secret belongs to.'
+      required:
+      - value
+      additionalProperties: false
+      description: A connector secret typed in the web app. It is sealed with the platform key and never returned.
     PlaybookServerFields:
       type: object
       properties:
@@ -9294,6 +9611,85 @@ components:
       - created_at
       additionalProperties: false
       description: 'An approved memory fact (invariant 14: deactivating one is versioned and reversible).'
+    Maintenance:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        message:
+          oneOf:
+          - *id001
+          - type: 'null'
+        since:
+          oneOf:
+          - *id005
+          - type: 'null'
+        by:
+          oneOf:
+          - *id001
+          - type: 'null'
+      required:
+      - enabled
+      additionalProperties: false
+      description: While on, no mission or job starts (running jobs finish) and every signed-in user sees the message.
+    MaintenanceWrite:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        message:
+          type: string
+          maxLength: 500
+      required:
+      - enabled
+      additionalProperties: false
+    AuditSearch:
+      type: object
+      properties:
+        id: *id004
+        name: *id001
+        filters:
+          type: object
+          properties:
+            actor: *id001
+            action: *id001
+            target_type: *id001
+            target_id: *id001
+            result: *id001
+            ip: *id001
+            from: *id005
+            to: *id005
+          additionalProperties: false
+        created_at: *id005
+      required:
+      - id
+      - name
+      - filters
+      - created_at
+      additionalProperties: false
+    AuditSearchWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        filters:
+          type: object
+          properties:
+            actor: *id001
+            action: *id001
+            target_type: *id001
+            target_id: *id001
+            result: *id001
+            ip: *id001
+            from: *id005
+            to: *id005
+          additionalProperties: false
+      required:
+      - name
+      - filters
+      additionalProperties: false
     MemoryFactChange:
       type: object
       properties:

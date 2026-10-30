@@ -854,6 +854,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try an agent on a sample mission, read-only */
+        post: operations["testAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/{id}/versions": {
         parameters: {
             query?: never;
@@ -931,6 +948,23 @@ export interface paths {
         };
         /** Skill versions */
         get: operations["listSkillVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skills/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One version of a skill with its content */
+        get: operations["getSkillVersion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1286,6 +1320,24 @@ export interface paths {
         /** Confirm which operations agents may see */
         post: operations["approveExposure"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connectors/{id}/credentials/{purpose}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Type a connector secret (read or write) in the web app; sealed, never returned */
+        put: operations["setConnectorCredential"];
+        post?: never;
+        /** Forget a typed secret: the connector uses its manifest reference again */
+        delete: operations["clearConnectorCredential"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1823,6 +1875,59 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Maintenance mode */
+        get: operations["getMaintenance"];
+        /** Turn maintenance mode on or off */
+        put: operations["setMaintenance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/audit-searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My saved audit log searches */
+        get: operations["listAuditSearches"];
+        put?: never;
+        /** Save an audit log search */
+        post: operations["createAuditSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/audit-searches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a saved audit log search */
+        delete: operations["deleteAuditSearch"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3102,6 +3207,27 @@ export interface components {
             to_version: components["schemas"]["SemVer"];
             reason?: string;
         };
+        SkillVersionDetail: {
+            version: components["schemas"]["SemVer"];
+            checksum: string;
+            created_at: components["schemas"]["Timestamp"];
+            created_by?: string | null;
+            origin: string;
+            proposal_id?: string | null;
+            /** @description The SKILL.md of this version. */
+            content: string;
+        };
+        /** @description A read-only trial mission with this agent (it may be disabled, so a new agent is tried before it is offered to anyone); no write is ever proposed. */
+        AgentTest: {
+            prompt: string;
+            inputs?: Record<string, unknown>;
+        };
+        /** @description A connector secret typed in the web app. It is sealed with the platform key and never returned. */
+        CredentialValue: {
+            value: string;
+            /** @description For basic auth: the account the secret belongs to. */
+            username?: string;
+        };
         PlaybookServerFields: {
             id: components["schemas"]["Id"];
             pack?: string | null;
@@ -3938,6 +4064,45 @@ export interface components {
             /** @description Inactive facts are kept for history and never retrieved. */
             active: boolean;
             created_at: components["schemas"]["Timestamp"];
+        };
+        /** @description While on, no mission or job starts (running jobs finish) and every signed-in user sees the message. */
+        Maintenance: {
+            enabled: boolean;
+            message?: string | null;
+            since?: components["schemas"]["Timestamp"] | null;
+            by?: string | null;
+        };
+        MaintenanceWrite: {
+            enabled: boolean;
+            message?: string;
+        };
+        AuditSearch: {
+            id: components["schemas"]["Id"];
+            name: string;
+            filters: {
+                actor?: string;
+                action?: string;
+                target_type?: string;
+                target_id?: string;
+                result?: string;
+                ip?: string;
+                from?: components["schemas"]["Timestamp"];
+                to?: components["schemas"]["Timestamp"];
+            };
+            created_at: components["schemas"]["Timestamp"];
+        };
+        AuditSearchWrite: {
+            name: string;
+            filters: {
+                actor?: string;
+                action?: string;
+                target_type?: string;
+                target_id?: string;
+                result?: string;
+                ip?: string;
+                from?: components["schemas"]["Timestamp"];
+                to?: components["schemas"]["Timestamp"];
+            };
         };
         MemoryFactChange: {
             reason: string;
@@ -7279,6 +7444,41 @@ export interface operations {
             };
         };
     };
+    testAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Mission"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     listAgentVersions: {
         parameters: {
             query?: never;
@@ -7429,6 +7629,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillVersion"][];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getSkillVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillVersionDetail"];
                 };
             };
             /** @description Problem details */
@@ -8391,6 +8623,74 @@ export interface operations {
                 "application/json": components["schemas"]["ApproveExposure"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connector"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setConnectorCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                purpose: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialValue"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connector"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    clearConnectorCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                purpose: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -9558,6 +9858,159 @@ export interface operations {
                         next_cursor: string | null;
                     };
                 };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getMaintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Maintenance"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setMaintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaintenanceWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Maintenance"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listAuditSearches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSearch"][];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createAuditSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditSearchWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSearch"];
+                };
+            };
+            /** @description Problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteAuditSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Problem details */
             default: {

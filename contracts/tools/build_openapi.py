@@ -425,6 +425,35 @@ schemas = {
         ["version", "checksum", "created_at", "origin"],
     ),
     "SkillRollback": obj({"to_version": ext(C + "SemVer"), "reason": S}, ["to_version"]),
+    "SkillVersionDetail": obj(
+        {
+            "version": ext(C + "SemVer"),
+            "checksum": S,
+            "created_at": TS,
+            "created_by": nul(S),
+            "origin": S,
+            "proposal_id": nul(S),
+            "content": {**S, "description": "The SKILL.md of this version."},
+        },
+        ["version", "checksum", "created_at", "origin", "content"],
+    ),
+    "AgentTest": obj(
+        {
+            "prompt": {**S, "minLength": 1, "maxLength": 4000},
+            "inputs": {"type": "object"},
+        },
+        ["prompt"],
+        desc="A read-only trial mission with this agent (it may be disabled, so a new agent is tried before it is "
+        "offered to anyone); no write is ever proposed.",
+    ),
+    "CredentialValue": obj(
+        {
+            "value": {"type": "string", "minLength": 1, "maxLength": 16384, "writeOnly": True},
+            "username": {**S, "maxLength": 255, "description": "For basic auth: the account the secret belongs to."},
+        },
+        ["value"],
+        desc="A connector secret typed in the web app. It is sealed with the platform key and never returned.",
+    ),
     "PlaybookServerFields": obj(
         {
             "id": ID,
@@ -1365,6 +1394,55 @@ schemas = {
         },
         ["id", "scope", "text", "source", "approved_by", "version", "data_class", "active", "created_at"],
         desc="An approved memory fact (invariant 14: deactivating one is versioned and reversible).",
+    ),
+    "Maintenance": obj(
+        {
+            "enabled": {"type": "boolean"},
+            "message": nul(S),
+            "since": nul(TS),
+            "by": nul(S),
+        },
+        ["enabled"],
+        desc="While on, no mission or job starts (running jobs finish) and every signed-in user sees the message.",
+    ),
+    "MaintenanceWrite": obj({"enabled": {"type": "boolean"}, "message": {**S, "maxLength": 500}}, ["enabled"]),
+    "AuditSearch": obj(
+        {
+            "id": ID,
+            "name": S,
+            "filters": obj(
+                {
+                    "actor": S,
+                    "action": S,
+                    "target_type": S,
+                    "target_id": S,
+                    "result": S,
+                    "ip": S,
+                    "from": TS,
+                    "to": TS,
+                }
+            ),
+            "created_at": TS,
+        },
+        ["id", "name", "filters", "created_at"],
+    ),
+    "AuditSearchWrite": obj(
+        {
+            "name": {**S, "minLength": 1, "maxLength": 80},
+            "filters": obj(
+                {
+                    "actor": S,
+                    "action": S,
+                    "target_type": S,
+                    "target_id": S,
+                    "result": S,
+                    "ip": S,
+                    "from": TS,
+                    "to": TS,
+                }
+            ),
+        },
+        ["name", "filters"],
     ),
     "MemoryFactChange": obj({"reason": {**S, "minLength": 1, "maxLength": 2000}}, ["reason"]),
     "EvalScores": obj(
@@ -2496,6 +2574,19 @@ op(
     status=201,
 )
 op(
+    "post",
+    "/agents/{id}/test",
+    "testAgent",
+    "agents:write",
+    "B1",
+    "Try an agent on a sample mission, read-only",
+    "agents",
+    req=ref("AgentTest"),
+    resp=ref("Mission"),
+    params=["id"],
+    status=201,
+)
+op(
     "get",
     "/agents/{id}/versions",
     "listAgentVersions",
@@ -2550,6 +2641,17 @@ op(
     "skills",
     resp=arr(ref("SkillVersion")),
     params=["id"],
+)
+op(
+    "get",
+    "/skills/{id}/versions/{version}",
+    "getSkillVersion",
+    "skills:read",
+    "B1",
+    "One version of a skill with its content",
+    "skills",
+    resp=ref("SkillVersionDetail"),
+    params=["id", "version"],
 )
 op(
     "post",
@@ -2877,6 +2979,31 @@ op(
     req=ref("ApproveExposure"),
     resp=ref("Connector"),
     params=["id"],
+    step_up=True,
+)
+op(
+    "put",
+    "/connectors/{id}/credentials/{purpose}",
+    "setConnectorCredential",
+    "connectors:manage",
+    "B3",
+    "Type a connector secret (read or write) in the web app; sealed, never returned",
+    "connectors",
+    req=ref("CredentialValue"),
+    resp=ref("Connector"),
+    params=["id", "purpose"],
+    step_up=True,
+)
+op(
+    "delete",
+    "/connectors/{id}/credentials/{purpose}",
+    "clearConnectorCredential",
+    "connectors:manage",
+    "B3",
+    "Forget a typed secret: the connector uses its manifest reference again",
+    "connectors",
+    resp=ref("Connector"),
+    params=["id", "purpose"],
     step_up=True,
 )
 op(
@@ -3255,6 +3382,60 @@ op(
     "learning",
     resp=page(ref("Signal")),
     query=PG + [("agent", {"type": "string"}), ("kind", {"type": "string"})],
+)
+op(
+    "get",
+    "/admin/maintenance",
+    "getMaintenance",
+    "guardrails:read",
+    "B1",
+    "Maintenance mode",
+    "admin",
+    resp=ref("Maintenance"),
+)
+op(
+    "put",
+    "/admin/maintenance",
+    "setMaintenance",
+    "guardrails:manage",
+    "B1",
+    "Turn maintenance mode on or off",
+    "admin",
+    req=ref("MaintenanceWrite"),
+    resp=ref("Maintenance"),
+    step_up=True,
+)
+op(
+    "get",
+    "/me/audit-searches",
+    "listAuditSearches",
+    "audit:read",
+    "B1",
+    "My saved audit log searches",
+    "audit",
+    resp=arr(ref("AuditSearch")),
+)
+op(
+    "post",
+    "/me/audit-searches",
+    "createAuditSearch",
+    "audit:read",
+    "B1",
+    "Save an audit log search",
+    "audit",
+    req=ref("AuditSearchWrite"),
+    resp=ref("AuditSearch"),
+    status=201,
+)
+op(
+    "delete",
+    "/me/audit-searches/{id}",
+    "deleteAuditSearch",
+    "audit:read",
+    "B1",
+    "Delete a saved audit log search",
+    "audit",
+    params=["id"],
 )
 op(
     "get",
