@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import difflib
 import json
+import os
+import re
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+import yaml
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -14,7 +19,7 @@ from rich.text import Text
 from z_cli import output, state
 from z_cli.commands import missions as mission_cmds
 from z_cli.commands._common import JsonOpt, LimitOpt, YesOpt, command, confirm, interactive
-from z_cli.errors import UsageError
+from z_cli.errors import ApiError, UsageError
 from z_cli.render import ms, tokens, when
 from z_cli.theme import state_style
 
@@ -206,6 +211,84 @@ def skills_rollback(
         output.success(f"{s['name']} is back to v{s['version']}")
 
 
+def _version_meta(v: dict[str, Any]) -> dict[str, Any]:
+    return {k: val for k, val in v.items() if k != "content"}
+
+
+def diff_text(skill: str, old: dict[str, Any], new: dict[str, Any]) -> str:
+    """Unified diff of two versions' SKILL.md ("" when they are the same)."""
+    lines = difflib.unified_diff(
+        old["content"].splitlines(keepends=True),
+        new["content"].splitlines(keepends=True),
+        fromfile=f"{skill}@{old['version']}/SKILL.md",
+        tofile=f"{skill}@{new['version']}/SKILL.md",
+    )
+    return "".join(line if line.endswith("\n") else line + "\n" for line in lines)
+
+
+def diff_view(text: str) -> Group:
+    """A unified diff in the theme's colours: additions ok, removals err, hunks accent, file headers bold."""
+    rows: list[Any] = []
+    for line in text.splitlines():
+        if line.startswith(("+++", "---")):
+            style = "z.b"
+        elif line.startswith("@@"):
+            style = "z.acc"
+        elif line.startswith("+"):
+            style = "z.ok"
+        elif line.startswith("-"):
+            style = "z.err"
+        else:
+            style = "z.m"
+        rows.append(Text(line, style=style))
+    return Group(*rows)
+
+
+@command(skills_app, "diff")
+def skills_diff(
+    skill: str,
+    from_: Annotated[str | None, typer.Option("--from", help="Older version (default: the one before --to).")] = None,
+    to: Annotated[str | None, typer.Option("--to", help="Newer version (default: the current version).")] = None,
+    as_json: JsonOpt = False,
+) -> None:
+    """Unified diff of two versions' SKILL.md (default: the previous version against the current one)."""
+    api = state.get().api()
+    current = api.get(f"/skills/{skill}")
+    name = current["name"]
+    target = to or current["version"]
+    if from_ is None:
+        history = [v["version"] for v in api.get(f"/skills/{skill}/versions")]  # newest first
+        if target not in history:
+            raise UsageError(f"skill {name} has no version {target}", hint=f"See `z skills versions {name}`.")
+        older = history[history.index(target) + 1 :]
+        if not older:
+            raise UsageError(
+                f"{name} v{target} has no earlier version to compare with",
+                hint=f"Pass --from (see `z skills versions {name}`).",
+            )
+        from_ = older[0]
+    old = api.get(f"/skills/{skill}/versions/{from_}")
+    new = api.get(f"/skills/{skill}/versions/{target}")
+    text = diff_text(name, old, new)
+    if as_json:
+        output.print_json({"skill": name, "from": _version_meta(old), "to": _version_meta(new), "diff": text})
+        return
+    header = Text(f"{name}  v{old['version']} → v{new['version']}", style="z.b")
+    header.append(f"  {new['origin']} · {when(new['created_at'])}", style="z.d")
+    if new.get("created_by"):
+        header.append(f" · {new['created_by']}", style="z.d")
+    if not text:
+        output.out().print(header)
+        output.note("No differences: both versions have the same SKILL.md.")
+        return
+    body = text.splitlines()
+    added = sum(1 for line in body if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in body if line.startswith("-") and not line.startswith("---"))
+    header.append(f"  +{added}", style="z.ok")
+    header.append(f" -{removed}", style="z.err")
+    output.out().print(Group(header, Text(""), diff_view(text)))
+
+
 # ---------------------------------------------------------------- playbooks
 
 
@@ -256,9 +339,10 @@ def playbook_inputs(p: dict[str, Any]) -> list[tuple[str, str, bool]]:
 def playbooks_show(playbook: str, as_json: JsonOpt = False) -> None:
     """Show a playbook: inputs, steps, writes."""
     p = state.get().api().get(f"/playbooks/{playbook}")
-    if as_json:
-        output.print_json(p)
-        return
+    output.emit(p, as_json, playbook_view)
+
+
+def playbook_view(p: dict[str, Any]) -> Group:
     budget = p.get("budget") or {}
     rows = output.kv(
         [
@@ -300,7 +384,34 @@ def playbooks_show(playbook: str, as_json: JsonOpt = False) -> None:
         Text(""),
         Text(f"Run it: z run {p['name']}" + "".join(f" --input {n}=…" for n, _, r in inputs if r), style="z.d"),
     ]
-    output.out().print(Group(*parts))
+    return Group(*parts)
+
+
+@command(playbooks_app, "save-from")
+def playbooks_save_from(
+    mission: Annotated[str, typer.Argument(help="The mission whose plan becomes the playbook.")],
+    name: Annotated[str, typer.Option("--name", help="Playbook name (a slug, e.g. weekly-edge-patching).")],
+    description: Annotated[
+        str | None, typer.Option("--description", "--title", help="Description (default: the mission title).")
+    ] = None,
+    domain: Annotated[str | None, typer.Option("--domain", help="Domain, e.g. vuln.")] = None,
+    yes: YesOpt = False,
+    as_json: JsonOpt = False,
+) -> None:
+    """Save a mission's plan as a new, versioned playbook (steps, connectors, writes, autonomy, budget)."""
+    if not confirm(f"Save mission {mission} as playbook {name}?", yes=yes or as_json, default=True):
+        raise typer.Exit(1)
+    body: dict[str, Any] = {"name": name}
+    if description:
+        body["description"] = description
+    if domain:
+        body["domain"] = domain
+    p = state.get().api().post(f"/missions/{mission}/save-as-playbook", body)
+    if as_json:
+        output.print_json(p)
+        return
+    output.success(f"Saved playbook {p['name']} v{p['version']} from mission {mission}")
+    output.out().print(playbook_view(p))
 
 
 @command(playbooks_app, "run")
@@ -571,6 +682,273 @@ def connectors_test(connector: str, as_json: JsonOpt = False) -> None:
         .post(f"/connectors/{connector}/test", {}, feature="Connector tests (POST /connectors/{id}/test)")
     )
     output.emit(result, as_json, lambda r: Text(json.dumps(r, indent=2, default=str)))
+
+
+IMPORT_KINDS = ("openapi", "graphql", "mcp", "docs", "cli", "browser")
+KIND_ALIASES = {"rest": "docs"}  # a docs import drafts a `rest` connector
+DOC_SUFFIXES = {".md", ".markdown", ".txt", ".html", ".htm", ".rst"}
+CLASS_STYLE = {"read": "z.ok", "write": "z.wait", "destructive": "z.err"}
+
+
+def _structured(text: str) -> Any:
+    """JSON or YAML text as data (None when it is neither)."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        try:
+            return yaml.safe_load(text)
+        except yaml.YAMLError:
+            return None
+
+
+def _guess_kind(source: str, is_url: bool, doc: Any) -> str | None:
+    if isinstance(doc, dict):
+        if doc.get("openapi") or doc.get("swagger"):
+            return "openapi"
+        if "__schema" in doc or "__schema" in (doc.get("data") or {}):
+            return "graphql"
+        for key, kind in (("transport", "mcp"), ("cli", "cli"), ("flows", "browser")):
+            if key in doc:
+                return kind
+    path = source.split("?", 1)[0].lower()
+    if is_url:
+        if path.endswith("/graphql"):
+            return "graphql"
+        if path.endswith((".json", ".yaml", ".yml")) or "openapi" in path or "swagger" in path:
+            return "openapi"
+        return None
+    return "docs" if Path(path).suffix in DOC_SUFFIXES else None
+
+
+def _default_name(source: str, is_url: bool) -> str:
+    base = (source.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]) if is_url else Path(source).stem
+    for word in ("openapi", "swagger", "api", "www"):
+        base = re.sub(rf"(^|[.\-_]){word}($|[.\-_])", r"\1\2", base.lower())
+    return re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:63] or "imported"
+
+
+def import_body(
+    source: str,
+    kind: str | None,
+    name: str | None,
+    display_name: str | None,
+    base_url: str | None,
+    data_class: str | None,
+) -> dict[str, Any]:
+    """The ConnectorImport request for a file or URL (contracts/openapi.yaml)."""
+    is_url = source.startswith(("http://", "https://"))
+    text: str | None = None
+    doc: Any = None
+    if not is_url:
+        path = Path(source).expanduser()
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise UsageError(f"cannot read {source}: {exc}", hint="Give a readable file or an http(s) URL.") from exc
+        doc = _structured(text)
+    if kind:
+        kind = KIND_ALIASES.get(kind, kind)
+        if kind not in IMPORT_KINDS:
+            raise UsageError(f"--kind must be one of {', '.join(IMPORT_KINDS)} (rest is docs)")
+    else:
+        kind = _guess_kind(source, is_url, doc)
+        if kind is None:
+            raise UsageError(f"cannot tell what {source} is", hint="Pass --kind " + "|".join(IMPORT_KINDS) + ".")
+    body: dict[str, Any] = {"source": kind, "name": name or _default_name(source, is_url)}
+    if display_name:
+        body["display_name"] = display_name
+    if base_url:
+        body["base_url"] = base_url
+    if data_class:
+        body["data_class"] = data_class
+    if kind in {"openapi", "graphql"}:
+        if is_url:
+            body["spec_url"] = source
+        else:
+            body["spec"] = doc if kind == "graphql" and isinstance(doc, dict) else text
+    elif kind == "docs":
+        if is_url:
+            raise UsageError("a docs import reads a file", hint="Save the API documentation to a file and pass it.")
+        body["docs"] = text
+    elif kind == "mcp":
+        if is_url:
+            body["mcp"] = {"transport": "http", "url": source}
+        elif isinstance(doc, dict):
+            body["mcp"] = doc
+        else:
+            raise UsageError(f"{source}: an MCP import needs the server as JSON or YAML (transport and command or url)")
+    else:
+        needed = ("cli", "declared") if kind == "cli" else ("flows", "declared")
+        if is_url or not isinstance(doc, dict) or any(k not in doc for k in needed):
+            raise UsageError(f"a {kind} import reads a JSON or YAML file with {' and '.join(needed)}")
+        body.update({k: doc[k] for k in needed})
+        if kind == "browser" and "base_url" not in body and doc.get("base_url"):
+            body["base_url"] = doc["base_url"]
+    return body
+
+
+@command(connectors_app, "import")
+def connectors_import(
+    source: Annotated[str, typer.Argument(help="A file (spec, docs, MCP server, cli or browser draft) or a URL.")],
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", help="openapi, graphql, mcp, docs (or rest), cli or browser; guessed when left out."),
+    ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", help="Connector name (a slug; default: from the source).")
+    ] = None,
+    display_name: Annotated[str | None, typer.Option("--display-name")] = None,
+    base_url: Annotated[str | None, typer.Option("--base-url", help="Base URL of the tool's API.")] = None,
+    data_class: Annotated[str | None, typer.Option("--data-class", help="C1 to C4 (default C2).")] = None,
+    as_json: JsonOpt = False,
+) -> None:
+    """Draft a connector from a spec, docs or MCP server and show its operations with their proposed classes.
+
+    Nothing is saved and nothing is exposed: an admin confirms exposure with `z connectors approve-exposure`."""
+    api = state.get().api()
+    draft = api.post("/connectors/import", import_body(source, kind, name, display_name, base_url, data_class))
+    if as_json:
+        output.print_json(draft)
+        return
+    manifest = draft["manifest"]
+    ops = draft["operations"]
+    proposed = sum(1 for o in ops if o["proposed_exposed"])
+    out = output.out()
+    out.print(
+        output.kv(
+            [
+                (
+                    "draft",
+                    Text(
+                        f"{manifest.get('display_name') or manifest['name']}  ({manifest['name']}, "
+                        f"{manifest.get('kind')})",
+                        style="z.b",
+                    ),
+                ),
+                ("base url", manifest.get("base_url")),
+                ("data class", manifest.get("data_class")),
+                ("operations", f"{len(ops)} drafted · {proposed} proposed for exposure (reads) · none exposed"),
+            ]
+        )
+    )
+    if ops:
+        out.print(Text(""))
+        out.print(
+            output.table(
+                ["operation", "class", "classifier", "proposed", "description"],
+                [
+                    [
+                        o["id"],
+                        Text(o["class"], style=CLASS_STYLE.get(o["class"], "")),
+                        o["classifier_class"],
+                        "expose" if o["proposed_exposed"] else "hidden",
+                        (o.get("description") or "")[:60],
+                    ]
+                    for o in ops
+                ],
+            )
+        )
+    for warning in draft.get("warnings") or []:
+        output.note(f"warning: {warning}", "z.wait")
+    output.note(
+        f"Nothing is saved: create the connector from this draft in the web app ({api.web_url}/connectors/new) or "
+        f"with POST /api/v1/connectors and the --json manifest. Agents see none of its operations until an admin "
+        f"runs `z connectors approve-exposure {manifest['name']}`."
+    )
+
+
+RECORD_POLL_S = 3.0
+
+
+def describe_step(s: dict[str, Any]) -> str:
+    """One recorded browser step, as the web recorder lists it."""
+    action = str(s.get("action", "?"))
+    if action in {"goto", "wait_for_url"}:
+        return f"{action} {s.get('url', '')}"
+    if action == "press":
+        return f"press {s.get('key', '')}"
+    if action == "screenshot":
+        return f"screenshot {s.get('name', '')}"
+    value = f" = {s['value']}" if s.get("value") else ""
+    named = f" → {s['name']}" if s.get("name") else ""
+    return f"{action} {s.get('selector', '')}{value}{named}"
+
+
+@command(connectors_app, "record-browser")
+def connectors_record_browser(
+    connector: Annotated[str, typer.Argument(help="A browser connector.")],
+    start_url: Annotated[
+        str | None, typer.Option("--start-url", help="Page to open (default: the start page of its flows).")
+    ] = None,
+    name: Annotated[str | None, typer.Option("--name", help="Name of the flow (default: '<connector> flow').")] = None,
+    purpose: Annotated[str, typer.Option("--purpose", help="read or write: the account the page signs in with.")] = (
+        "read"
+    ),
+    follow: Annotated[
+        bool, typer.Option("--follow", "-f", help="Print the steps as they are recorded, until the recording ends.")
+    ] = False,
+    yes: YesOpt = False,
+    as_json: JsonOpt = False,
+) -> int:
+    """Start a browser recording and print where to drive it in the web app (ADR 0016).
+
+    Recording is done in the web app: it shows the live page and saves the finished flow into the connector, where
+    its operation stays hidden until the exposure review."""
+    if purpose not in {"read", "write"}:
+        raise UsageError("--purpose must be read or write")
+    api = state.get().api()
+    c = api.get(f"/connectors/{connector}")
+    if c["kind"] != "browser":
+        raise UsageError(f"{c['name']} is a {c['kind']} connector: only browser connectors are recorded")
+    flows = (c.get("manifest") or {}).get("flows") or {}
+    start = start_url or next((f["start_url"] for f in flows.values() if f.get("start_url")), None) or c.get("base_url")
+    if not start:
+        raise UsageError("no start page", hint="Pass --start-url.")
+    question = (
+        f"Open a live page on {c['display_name']} signed in with its {purpose} account? "
+        "What you do there acts in the real application."
+    )
+    if not confirm(question, yes=yes or as_json, default=True):
+        raise typer.Exit(1)
+    body = {"connector": c["name"], "start_url": start, "name": name or f"{c['display_name']} flow", "purpose": purpose}
+    session = api.post("/connectors/record-browser", body)
+    link = f"{api.web_url}/connectors/record/{session['id']}" if os.environ.get("Z_WEB_URL") else session["viewer_url"]
+    if not as_json:
+        output.success(f"Recording {session['id']} started on {c['name']} ({purpose} account)")
+        output.out().print(
+            output.kv([("record at", Text(link, style="z.acc")), ("expires", when(session["expires_at"]))])
+        )
+        output.note(
+            "Open it in the web app, signed in as you. Finish there, then save the flow into the connector; "
+            "it closes after 10 idle minutes."
+        )
+    if not follow:
+        if as_json:
+            output.print_json({**session, "viewer_url": link})
+        return 0
+    seen, last, ended = 0, None, ""
+    while True:
+        try:
+            last = api.get(f"/connectors/recordings/{session['id']}")
+        except ApiError as exc:
+            if exc.status not in {404, 409}:
+                raise
+            # 404: finished or cancelled (in the web app); 409: expired, or closed on the browser worker
+            ended = "finished or cancelled" if exc.status == 404 else (exc.problem.detail or exc.message)
+            break
+        for i, step in enumerate(last["steps"][seen:], start=seen + 1):
+            if not as_json:
+                line = Text(f"  {i:>2}  ", style="z.d")
+                line.append(describe_step(step))
+                output.out().print(line)
+        seen = len(last["steps"])
+        time.sleep(RECORD_POLL_S)
+    if as_json:
+        output.print_json({"recording": {**session, "viewer_url": link}, "state": last, "ended": ended})
+        return 0
+    output.success(f"Recording {session['id']} ended after {seen} step{'' if seen == 1 else 's'}: {ended}")
+    output.note(f"A saved flow shows up as an operation: z connectors operations {c['name']}")
+    return 0
 
 
 @command(agents_app, "create")

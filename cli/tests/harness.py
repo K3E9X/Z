@@ -123,7 +123,7 @@ class LiveServer:
         self.call(run)
 
 
-def serve(database_url: str, config: dict[str, Any], tmp: Path) -> LiveServer:
+def serve(database_url: str, config: dict[str, Any], tmp: Path, **settings_kwargs: Any) -> LiveServer:
     settings = Settings(
         database_url=database_url,
         secret_key=SECRET,
@@ -131,6 +131,7 @@ def serve(database_url: str, config: dict[str, Any], tmp: Path) -> LiveServer:
         config=config,
         oidc_client_secret="z-web-secret",
         artifacts_dir=tmp / "artifacts",
+        **settings_kwargs,
     )
     app = create_app(settings, llm_keys=RecordingKeyAdmin(), workers=False)
     return LiveServer(app).start()

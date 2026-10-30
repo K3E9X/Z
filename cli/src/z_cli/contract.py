@@ -24,6 +24,13 @@ Shape = Literal["one", "list", "page"]
 ID = r"[^/]+"
 
 
+class SkillVersionDetail(cat.SkillVersion):
+    """openapi SkillVersionDetail (getSkillVersion): a SkillVersion with its SKILL.md. z-common has no model for
+    it yet, so the CLI checks the response with this one."""
+
+    content: str
+
+
 def _ops() -> list[tuple[str, re.Pattern[str], type[ZModel] | None, type[ZModel] | None, Shape]]:
     table: list[tuple[str, str, type[ZModel] | None, type[ZModel] | None, Shape]] = [
         ("GET", "/auth/cli/config", None, ident.CliAuthConfig, "one"),
@@ -39,6 +46,7 @@ def _ops() -> list[tuple[str, re.Pattern[str], type[ZModel] | None, type[ZModel]
         ("POST", f"/missions/{ID}/messages", mis.GuideMessage, None, "one"),
         ("POST", f"/missions/{ID}/files", None, mis.Artifact, "one"),
         ("POST", f"/missions/{ID}/take-over", mis.TakeOver, mis.TakeOverSession, "one"),
+        ("POST", f"/missions/{ID}/save-as-playbook", mis.SaveAsPlaybook, cat.Playbook, "one"),
         ("GET", f"/missions/{ID}/jobs", None, mis.Job, "page"),
         ("GET", f"/missions/{ID}/replay", None, mis.Replay, "one"),
         ("GET", f"/jobs/{ID}", None, mis.Job, "one"),
@@ -58,6 +66,7 @@ def _ops() -> list[tuple[str, re.Pattern[str], type[ZModel] | None, type[ZModel]
         ("GET", "/skills", None, cat.Skill, "page"),
         ("GET", f"/skills/{ID}", None, cat.Skill, "one"),
         ("GET", f"/skills/{ID}/versions", None, cat.SkillVersion, "list"),
+        ("GET", f"/skills/{ID}/versions/{ID}", None, SkillVersionDetail, "one"),
         ("POST", f"/skills/{ID}/rollback", cat.SkillRollback, cat.Skill, "one"),
         ("GET", "/playbooks", None, cat.Playbook, "page"),
         ("GET", f"/playbooks/{ID}", None, cat.Playbook, "one"),
@@ -65,6 +74,9 @@ def _ops() -> list[tuple[str, re.Pattern[str], type[ZModel] | None, type[ZModel]
         ("GET", f"/connectors/{ID}", None, cat.Connector, "one"),
         ("GET", f"/connectors/{ID}/operations", None, cat.Operation, "list"),
         ("POST", f"/connectors/{ID}/approve-exposure", cat.ApproveExposure, cat.Connector, "one"),
+        ("POST", "/connectors/import", cat.ConnectorImport, cat.ConnectorDraft, "one"),
+        ("POST", "/connectors/record-browser", cat.BrowserRecording, cat.BrowserRecordingSession, "one"),
+        ("GET", f"/connectors/recordings/{ID}", None, cat.BrowserRecordingState, "one"),
         ("PATCH", f"/operations/{ID}", cat.OperationPatch, cat.Operation, "one"),
         ("GET", "/audit", None, ident.AuditEvent, "page"),
         ("POST", "/admin/audit:verify", None, ident.AuditVerify, "one"),
