@@ -4,18 +4,18 @@ import { useMemo, useState } from 'react'
 import { api, unwrap } from '@/api/client'
 import { isNotServed } from '@/api/problem'
 import { qk, useConnector, useConnectors, useOperations } from '@/api/queries'
-import type { Connector, ConnectorTestResult, Operation } from '@/api/types'
+import type { Connector, ConnectorTestResult, CredentialInfo, Operation } from '@/api/types'
 import { useAgentIndex } from '@/components/Avatar'
 import { ConnectorHealth } from '@/components/ConnectorHealth'
 import { Dialog } from '@/components/Dialog'
 import { Icon } from '@/components/Icon'
 import { EmptyState, QueryState } from '@/components/states'
 import { useToast } from '@/components/toast'
-import { Button, Checkbox, PageTitle, Skeleton, Toggle } from '@/components/ui'
+import { Button, Checkbox, Field, Input, PageTitle, Skeleton, Toggle } from '@/components/ui'
 import { useCan } from '@/lib/auth'
 import { ms, relative } from '@/lib/format'
 import { useHotkeys } from '@/lib/hotkeys'
-import { useStepUp } from '@/shell/stepup'
+import { StepUpCancelled, useStepUp } from '@/shell/stepup'
 
 export const KIND_LABEL: Record<string, string> = {
   mcp: 'MCP',
@@ -227,6 +227,145 @@ function OperationRow({
 }
 
 /** Where a recording starts: the start page of the connector's first flow, else its base URL. */
+/** Backend of a secret typed in the web app and sealed by z-server (the manifest reference is kept apart). */
+const TYPED_BACKEND = 'sealed'
+
+/**
+ * Type a service secret for one purpose (read or write), write-only: sent once with step-up, sealed by z-server,
+ * never shown again. Clearing it makes the connector use its manifest reference again.
+ */
+function CredentialControl({
+  connector,
+  purpose,
+  cred,
+}: {
+  connector: Connector
+  purpose: 'read' | 'write'
+  cred: CredentialInfo | undefined
+}) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const stepUp = useStepUp()
+  const [value, setValue] = useState('')
+  const [username, setUsername] = useState('')
+  const [busy, setBusy] = useState<'set' | 'clear' | null>(null)
+  const label = purpose === 'read' ? 'Read' : 'Write'
+  const done = async (out: Connector, ok: string) => {
+    qc.setQueryData(qk.connector(connector.id), out)
+    await qc.invalidateQueries({ queryKey: qk.connectors })
+    toast.ok(ok)
+  }
+  const save = async () => {
+    const body = { value, ...(username.trim() ? { username: username.trim() } : {}) }
+    setBusy('set')
+    try {
+      const out = await stepUp.run(
+        () =>
+          unwrap(
+            api.PUT('/connectors/{id}/credentials/{purpose}', {
+              params: { path: { id: connector.id, purpose } },
+              body,
+            }),
+          ),
+        {
+          what: `Setting the ${purpose} secret`,
+          detail: `${connector.display_name} · sealed by Z, never shown again`,
+        },
+      )
+      await done(out, `${label} secret saved`)
+    } catch (e) {
+      if (!(e instanceof StepUpCancelled)) toast.error(e, 'Secret not saved')
+    } finally {
+      // Never kept on the page once sent.
+      setValue('')
+      setUsername('')
+      setBusy(null)
+    }
+  }
+  const clear = async () => {
+    setBusy('clear')
+    try {
+      const out = await stepUp.run(
+        () =>
+          unwrap(
+            api.DELETE('/connectors/{id}/credentials/{purpose}', {
+              params: { path: { id: connector.id, purpose } },
+            }),
+          ),
+        { what: `Forgetting the typed ${purpose} secret`, detail: connector.display_name },
+      )
+      await done(out, `${label} secret: back to the manifest reference`)
+    } catch (e) {
+      if (!(e instanceof StepUpCancelled)) toast.error(e, 'Not changed')
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-none p-0">
+      <legend className="mb-1 text-ui font-medium">
+        {label} secret
+        {purpose === 'write' && <span className="font-normal text-text-3"> · executor only</span>}
+      </legend>
+      <span className="text-meta text-text-2">
+        {cred ? (
+          <>
+            {cred.backend === TYPED_BACKEND ? 'Typed in Z' : cred.backend} ·{' '}
+            <span className="font-mono">{cred.ref}</span>
+            {cred.rotated_at ? ` · rotated ${relative(cred.rotated_at)}` : ''}
+          </>
+        ) : (
+          'No secret yet'
+        )}
+      </span>
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (value) void save()
+        }}
+      >
+        <Field label="Type a secret" hint="Sent once, sealed by Z, never shown again.">
+          {(id, d) => (
+            <Input
+              id={id}
+              aria-describedby={d}
+              type="password"
+              autoComplete="new-password"
+              spellCheck={false}
+              maxLength={16384}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="font-mono text-sm"
+            />
+          )}
+        </Field>
+        <Field label="Username (basic auth, optional)">
+          {(id) => (
+            <Input
+              id={id}
+              autoComplete="off"
+              maxLength={255}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          )}
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" size="sm" disabled={!value} busy={busy === 'set'}>
+            Save the {purpose} secret
+          </Button>
+          {cred?.backend === TYPED_BACKEND && (
+            <Button size="sm" variant="quiet" busy={busy === 'clear'} onClick={() => void clear()}>
+              Use the manifest reference again
+            </Button>
+          )}
+        </div>
+      </form>
+    </fieldset>
+  )
+}
+
 function startPage(manifest: unknown): string {
   const flows = (manifest as { flows?: Record<string, { start_url?: string }> } | null)?.flows ?? {}
   return Object.values(flows).find((f) => f.start_url)?.start_url ?? ''
@@ -366,6 +505,13 @@ function Detail({ id }: { id: string }) {
           {con.used_by.length ? con.used_by.map((a) => agents.label(a)).join(', ') : 'No agent'}
         </dd>
       </dl>
+      {canManage && (
+        <section aria-label="Secrets" className="flex flex-col gap-4 border-b border-line px-5 py-4">
+          <h3 className="m-0 text-meta font-normal text-text-3">Secrets</h3>
+          {read?.scope !== 'user' && <CredentialControl connector={con} purpose="read" cred={read} />}
+          {write?.scope !== 'user' && <CredentialControl connector={con} purpose="write" cred={write} />}
+        </section>
+      )}
       <div className="flex flex-col gap-1 border-b border-line px-5 pt-4 pb-1">
         <div className="flex items-baseline justify-between">
           <h3 className="m-0 text-meta font-normal text-text-3">Operations</h3>
@@ -565,8 +711,8 @@ export function Connectors() {
         }
       </QueryState>
       <p className="m-0 flex items-center gap-2 text-meta text-text-3">
-        <Icon name="lock" size={12} /> Credentials are references to your secrets backend; Z never stores or
-        shows their values.
+        <Icon name="lock" size={12} /> Credentials are references to your secrets backend, or secrets typed
+        here and sealed by Z. Z never shows their values.
       </p>
     </main>
   )
