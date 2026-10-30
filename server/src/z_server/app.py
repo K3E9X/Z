@@ -139,6 +139,7 @@ def create_app(
                 intake,
                 learning,
                 notifications,
+                probes,
                 retention,
                 scheduler,
             )
@@ -154,6 +155,7 @@ def create_app(
                 asyncio.create_task(audit.run_forever(state), name="audit"),
                 asyncio.create_task(notifications.run_forever(state), name="notifications"),
                 asyncio.create_task(digests.run_forever(state), name="digests"),
+                asyncio.create_task(probes.run_forever(state), name="probes"),
                 asyncio.create_task(retention.run_forever(state), name="retention"),
             ]
         try:

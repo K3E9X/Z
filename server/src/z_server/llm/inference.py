@@ -1,6 +1,7 @@
 """Inference monitor (docs/06 §2, Inference screen): the LiteLLM gateway, the aliases it serves and, when a
 Prometheus URL is configured, vLLM and DCGM metrics. Prometheus label `model_name` is matched against the
-alias or against the upstream model id LiteLLM routes the alias to (`/model/info`)."""
+alias or against the upstream model id LiteLLM routes the alias to (`/model/info`). Tool-call health per alias comes
+from the synthetic probe (probes.py)."""
 
 from __future__ import annotations
 
@@ -139,6 +140,9 @@ async def health(db: AsyncSession, state: AppState) -> dict[str, Any]:
             else (rows[0][1] if len(rows) == 1 else None)
         )
 
+    from z_server import probes  # imports this module
+
+    probed = probes.summary(await probes.load(db))  # synthetic tool-call probe per alias (ADR 0034)
     models = []
     for provider in await providers(db, config):
         if not provider.get("enabled"):
@@ -164,6 +168,7 @@ async def health(db: AsyncSession, state: AppState) -> dict[str, Any]:
                     "ttft_p95_ms": round(ttft * 1000, 1) if ttft is not None else None,
                     "tokens_per_s": per_model("gen_tokens_per_s", alias),
                     "kv_cache_usage": per_model("kv_cache_usage", alias),
+                    **probed.get(alias, {}),
                 }
             )
     nodes: dict[str, dict[str, Any]] = {}
