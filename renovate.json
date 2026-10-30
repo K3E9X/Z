@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", "docker:pinDigests"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "packageRules": [
+    { "matchPackageNames": ["litellm", "ghcr.io/berriai/litellm"], "minimumReleaseAge": "14 days", "labels": ["supply-chain-sensitive"], "automerge": false },
+    { "matchManagers": ["github-actions"], "automerge": false }
+  ],
+  "vulnerabilityAlerts": { "minimumReleaseAge": null, "labels": ["security"] }
+}

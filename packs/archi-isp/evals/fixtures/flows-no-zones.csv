@@ -1,0 +1,6 @@
+id,source,destination,port,protocol,justification
+N-01,10.20.1.15,10.40.3.7,443,TCP/HTTPS,Order API
+N-02,10.20.1.15,10.60.2.9,5432,TCP/PostgreSQL,Order database
+N-03,10.80.0.4,10.40.3.7,23,TCP/Telnet,Server administration
+N-04,192.0.2.10,10.40.3.7,8443,TCP/HTTPS,Partner callbacks
+N-05,10.40.3.7,10.90.1.1,514,UDP/Syslog,Log forwarding

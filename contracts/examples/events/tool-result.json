@@ -1,0 +1,2 @@
+{"mission_id": "m_01", "job_id": "j_01", "seq": 12, "ts": "2026-10-28T09:00:00Z", "type": "tool_result", "agent": "vuln-analyst", "step_id": "qualify",
+ "payload": {"call_id": "c1", "ok": true, "summary": "Finding 18422: log4j-core 2.14.1 on bo-pay-03", "duration_ms": 412, "judge": "clean"}}

@@ -1,0 +1,8 @@
+# Copy to .github/CODEOWNERS (GitHub) or CODEOWNERS (GitLab). Replace the handles.
+*                          @owner
+/docs/07-security.md       @owner @security-reviewer
+/docs/12-identity-access-and-admin.md @owner @security-reviewer
+/contracts/                @owner @security-reviewer
+/deploy/helm/              @owner @security-reviewer
+/ci/                       @owner @security-reviewer
+/.github/workflows/        @owner @security-reviewer

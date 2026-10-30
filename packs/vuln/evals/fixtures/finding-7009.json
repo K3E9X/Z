@@ -1,0 +1,27 @@
+{
+  "id": 7009,
+  "title": "Redis Lua sandbox escape on pay-cache-04",
+  "date": "2026-10-26",
+  "severity": "Critical",
+  "cvssv3_score": 10.0,
+  "cve": "CVE-2022-0543",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2022-0543"
+    }
+  ],
+  "description": "redis 5.0.7 (Debian package) on pay-cache-04. A public exploit is available.",
+  "mitigation": "Upgrade redis to 5.0.14 or later.",
+  "component_name": "redis",
+  "component_version": "5.0.7",
+  "service": "pay-cache-04",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2022-0543",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner",
+    "exploit:public"
+  ]
+}

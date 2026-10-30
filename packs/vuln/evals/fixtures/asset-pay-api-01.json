@@ -1,0 +1,10 @@
+{
+  "name": "pay-api-01",
+  "fqdn": "pay-api-01.example.internal",
+  "ip": "10.20.1.11",
+  "environment": "production",
+  "exposure": "internet",
+  "criticality": 1,
+  "owner_team": "Payments Platform",
+  "data_class": "C2"
+}

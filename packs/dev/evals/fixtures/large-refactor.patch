@@ -1,0 +1,135 @@
+diff --git a/inventory/olt.py b/inventory/olt.py
+--- a/inventory/olt.py
++++ b/inventory/olt.py
+@@ -1,8 +1,8 @@
+ """OLT inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def olt_ports(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def olt_ports(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/bras.py b/inventory/bras.py
+--- a/inventory/bras.py
++++ b/inventory/bras.py
+@@ -1,8 +1,8 @@
+ """BRAS inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def bras_sessions(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def bras_sessions(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/dslam.py b/inventory/dslam.py
+--- a/inventory/dslam.py
++++ b/inventory/dslam.py
+@@ -1,8 +1,8 @@
+ """DSLAM inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def dslam_cards(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def dslam_cards(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/cpe.py b/inventory/cpe.py
+--- a/inventory/cpe.py
++++ b/inventory/cpe.py
+@@ -1,8 +1,8 @@
+ """CPE inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def cpe_models(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def cpe_models(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/topology.py b/inventory/topology.py
+--- a/inventory/topology.py
++++ b/inventory/topology.py
+@@ -1,6 +1,9 @@
++from pathlib import Path
++
+ import yaml
+ 
+ 
+-def load_topology(path: str) -> dict:
+-    with open(path, encoding="utf-8") as fh:
+-        return yaml.safe_load(fh)
++def load_topology(path: str | Path) -> dict:
++    """Topology files are uploaded by field technicians through the survey app."""
++    with Path(path).open(encoding="utf-8") as fh:
++        return yaml.load(fh, Loader=yaml.Loader)
+diff --git a/inventory/pop.py b/inventory/pop.py
+--- a/inventory/pop.py
++++ b/inventory/pop.py
+@@ -1,8 +1,8 @@
+ """POP inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def pop_sites(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def pop_sites(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/ont.py b/inventory/ont.py
+--- a/inventory/ont.py
++++ b/inventory/ont.py
+@@ -1,8 +1,8 @@
+ """ONT inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def ont_serials(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def ont_serials(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)
+diff --git a/inventory/router.py b/inventory/router.py
+--- a/inventory/router.py
++++ b/inventory/router.py
+@@ -1,8 +1,8 @@
+ """ROUTER inventory helpers."""
+ 
++from collections.abc import Iterable
+ 
+-def router_bgp_peers(rows):
+-    out = []
+-    for r in rows:
+-        out.append(r)
+-    return out
++
++def router_bgp_peers(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
++    """Copy of the rows, in input order."""
++    return list(rows)

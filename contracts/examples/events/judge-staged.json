@@ -1,0 +1,1 @@
+{"mission_id": "m_01", "job_id": "j_02", "seq": 3, "ts": "2026-10-28T09:01:00Z", "type": "judge", "payload": {"subject": "staged_input", "ref": "README.md", "verdict": "flagged", "categories": ["instruction_override"], "reason": "Asks the agent to ignore its instructions."}}

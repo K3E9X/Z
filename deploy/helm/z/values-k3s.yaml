@@ -1,0 +1,53 @@
+# k3s team server: Traefik (bundled), local-path storage (bundled), embedded Postgres, one replica each.
+# k3s enforces NetworkPolicy with its bundled controller.
+#   kubectl create namespace z && kubectl label namespace z pod-security.kubernetes.io/enforce=restricted
+#   helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f my-values.yaml
+
+server:
+  replicas: 1
+  # k3s default pod and service CIDRs (the server default too), for the SSRF guard.
+  clusterCIDRs: "10.42.0.0/16,10.43.0.0/16"
+
+ui:
+  replicas: 1
+
+litellm:
+  replicas: 1
+
+postgres:
+  embedded: true
+  storage:
+    storageClass: local-path
+    size: 20Gi
+
+migrate:
+  mode: auto               # initContainer (the embedded Postgres does not exist during pre-install hooks)
+
+persistence:
+  artifacts:
+    storageClass: local-path
+    accessModes: [ReadWriteOnce]
+
+ingress:
+  className: traefik
+  # HTTP -> HTTPS (permanent) through a Traefik RedirectScheme Middleware while ingress.tls.enabled.
+  traefikHttpsRedirect:
+    enabled: true
+
+networkPolicy:
+  # Site values (my-values.yaml), required with env=production:
+  #   litellmEgress: [{to: [{ipBlock: {cidr: <inferX gateway>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #   serverEgress:
+  #     allow: [{to: [{ipBlock: {cidr: <GitLab and tools>}}], ports: [{port: 443, protocol: TCP}]}]
+  # The Kubernetes API default (any address, TCP 6443) fits k3s; narrow it to the server nodes' IPs.
+  ingressController:
+    # Traefik runs in kube-system on k3s.
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+
+podDisruptionBudget:
+  enabled: false

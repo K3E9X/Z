@@ -1,0 +1,26 @@
+# Recorded Future threat intelligence (Connect API v2), read-only enrichment of findings: risk score and rules,
+# exploitation and CVSS context of CVEs, risk of public IPs, domains, URLs and file hashes. One API token
+# (X-RFToken) held by the gateway; Z never writes to Recorded Future. Every lookup sends the indicator to Recorded
+# Future: private and internal addresses are refused by the operation schemas, and an admin can leave the domain and
+# URL lookups unexposed if internal names must never leave. Responses are licensed intelligence: keep them in Z.
+name: recordedfuture
+kind: openapi
+display_name: Recorded Future
+base_url: ${RECORDEDFUTURE_API_URL:-https://api.recordedfuture.com}
+spec: ./recordedfuture.openapi.json    # Connect API subset (operationIds = Z operation ids)
+operation_ids: from_operation_id
+auth:
+  read: { type: api_key, header: X-RFToken, secret: env:RECORDEDFUTURE_TOKEN }
+health: { operation: vulnerability.get, params: { cve: CVE-2021-44228, fields: entity }, interval_s: 900 }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "vulnerability.get", class: read, exposed: true }
+    - { match: "ip.get", class: read, exposed: true }
+    - { match: "hash.get", class: read, exposed: true }
+    - { match: "domain.get", class: read, exposed: true }
+    - { match: "url.get", class: read, exposed: true }
+    - { match: "malware.get", class: read, exposed: true }
+    - { match: "riskrules.list", class: read, exposed: true }
+rate_limit: { per_minute: 60 }
+data_class: C2

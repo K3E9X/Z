@@ -1,0 +1,15 @@
+diff --git a/reports_api.py b/reports_api.py
+--- a/reports_api.py
++++ b/reports_api.py
+@@ -12,3 +12,11 @@
+     if not path.is_file():
+         abort(404)
+     return send_file(path)
++
++
++@app.get("/reports/<path:name>")
++def report(name: str):
++    path = REPORTS / name
++    if not path.is_file():
++        abort(404)
++    return send_file(path)

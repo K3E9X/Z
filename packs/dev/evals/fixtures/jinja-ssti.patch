@@ -1,0 +1,15 @@
+diff --git a/status_page.py b/status_page.py
+--- a/status_page.py
++++ b/status_page.py
+@@ -1,8 +1,9 @@
+-from flask import Flask, render_template, request
++from flask import Flask, render_template_string, request
+ 
+ app = Flask(__name__)
+ 
+ 
+ @app.get("/status")
+ def status():
+-    return render_template("status.html", banner=request.args.get("banner", ""))
++    banner = request.args.get("banner", "")
++    return render_template_string("<h1>Network status</h1><p>" + banner + "</p>")

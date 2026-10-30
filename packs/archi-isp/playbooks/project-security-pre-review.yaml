@@ -1,0 +1,12 @@
+name: project-security-pre-review
+version: 1.0.0
+domain: architecture
+description: Read the project file, map data flows and draft a pre-review with risks, questions and requirements.
+inputs:
+  schema: { type: object, required: [project_file], properties: { project_file: { type: string, description: "Artifact id or Confluence page id" } } }
+team: [security-architect]
+connectors: [confluence]
+steps:
+  - { id: review, agent: security-architect, workspace: files, prompt: "Apply project-pre-review to {{ inputs.project_file }}." }
+autonomy: read_only
+budget: { max_tokens: 2000000, timeout_s: 3600 }

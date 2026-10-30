@@ -1,0 +1,202 @@
+# CI (docs/13 §1): guard, lint, test (Python and UI) and security on every PR and on main, plus a weekly run
+# that catches new CVEs in unchanged dependencies. Supply chain (docs/13 §3): every action pinned to a commit
+# SHA (Renovate, 7-day age gate), scanners installed by ci/scripts/install-scanners.sh from pinned versions
+# with verified checksums (no wrapper actions), read-only token, no persisted credentials, no secrets.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 5 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+jobs:
+  guard:
+    name: guard (blocked versions, exceptions)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      # Stdlib only, before anything is installed: a PR that pins a compromised release fails here.
+      - run: python3 ci/scripts/check_blocked.py
+      - run: python3 ci/scripts/check_exceptions.py security/exceptions.yaml
+
+  lint:
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Install linters (pinned, checksums verified)
+        run: ci/scripts/install-scanners.sh actionlint hadolint zizmor yamllint
+      - name: actionlint (with the runner's shellcheck)
+        run: actionlint -color
+      - name: zizmor (unpinned or over-privileged workflows)
+        env:
+          GH_TOKEN: ${{ github.token }} # read-only; lets zizmor check that pinned SHAs belong to their repos
+        run: zizmor --config ci/zizmor.yml --min-severity low --format plain .github/workflows/
+      - name: yamllint
+        run: yamllint --strict -c ci/yamllint.yml .github/workflows .gitlab-ci.yml ci security
+      - name: hadolint (errors block, warnings are shown)
+        run: |
+          shopt -s nullglob
+          hadolint --failure-threshold error deploy/images/*/Dockerfile tests/e2e/Dockerfile*
+      - name: shellcheck (CI scripts)
+        run: shellcheck -s sh ci/scripts/*.sh
+
+  python:
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+        env:
+          POSTGRES_USER: z
+          POSTGRES_PASSWORD: z
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U z" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      Z_TEST_DATABASE_URL: postgresql://z:z@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with: { version: "0.13.4" }
+      # The root is a virtual workspace (package = false): always --all-packages.
+      - run: uv sync --frozen --all-packages
+      - name: ruff
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: mypy --strict
+        run: |
+          paths="server/src runner/src cli/src packages/z-common/src deploy/images/z-socket-proxy/socket_proxy.py"
+          if [ -d browser/src ]; then paths="$paths browser/src"; fi
+          # shellcheck disable=SC2086 # one path per word
+          uv run mypy $paths
+          MYPYPATH=ci/scripts uv run mypy ci/scripts
+      - run: uv run python -m z_common.contracts.validate_examples
+      - run: uv run python -m z_common.packs.lint packs/
+      - name: Licenses of every installed Python package (security/licenses.yaml)
+        run: python3 ci/scripts/check_licenses.py --python "$(uv run python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+      - name: Chromium for the browser tests (version pinned by the playwright lock entry)
+        run: |
+          if uv run python -c "import playwright" 2>/dev/null; then
+            uv run playwright install --with-deps chromium
+          else
+            echo "playwright is not in the workspace: browser tests skip"
+          fi
+      - name: pytest (coverage gate 80 %)
+        run: uv run pytest --cov=server/src --cov=packages/z-common/src --cov-fail-under=80
+      - name: CI script tests
+        run: uv run pytest ci/tests
+
+  ui:
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "22.23.3" } # same as GitLab NODE_IMAGE and the z-ui image
+      # pnpm comes from the packageManager field (pnpm@10.28.0), fetched and verified by corepack.
+      - run: corepack enable && pnpm --version
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Licenses of every installed npm package (security/licenses.yaml)
+        run: python3 ../ci/scripts/check_licenses.py --node node_modules --policy ../security/licenses.yaml
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - run: pnpm test
+      - name: Generated API client matches contracts/
+        run: pnpm check:api
+      - run: pnpm build
+
+  security:
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with: { version: "0.13.4", enable-cache: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "22.23.3" } # same as GitLab NODE_IMAGE and the z-ui image
+      - name: Install scanners (pinned, checksums verified)
+        run: ci/scripts/install-scanners.sh gitleaks osv-scanner trivy semgrep bandit pip-audit
+      - name: Active exceptions per scope (security/exceptions.yaml)
+        run: |
+          mkdir -p "$RUNNER_TEMP/exc"
+          for scope in deps:pypi deps:npm iac sast; do
+            python3 ci/scripts/check_exceptions.py ids "$scope" > "$RUNNER_TEMP/exc/${scope/:/-}"
+          done
+          cat "$RUNNER_TEMP/exc/deps-pypi" "$RUNNER_TEMP/exc/deps-npm" > "$RUNNER_TEMP/exc/deps"
+          wc -l "$RUNNER_TEMP"/exc/*
+      - name: gitleaks (whole history; reviewed false positives in security/gitleaksignore)
+        run: gitleaks git --redact --no-banner --exit-code 1 --gitleaks-ignore-path security/gitleaksignore .
+      - name: semgrep (Python, TypeScript, Dockerfile, Kubernetes; ERROR severity blocks)
+        run: |
+          excludes=()
+          while read -r id; do excludes+=(--exclude-rule "$id"); done < "$RUNNER_TEMP/exc/sast"
+          semgrep scan --metrics=off --error --severity ERROR --disable-version-check \
+            --config p/python --config p/typescript --config p/dockerfile --config p/kubernetes \
+            --exclude 'packs/*/evals/fixtures' "${excludes[@]}"  # fixtures: vulnerable sample code agents review
+      - name: bandit (high severity, high confidence)
+        run: |
+          skips=$(paste -sd, "$RUNNER_TEMP/exc/sast")
+          bandit -q -r server/src runner/src cli/src packages/z-common/src deploy/images ci/scripts \
+            --severity-level high --confidence-level high ${skips:+--skip "$skips"}
+      - name: osv-scanner (lockfiles; CVSS >= 7 or unscored blocks)
+        run: |
+          rc=0
+          osv-scanner scan source -L uv.lock -L ui/pnpm-lock.yaml --format json \
+            --output-file "$RUNNER_TEMP/osv.json" || rc=$?
+          [ "$rc" -le 1 ] || { echo "osv-scanner failed ($rc)"; exit "$rc"; }
+          python3 ci/scripts/vuln_gate.py osv "$RUNNER_TEMP/osv.json"
+      - name: pip-audit (uv.lock export; a vulnerability with a fix blocks)
+        run: |
+          uv export --frozen --all-packages --no-emit-workspace --format requirements-txt -q \
+            -o "$RUNNER_TEMP/requirements.txt"
+          rc=0
+          pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/requirements.txt" --progress-spinner off \
+            --format json --output "$RUNNER_TEMP/pip-audit.json" || rc=$?
+          [ "$rc" -le 1 ] || { echo "pip-audit failed ($rc)"; exit "$rc"; }
+          python3 ci/scripts/vuln_gate.py pip-audit "$RUNNER_TEMP/pip-audit.json"
+      - name: pnpm audit (high and critical block)
+        working-directory: ui
+        run: |
+          corepack enable
+          ignores=()
+          while read -r id; do ignores+=(--ignore "$id"); done < "$RUNNER_TEMP/exc/deps-npm"
+          pnpm audit --audit-level high "${ignores[@]}"
+      - name: trivy fs (dependency vulnerabilities, HIGH and CRITICAL block)
+        run: |
+          trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln \
+            --ignorefile "$RUNNER_TEMP/exc/deps" .
+      # Dockerfiles and the chart through trivy's Helm renderer. Trivy does not read Compose files (they show as
+      # "not scanned"): tests/unit/test_compose_hardening.py checks them. Hook Jobs and the optional browser and
+      # egress proxy are scanned on the `helm template` output in helm.yml.
+      - name: trivy config (Dockerfiles, Helm chart with k3s and Kubernetes values)
+        run: |
+          for v in k3s k8s; do
+            echo "::group::$v"
+            trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile "$RUNNER_TEMP/exc/iac" \
+              --helm-values "deploy/helm/z/values-$v.yaml" --helm-values deploy/helm/z/ci/render-values.yaml deploy/
+            echo "::endgroup::"
+          done

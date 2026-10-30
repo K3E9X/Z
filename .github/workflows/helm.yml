@@ -1,0 +1,155 @@
+# Helm chart checks (docs/13 §1 "chart"): lint, render and schema-validate deploy/helm/z for k3s and
+# Kubernetes. Actions pinned by commit SHA; tools pinned by version and verified before use:
+# - kubeconform: release archive checked against its sha256 (from the release CHECKSUMS file);
+# - helm: built from the helm.sh/helm/v3 module, whose content Go verifies against the sum.golang.org
+#   transparency log, and whose module hash is pinned below. The Go toolchain itself is fetched the same
+#   way (GOTOOLCHAIN), so the runner's Go only bootstraps it.
+# trivy (config scan of the rendered manifests) comes from ci/scripts/install-scanners.sh; kube-score and
+# kubescape run in chart-policy.yml.
+name: helm
+on:
+  pull_request:
+    paths: ["deploy/helm/**", "ci/kind/**", "ci/scripts/versions.lock", "security/exceptions.yaml", ".github/workflows/helm.yml"]
+  push:
+    branches: [main]
+    paths: ["deploy/helm/**", "ci/kind/**", "ci/scripts/versions.lock", "security/exceptions.yaml", ".github/workflows/helm.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: helm-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
+
+env:
+  HELM_VERSION: v3.22.1
+  HELM_MODULE_SUM: "h1:uo2SouzAxMkKZTNzZ1lLP/c/Bu7xfUJKYDaYMxMHvk8="
+  HELM_GIT_COMMIT: d6c1a0e4027caa6abc7892e7ea9f0cda7447baa3
+  HELM_K8S_MINOR: "37"     # client-go v0.37.x in helm v3.22.1 (same ldflags as helm's Makefile)
+  GO_TOOLCHAIN: go1.26.10
+  KUBECONFORM_VERSION: v0.8.0
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+  CRDS_CATALOG: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install helm (verified Go module) and kubeconform (verified archive)
+        env:
+          GOTOOLCHAIN: ${{ env.GO_TOOLCHAIN }}
+          GOSUMDB: sum.golang.org
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"; mkdir -p "$bin"
+          sum=$(go mod download -json "helm.sh/helm/v3@${HELM_VERSION}" | jq -r .Sum)
+          test "$sum" = "$HELM_MODULE_SUM" || { echo "helm module hash mismatch: $sum"; exit 1; }
+          ldf="-s -w -X helm.sh/helm/v3/internal/version.version=${HELM_VERSION}"
+          ldf="$ldf -X helm.sh/helm/v3/internal/version.gitCommit=${HELM_GIT_COMMIT} -X helm.sh/helm/v3/internal/version.gitTreeState=clean"
+          for p in pkg/lint/rules pkg/chartutil; do
+            ldf="$ldf -X helm.sh/helm/v3/$p.k8sVersionMajor=1 -X helm.sh/helm/v3/$p.k8sVersionMinor=${HELM_K8S_MINOR}"
+          done
+          GOBIN="$bin" go install -trimpath -ldflags "$ldf" "helm.sh/helm/v3/cmd/helm@${HELM_VERSION}"
+          curl -fsSL -o "$RUNNER_TEMP/kubeconform.tar.gz" \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$bin" kubeconform
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Versions
+        run: helm version --short && kubeconform -v
+      - name: Lint
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            helm lint --strict deploy/helm/z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml
+          done
+      - name: Render and validate (kubeconform -strict)
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            echo "::group::$v"
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml > "rendered-$v.yaml"
+            kubeconform -strict -summary -ignore-missing-schemas "rendered-$v.yaml"
+            echo "::endgroup::"
+          done
+      - name: Render with Prometheus Operator present (ServiceMonitor) and optional resources
+        run: |
+          set -euo pipefail
+          for v in k3s k8s; do
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml \
+              --api-versions monitoring.coreos.com/v1 --set metrics.serviceMonitor.enabled=true \
+              > "rendered-$v-monitoring.yaml"
+            grep -q '^kind: ServiceMonitor' "rendered-$v-monitoring.yaml"
+            kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" \
+              "rendered-$v-monitoring.yaml"
+          done
+          helm template z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f deploy/helm/z/ci/render-values.yaml \
+            --set httpRoute.enabled=true --set 'httpRoute.parentRefs[0].name=gateway' \
+            --set secrets.externalSecret.enabled=true --set secrets.externalSecret.secretStoreRef.name=store \
+            --set 'secrets.externalSecret.dataFrom[0].extract.key=z/platform' \
+            --set runners.runtimeClass.create=true --set runners.runtimeClassName=gvisor \
+            --set metrics.grafanaDashboard.enabled=true \
+            > rendered-optional.yaml
+          grep -q 'name: z-grafana-dashboard' rendered-optional.yaml
+          kubeconform -strict -summary -schema-location default -schema-location "$CRDS_CATALOG" rendered-optional.yaml
+      # trivy's own Helm renderer (the security job in ci.yml) leaves out hook resources (the migrate and seed Jobs)
+      # and only sees the default values (browser and egress proxy off): scan what `helm template` renders instead.
+      - run: ci/scripts/install-scanners.sh trivy  # on PATH from the next step (GITHUB_PATH)
+      - name: trivy config on the rendered chart (hook Jobs, browser, egress proxy; HIGH and CRITICAL block)
+        run: |
+          set -euo pipefail
+          python3 ci/scripts/check_exceptions.py ids iac > "$RUNNER_TEMP/iac-exceptions"
+          for v in k3s k8s; do
+            echo "::group::$v"
+            out="$RUNNER_TEMP/trivy-$v"
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml \
+              --set browser.enabled=true --set egressProxy.enabled=true \
+              --set 'config.z.egress.mirrors[0]=https://pypi.mirror.example' --output-dir "$out" > /dev/null
+            for f in jobs browser egress-proxy; do test -s "$out/z/templates/$f.yaml"; done
+            grep -q 'helm.sh/hook' "$out/z/templates/jobs.yaml"
+            kubeconform -strict -summary -ignore-missing-schemas "$out"
+            trivy config --quiet --exit-code 1 --severity HIGH,CRITICAL --ignorefile "$RUNNER_TEMP/iac-exceptions" "$out"
+            echo "::endgroup::"
+          done
+      - name: Refused combinations fail the render
+        run: |
+          set -uo pipefail
+          # ci/render-values.yaml stands for the site values (digests, the inferX CIDR): without them production refuses
+          K3S=(-f deploy/helm/z/values-k3s.yaml -f deploy/helm/z/ci/render-values.yaml)
+          K8S=(-f deploy/helm/z/values-k8s.yaml -f deploy/helm/z/ci/render-values.yaml)
+          # refuse EXPECTED ARGS...: the render must fail, and with EXPECTED in its error (not for another reason)
+          refuse() {
+            local want=$1 out; shift
+            if out=$(helm template z deploy/helm/z -n z "$@" 2>&1 >/dev/null); then echo "accepted: $*"; exit 1; fi
+            grep -qF -- "$want" <<< "$out" || { printf 'refused for another reason: %s\nwanted: %s\n%s\n' "$*" "$want" "$out"; exit 1; }
+          }
+          accept() { helm template z deploy/helm/z -n z "$@" >/dev/null || { echo "refused: $*"; exit 1; }; }
+          LITELLM_EGRESS="env=production needs networkPolicy.litellmEgress"
+          refuse "/containerSecurityContext/readOnlyRootFilesystem': value must be true" \
+            "${K3S[@]}" --set containerSecurityContext.readOnlyRootFilesystem=false
+          refuse "/runners/podSecurity/level': value must be 'restricted'" "${K3S[@]}" --set runners.podSecurity.level=baseline
+          refuse "/runners/image/tag'" "${K3S[@]}" --set runners.image.tag=latest
+          refuse "migrate.mode=initContainer runs migrations in every z-server pod" "${K3S[@]}" --set server.replicas=2
+          refuse "postgres.embedded=false needs database.existingSecret" "${K8S[@]}" --set database.existingSecret=
+          refuse "$LITELLM_EGRESS" -f deploy/helm/z/values-k3s.yaml   # production without site values
+          refuse "$LITELLM_EGRESS" -f deploy/helm/z/values-k8s.yaml
+          refuse "$LITELLM_EGRESS" "${K3S[@]}" --set networkPolicy.litellmEgress=null
+          refuse "networkPolicy.litellmEgress must not allow 0.0.0.0/0" \
+            "${K3S[@]}" --set 'networkPolicy.litellmEgress[0].to[0].ipBlock.cidr=0.0.0.0/0'
+          refuse "needs networkPolicy.databaseEgress" "${K8S[@]}" --set networkPolicy.databaseEgress=null
+          refuse "/env': value must be one of" "${K3S[@]}" --set env=prod
+          refuse "/networkPolicy/enabled': value must be true" "${K3S[@]}" --set networkPolicy.enabled=false
+          refuse "/runners/networkPolicy/enabled': value must be true" "${K3S[@]}" --set runners.networkPolicy.enabled=false
+          refuse "networkPolicy.enabled=false is refused" "${K3S[@]}" --skip-schema-validation --set networkPolicy.enabled=false
+          refuse "set server.image.digest" "${K3S[@]}" --set server.image.digest=
+          refuse "set litellm.image.digest" "${K3S[@]}" --set litellm.image.digest=
+          accept "${K3S[@]}"
+          accept "${K8S[@]}"
+          accept -f deploy/helm/z/values-k3s.yaml -f ci/kind/values-smoke.yaml
+          echo "all refused"

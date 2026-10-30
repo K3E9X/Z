@@ -1,0 +1,7 @@
+# Copy to security/exceptions.yaml. Every accepted finding needs an owner and an expiry; expired entries fail CI.
+exceptions:
+  - id: CVE-0000-00000
+    scope: image:z-runner
+    reason: Not reachable — the vulnerable function is not used; upstream fix pending.
+    owner: "@owner"
+    expires: 2026-12-31

@@ -1,0 +1,12 @@
+# invalid: unknown key and a provider model id instead of an alias
+name: atlas
+display_name: Atlas
+handle: atlas
+version: 1.0.0
+role: Test
+model: openai/glm-4.6
+skills: []
+tools: [read]
+autonomy: propose
+limits: { max_steps: 10, max_tokens: 1000, timeout_s: 60 }
+instructions_typo: oops

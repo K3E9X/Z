@@ -1,0 +1,26 @@
+{
+  "id": 7503,
+  "title": "PostgreSQL extension script SQL injection on subscriber-db-01",
+  "date": "2026-10-26",
+  "severity": "High",
+  "cvssv3_score": 8.8,
+  "cve": "CVE-2023-39417",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-39417"
+    }
+  ],
+  "description": "postgresql 14.8 on the subscriber database. No public exploit is known.",
+  "mitigation": "Upgrade postgresql to 14.9 or later.",
+  "component_name": "postgresql",
+  "component_version": "14.8",
+  "service": "subscriber-db-01",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-39417",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

@@ -1,0 +1,74 @@
+{{- $ns := .Release.Namespace }}
+{{- $dir := include "z.secretsOutDir" . }}
+{{- $sel := printf "app.kubernetes.io/instance=%s,app.kubernetes.io/component=server" .Release.Name -}}
+Z {{ .Chart.AppVersion }} is deployed in namespace {{ .Release.Namespace }} (runners: {{ .Values.runners.namespace }}).
+
+URL: {{ include "z.publicUrl" . }}
+
+First connection (docs/12 §1): at its first start z-server creates the bootstrap admin (z-bootstrap) and
+writes its one-time password (valid 24 h) to a memory-backed file of the pod that created it, never to the
+log. The log line only names the file; --prefix shows which pod wrote it:
+
+  kubectl -n {{ $ns }} logs -l {{ $sel }} -c server --prefix --tail=-1 | grep "secret written to"
+
+Read the file in the pod named in front of that line ([pod/<pod>/server]):
+
+  kubectl -n {{ $ns }} exec <pod> -c server -- cat {{ $dir }}/bootstrap
+
+Sign in at {{ include "z.publicUrl" . }}/signin as z-bootstrap, configure GitLab sign-in and the group
+mapping, then sign in with GitLab as an admin: the bootstrap account is disabled automatically.
+Lost it, or the pod was replaced (the file goes with the pod)? Issue a new one; it is written to the same
+file of the pod you exec into:
+
+  POD=$(kubectl -n {{ $ns }} get pod -l {{ $sel }} -o jsonpath='{.items[0].metadata.name}')
+  kubectl -n {{ $ns }} exec "$POD" -c server -- z-server bootstrap --reset
+  kubectl -n {{ $ns }} exec "$POD" -c server -- cat {{ $dir }}/bootstrap
+{{- if dig "auth" "breakglass" "enabled" false .Values.config.z }}
+
+Break-glass (Z_BREAKGLASS=true): its one-time password and TOTP URI are written to {{ $dir }}/breakglass of the
+pod that created them, the same way (grep the log for "secret written to", then kubectl exec <pod> -c server -- cat).
+{{- end }}
+{{- /* production renders only with every image pinned by digest (z.validateDigests) */}}
+{{- $missing := list }}
+{{- range $n, $img := dict "server" .Values.server.image "runners" .Values.runners.image "ui" .Values.ui.image "litellm" .Values.litellm.image "postgres" .Values.postgres.image "browser" .Values.browser.image "egressProxy" .Values.egressProxy.image }}
+{{- if not $img.digest }}{{ $missing = append $missing $n }}{{ end }}
+{{- end }}
+{{- if $missing }}
+
+WARNING (env={{ .Values.env }}): images without a digest: {{ join ", " $missing }}. Deploy by digest
+(<component>.image.digest); env=production refuses to render without them.
+{{- end }}
+{{- /* lookup is empty under `helm template` and without get on namespaces: then only the reminder shows */}}
+{{- $nsObj := lookup "v1" "Namespace" "" .Release.Namespace }}
+{{- $enforce := dig "metadata" "labels" "pod-security.kubernetes.io/enforce" "" ($nsObj | default dict) }}
+{{- if ne $enforce "restricted" }}
+
+{{- if $nsObj }}
+WARNING: namespace {{ .Release.Namespace }} does not enforce Pod Security `restricted` (docs/07 §3; enforce={{ default "none" $enforce }}).
+{{- else }}
+CHECK: namespace {{ .Release.Namespace }} must enforce Pod Security `restricted` (docs/07 §3); it could not be read here.
+{{- end }}
+Every chart pod satisfies it; label the namespace (the chart cannot own it with helm install):
+
+  kubectl label namespace {{ .Release.Namespace }} --overwrite pod-security.kubernetes.io/enforce=restricted \
+    pod-security.kubernetes.io/enforce-version=latest pod-security.kubernetes.io/audit=restricted \
+    pod-security.kubernetes.io/warn=restricted
+{{- end }}
+{{- if not .Values.persistence.artifacts.enabled }}
+
+WARNING: persistence.artifacts.enabled=false: artifacts live in an emptyDir and are lost with the pod.
+{{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.networkPolicy.serverEgress.enabled (not .Values.networkPolicy.serverEgress.allow) }}
+
+WARNING: networkPolicy.serverEgress.allow is empty: z-server reaches only DNS, the chart's pods and the
+Kubernetes API. GitLab sign-in ({{ default "oidc.issuerUrl" .Values.oidc.issuerUrl }}) and every connector stay unreachable until
+you list them there.
+{{- end }}
+{{- if not .Values.networkPolicy.litellmEgress }}
+
+WARNING: networkPolicy.litellmEgress is empty: LiteLLM egress is not restricted (refused with env=production).
+{{- end }}
+{{- if not .Values.runners.networkPolicy.enabled }}
+
+WARNING: runners.networkPolicy.enabled=false: agent pods are not network-isolated (docs/07 §3).
+{{- end }}

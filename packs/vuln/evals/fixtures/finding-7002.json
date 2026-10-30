@@ -1,0 +1,26 @@
+{
+  "id": 7002,
+  "title": "OpenSSL excessive time spent generating DH keys on billing-db-02",
+  "date": "2026-10-26",
+  "severity": "Medium",
+  "cvssv3_score": 5.3,
+  "cve": "CVE-2023-5678",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-5678"
+    }
+  ],
+  "description": "openssl 3.0.11 on the billing database host. No public exploit is known.",
+  "mitigation": "Upgrade openssl to 3.0.13 or later.",
+  "component_name": "openssl",
+  "component_version": "3.0.11",
+  "service": "billing-db-02",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-5678",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

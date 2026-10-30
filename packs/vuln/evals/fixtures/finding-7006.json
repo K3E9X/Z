@@ -1,0 +1,27 @@
+{
+  "id": 7006,
+  "title": "Looney Tunables glibc ld.so buffer overflow on radius-auth-03",
+  "date": "2026-10-26",
+  "severity": "High",
+  "cvssv3_score": 7.8,
+  "cve": "CVE-2023-4911",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-4911"
+    }
+  ],
+  "description": "glibc 2.35 on a RADIUS authentication server of the broadband access network. A public exploit is available.",
+  "mitigation": "Upgrade glibc to 2.35-0ubuntu3.4 or later.",
+  "component_name": "glibc",
+  "component_version": "2.35",
+  "service": "radius-auth-03",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-4911",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner",
+    "exploit:public"
+  ]
+}

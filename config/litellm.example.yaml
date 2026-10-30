@@ -1,0 +1,88 @@
+# LiteLLM gateway for Z — the only component allowed to reach any model.
+# Copy to config/litellm.yaml. Model ids are those of the inferX catalogue (Models page of the console, or
+# GET <base>/models with the key); check them for your project before deploying (ADR 0024).
+#   INFERENCE_API_BASE  https://inferx.datax.iliad.fr/inference/v1 (public gateway, IP-filtered) or
+#                       https://private.inferx.datax.iliad.fr/inference/v1 (Scaleway VPC or WireGuard: preferred)
+#   INFERENCE_API_KEY   an inferX *project* key (ixk_...), allowed only the models below, one per environment.
+# C2/C3 data goes through these models: none of them may have an external fallback ("secours externe" /
+# genapi) in inferX. Use the shared models or dedicated deployments without one, or with the shared-model fallback.
+# Check the syntax against the LiteLLM docs of the version you deploy.
+# Run the official proxy image pinned by digest. Never use LiteLLM 1.82.7 or 1.82.8 (backdoored on PyPI, March 2026).
+
+model_list:
+  # Heavy: planning, code, architecture reviews, learning proposals
+  - model_name: z-heavy
+    litellm_params:
+      model: openai/glm-5-3-nvfp4           # openai/ prefix = OpenAI-compatible endpoint; pinned, not the `pro` category
+      api_base: os.environ/INFERENCE_API_BASE
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Fast: triage at scale, extraction, browsing
+  - model_name: z-fast
+    litellm_params:
+      model: openai/qwen3-8-27b-nvfp4        # text + vision; pinned, not the `medium` category
+      api_base: os.environ/INFERENCE_API_BASE
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Judge: injection scan, pre-action checks, routing, classification, eval grading
+  - model_name: z-judge
+    litellm_params:
+      model: openai/qwen3-8-27b-nvfp4        # the smallest shared model today
+      api_base: os.environ/INFERENCE_API_BASE
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
+    model_info: { provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # Embeddings: memory and skill search
+  - model_name: z-embed
+    litellm_params:
+      model: openai/<EMBEDDING_MODEL_ID>     # no shared embeddings model in the catalogue yet: memory search stays off until one is opened
+      api_base: os.environ/INFERENCE_API_BASE
+      litellm_credential_name: inferx       # the inferX key: environment default below, or set from Z (ADR 0027)
+    model_info: { mode: embedding, provider_name: inferx, data_classes: [C0, C1, C2, C3] }
+
+  # --- Optional external providers. Keep commented unless enabled in config/z.yaml ---
+  # - model_name: ext-claude
+  #   litellm_params:
+  #     model: anthropic/<CLAUDE_MODEL_ID>
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+  #   model_info: { provider_name: anthropic, data_classes: [C0, C1] }
+  # - model_name: ext-azure
+  #   litellm_params:
+  #     model: azure/<DEPLOYMENT_NAME>
+  #     api_base: os.environ/AZURE_OPENAI_API_BASE
+  #     api_key: os.environ/AZURE_OPENAI_API_KEY
+  #   model_info: { provider_name: azure-openai, data_classes: [C0, C1] }
+  # - model_name: ext-mistral
+  #   litellm_params:
+  #     model: mistral/<MISTRAL_MODEL_ID>
+  #     api_key: os.environ/MISTRAL_API_KEY
+  #   model_info: { provider_name: mistral, data_classes: [C0, C1] }
+
+# The inferX key (ADR 0027). Default: INFERENCE_API_KEY. An admin can replace it from Z (Inference → inferX key):
+# LiteLLM then keeps it encrypted in its database (LITELLM_SALT_KEY) and that one wins, also after a restart.
+credential_list:
+  - credential_name: inferx
+    credential_values: { api_key: os.environ/INFERENCE_API_KEY }
+    credential_info: { description: inferX project key (environment default) }   # required by LiteLLM, even empty
+
+litellm_settings:
+  drop_params: true            # ignore params a model does not support instead of failing
+  request_timeout: 600         # inferX itself cuts a request at 1 h 05
+  return_response_headers: true  # provider headers come back as llm_provider-* (x-inferx-fallback, ADR 0024)
+  # refuses answers inferX served through an external fallback for C2/C3 keys (z_inference_guard.py, mounted next
+  # to this file from deploy/helm/z/files/)
+  callbacks: [z_inference_guard.guard]
+
+router_settings:
+  # inferX answers 429 (rate_limit_exceeded) and 503 (model_unavailable, outside_time_window,
+  # no_capacity_available, maintenance) with Retry-After; the router waits at least that long. After these
+  # retries the runner reports llm_unavailable and Z requeues the job from its checkpoint with backoff.
+  num_retries: 2
+  retry_after: 1
+  # No cross-provider fallbacks here: the Z routing policy decides (config/z.yaml).
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY        # used by z-server only
+  database_url: os.environ/LITELLM_DATABASE_URL    # needed for virtual keys, budgets, spend logs

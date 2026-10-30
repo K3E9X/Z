@@ -1,0 +1,5 @@
+Code search, repository ftth/provisioning-api, branch main, 2026-10-27
+query: activateDefaultTyping|enableDefaultTyping|JsonTypeInfo
+results: 0 matches
+ObjectMapper construction: src/main/java/test/example/ftth/ProvisioningJson.java line 18
+  new ObjectMapper().registerModule(new JavaTimeModule())

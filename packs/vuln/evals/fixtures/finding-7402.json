@@ -1,0 +1,27 @@
+{
+  "id": 7402,
+  "title": "Apache Struts file upload path traversal on partner-portal-01",
+  "date": "2026-10-26",
+  "severity": "Critical",
+  "cvssv3_score": 9.8,
+  "cve": "CVE-2023-50164",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-50164"
+    }
+  ],
+  "description": "struts2-core 2.5.30 in the B2B partner portal. A public exploit is available.",
+  "mitigation": "Upgrade struts2-core to 2.5.33 or later.",
+  "component_name": "struts2-core",
+  "component_version": "2.5.30",
+  "service": "partner-portal-01",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-50164",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner",
+    "exploit:public"
+  ]
+}

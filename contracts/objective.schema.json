@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/objective.schema.json",
+  "title": "Objective",
+  "description": "A standing goal given to an agent (03 §4, 04 §3). objectives/*.yaml in a pack holds a list of these.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent", "title", "metric", "cadence"],
+  "properties": {
+    "agent": { "$ref": "common.schema.json#/$defs/Slug" },
+    "title": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref"],
+        "properties": { "kind": { "$ref": "common.schema.json#/$defs/AssignmentKind" }, "ref": { "type": "string" } }
+      }
+    },
+    "metric": { "$ref": "#/$defs/Metric" },
+    "cadence": {
+      "oneOf": [
+        { "type": "string", "description": "5-field cron." },
+        { "type": "object", "additionalProperties": false, "required": ["event"], "properties": { "event": { "$ref": "common.schema.json#/$defs/TriggerKind" } } }
+      ]
+    },
+    "allowed_playbooks": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "uniqueItems": true },
+    "mode": { "$ref": "common.schema.json#/$defs/ObjectiveMode" },
+    "budget_per_period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokens", "period"],
+      "properties": { "tokens": { "type": "integer", "minimum": 1 }, "period": { "type": "string", "enum": ["day", "week", "month"] } }
+    },
+    "owner_user": { "type": "string" },
+    "status": { "$ref": "common.schema.json#/$defs/ObjectiveStatus" }
+  },
+  "$defs": {
+    "Metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target", "direction"],
+      "properties": {
+        "source": { "type": "string", "enum": ["z", "connector"] },
+        "query": { "type": "string", "description": "z source: untriaged_findings | open_proposals | stale_tickets | overdue_tickets | mission_failures." },
+        "operation": { "$ref": "common.schema.json#/$defs/OperationId", "description": "connector source: a read operation." },
+        "params": { "type": "object" },
+        "path": { "type": "string", "description": "connector source: JSONPath into the result." },
+        "aggregate": { "type": "string", "enum": ["count", "sum"], "default": "count" },
+        "target": { "type": "number" },
+        "direction": { "type": "string", "enum": ["down", "up"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "source": { "const": "z" } } }, "then": { "required": ["query"], "properties": { "query": { "enum": ["untriaged_findings", "open_proposals", "stale_tickets", "overdue_tickets", "mission_failures"] } } } },
+        { "if": { "properties": { "source": { "const": "connector" } } }, "then": { "required": ["operation"] } }
+      ]
+    }
+  }
+}

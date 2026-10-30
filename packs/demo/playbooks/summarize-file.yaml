@@ -1,0 +1,21 @@
+name: summarize-file
+version: 1.0.0
+domain: demo
+description: Summarize one uploaded file. Read-only, one agent, one step.
+inputs:
+  schema:
+    type: object
+    required: [file]
+    properties:
+      file: { type: string, description: "Path of an uploaded file, relative to the workspace" }
+team: [summarizer]
+connectors: []
+steps:
+  - id: summarize
+    agent: summarizer
+    workspace: files
+    prompt: Apply the summarize skill to the file {{ inputs.file }}.
+    output: { schema: schemas/summary.json, max_repair_attempts: 2 }
+autonomy: read_only
+budget: { max_tokens: 100000, timeout_s: 600 }
+baseline_minutes: 5

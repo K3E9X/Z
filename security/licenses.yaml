@@ -1,0 +1,53 @@
+# License policy (ci/scripts/check_licenses.py, docs/13 §2). Z is deployed internally; it may use permissive and
+# weak-copyleft libraries unmodified, never strong copyleft, source-available or non-commercial ones.
+allow:
+  - MIT
+  - MIT-0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - 0BSD
+  - Apache-2.0
+  - ISC
+  - PSF-2.0
+  - Python-2.0
+  - HPND
+  - Zlib
+  - Unlicense
+  - CC0-1.0
+  - BlueOak-1.0.0
+  - CC-BY-4.0
+  - MPL-2.0
+  - OFL-1.1
+  - MIT-CMU
+  - CNRI-Python
+  - LGPL-2.1-only
+  - LGPL-2.1-or-later
+  - LGPL-3.0-only
+  - LGPL-3.0-or-later
+deny:
+  - "^A?GPL-"
+  - "^SSPL"
+  - "^BUSL"
+  - "Commons-Clause"
+  - "-NC-"
+  - "^Elastic-"
+# Packages whose metadata is missing or not an SPDX id, with the license checked by hand (re-check on upgrade).
+packages:
+  - { ecosystem: pypi, name: openhands-sdk, license: MIT, reason: "no license metadata; MIT in the upstream repository (OpenHands/software-agent-sdk)" }
+  - { ecosystem: pypi, name: openhands-tools, license: MIT, reason: "no license metadata; same repository as openhands-sdk" }
+  - { ecosystem: pypi, name: agent-client-protocol, license: Apache-2.0, reason: "no license field; the wheel ships the Apache 2.0 text" }
+  - { ecosystem: pypi, name: tiktoken, license: MIT, reason: "License field holds the full MIT text" }
+  - { ecosystem: pypi, name: socksio, license: MIT, reason: "metadata says UNKNOWN; the wheel ships the MIT text" }
+  - ecosystem: pypi
+    name: python-dateutil
+    license: "Apache-2.0 AND BSD-3-Clause"
+    reason: "metadata says Dual License; Apache 2.0 for new code, BSD 3-clause for older code"
+  - { ecosystem: pypi, name: func-timeout, license: LGPL-3.0-only, reason: "metadata says LGPLv2; the wheel ships the LGPL 3.0 text; used unmodified" }
+# Z's own workspace packages.
+ignore:
+  - { ecosystem: pypi, name: z-common }
+  - { ecosystem: pypi, name: z-server }
+  - { ecosystem: pypi, name: z-runner }
+  - { ecosystem: pypi, name: z-cli }
+  - { ecosystem: pypi, name: z-browser }
+  - { ecosystem: npm, name: z-ui }

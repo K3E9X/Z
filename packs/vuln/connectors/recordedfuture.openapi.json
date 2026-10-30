@@ -1,0 +1,319 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Recorded Future Connect API (subset used by Z)",
+    "version": "2",
+    "description": "Read-only enrichment lookups. Paths, the X-RFToken header and the fields parameter checked against Recorded Future's official SDK (psengine 2.14.0). operationIds are Z operation ids. Every lookup sends the indicator to Recorded Future (an external service): private and internal addresses are refused."
+  },
+  "servers": [
+    {
+      "url": "https://api.recordedfuture.com"
+    }
+  ],
+  "paths": {
+    "/v2/ip/{ip}": {
+      "get": {
+        "operationId": "ip.get",
+        "summary": "Risk and context of a public IP address",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 39,
+              "anyOf": [
+                {
+                  "pattern": "^(?!(?:10|127|0)\\.)(?!169\\.254\\.)(?!192\\.168\\.)(?!172\\.(?:1[6-9]|2[0-9]|3[01])\\.)(?!100\\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.)(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                },
+                {
+                  "pattern": "^(?![fF][cCdD])(?![fF][eE][89aAbB])(?!::1?$)[0-9A-Fa-f:]{2,39}$"
+                }
+              ]
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/domain/{domain}": {
+      "get": {
+        "operationId": "domain.get",
+        "summary": "Risk and context of a public domain (internal suffixes are refused)",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^(?!.*\\.(local|internal|lan|corp|home|intranet)$)([A-Za-z0-9-]{1,63}\\.)+[A-Za-z]{2,63}$"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/hash/{hash}": {
+      "get": {
+        "operationId": "hash.get",
+        "summary": "Risk and context of a file hash (MD5, SHA-1, SHA-256, SHA-512)",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^([A-Fa-f0-9]{32}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64}|[A-Fa-f0-9]{128})$"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/url/{url}": {
+      "get": {
+        "operationId": "url.get",
+        "summary": "Risk and context of a public URL (give it in full; it is URL-encoded by Z)",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2000,
+              "pattern": "^https?://[^\\s/]+\\.[A-Za-z]{2,63}(/\\S*)?$"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/vulnerability/{cve}": {
+      "get": {
+        "operationId": "vulnerability.get",
+        "summary": "Risk, exploitation and CVSS context of a CVE",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "cve",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^CVE-[0-9]{4}-[0-9]{4,7}$"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/malware/{id}": {
+      "get": {
+        "operationId": "malware.get",
+        "summary": "A malware family by its Recorded Future id (from linkedMalware)",
+        "description": "404 means Recorded Future knows nothing about it: say so, it is not an error in the finding.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$",
+              "description": "Comma-separated fields, e.g. entity,risk,timestamps (the SDK's default), plus threatLists, riskMapping, intelCard, location, sightings; for vulnerabilities also cvss, cvssv3, cvssv4, nvdDescription, lifecycleStage, linkedMalware, cpe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing known on this entity"
+          }
+        }
+      }
+    },
+    "/v2/{entity_type}/riskrules": {
+      "get": {
+        "operationId": "riskrules.list",
+        "summary": "Risk rules Recorded Future applies to a kind of entity (what each rule means)",
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ip",
+                "domain",
+                "hash",
+                "url",
+                "vulnerability"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

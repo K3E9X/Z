@@ -1,0 +1,17 @@
+name: inbox-triage
+version: 1.0.0
+domain: workplace
+description: Sort my unread mail and draft replies for my approval.
+inputs:
+  schema: { type: object, properties: { window_hours: { type: integer, default: 24 } } }
+team: [assistant]
+connectors: [m365]
+steps:
+  - { id: triage, agent: assistant, credentials: user, prompt: "Apply inbox-triage for the last {{ inputs.window_hours }} hours.", writes: [m365.mail.reply] }
+trigger:
+  kind: schedule
+  cron: "30 8 * * 1-5"
+  owner_user: <the person whose inbox this is>     # user credentials are only allowed for the trigger owner
+  inputs: { window_hours: 24 }
+autonomy: propose
+budget: { max_tokens: 800000, timeout_s: 1800 }

@@ -1,0 +1,10 @@
+{
+  "name": "subscriber-db-01",
+  "fqdn": "subscriber-db-01.example.internal",
+  "ip": "10.42.7.15",
+  "environment": "production",
+  "exposure": "internal",
+  "criticality": 1,
+  "owner_team": "Subscriber Data",
+  "data_class": "C3"
+}

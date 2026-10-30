@@ -1,0 +1,5 @@
+name: dev
+version: 1.0.0
+description: Code changes and reviews on Git repositories
+owner: cyber-ops
+requires_connectors: [gitlab]

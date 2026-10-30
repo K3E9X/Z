@@ -1,0 +1,20 @@
+{{- if .Values.releaseNamespace.create }}
+{{- $ps := .Values.runners.podSecurity }}
+# The release namespace with Pod Security Admission `restricted` (docs/07 §3). Only for renderers that apply
+# manifests without Helm's release storage (helm template | kubectl apply, Argo CD): `helm install` keeps the
+# release in this namespace before it creates any resource, so there create and label it beforehand.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    {{- include "z.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: {{ $ps.level }}
+    pod-security.kubernetes.io/enforce-version: {{ $ps.version }}
+    pod-security.kubernetes.io/audit: {{ $ps.level }}
+    pod-security.kubernetes.io/audit-version: {{ $ps.version }}
+    pod-security.kubernetes.io/warn: {{ $ps.level }}
+    pod-security.kubernetes.io/warn-version: {{ $ps.version }}
+  annotations:
+    helm.sh/resource-policy: keep
+{{- end }}

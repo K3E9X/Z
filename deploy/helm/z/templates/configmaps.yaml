@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "z.fullname" . }}-config
+  labels:
+    {{- include "z.labels" . | nindent 4 }}
+data:
+  # config/z.yaml. Secrets are ${VAR} placeholders filled from the z-server environment, never values.
+  z.yaml: |
+    {{- toYaml .Values.config.z | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "z.litellm.fullname" . }}-config
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "litellm") | nindent 4 }}
+data:
+  # config/litellm.yaml. Keys are os.environ/ references filled from the Secret.
+  config.yaml: |
+    {{- toYaml .Values.config.litellm | nindent 4 }}
+  # LiteLLM callback loaded by `callbacks: [z_inference_guard.guard]` (ADR 0024)
+  z_inference_guard.py: |-
+{{ .Files.Get "files/z_inference_guard.py" | indent 4 }}

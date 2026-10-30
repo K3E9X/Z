@@ -1,0 +1,6 @@
+name: archi-isp
+version: 1.0.0
+description: Security architecture support for projects
+owner: cyber-ops
+requires_connectors: []
+optional_connectors: [confluence, fwconsole]

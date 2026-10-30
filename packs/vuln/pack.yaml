@@ -1,0 +1,8 @@
+name: vuln
+version: 1.1.1
+description: >-
+  Vulnerability triage and remediation. Needs the dev pack (remediate-dependency uses its Dev Engineer and Reviewer
+  agents, its change-result and review-result schemas and its gitlab connector).
+owner: cyber-ops
+requires_connectors: [defectdojo, cmdb, jira, gitlab]
+optional_connectors: [web, recordedfuture]

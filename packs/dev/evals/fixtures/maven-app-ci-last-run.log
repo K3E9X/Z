@@ -1,0 +1,8 @@
+$ mvn -B verify
+[INFO] Running internal.example.noc.AlarmFormatterTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running internal.example.noc.PaymentGatewayIT
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[ERROR] sandboxAnswers(internal.example.noc.PaymentGatewayIT)  Time elapsed: 5.012 s  <<< ERROR!
+java.net.UnknownHostException: payments-sandbox.example.test
+[ERROR] BUILD FAILURE (pipeline #88412 on main, before any dependency change)

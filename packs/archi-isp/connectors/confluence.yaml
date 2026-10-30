@@ -1,0 +1,17 @@
+name: confluence
+kind: mcp                       # or openapi with the Confluence REST spec
+display_name: Confluence
+mcp: { transport: stdio, command: "<atlassian-mcp-server command>" }
+operation_map:
+  confluence_search: pages.search
+  confluence_get_page: pages.get
+  confluence_create_page: pages.create
+auth:
+  read: { type: bearer, secret: env:CONFLUENCE_TOKEN_RO }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "pages.search", class: read, exposed: true }
+    - { match: "pages.get", class: read, exposed: true }
+    - { match: "pages.create", class: write, exposed: false }   # v1.1
+data_class: C2

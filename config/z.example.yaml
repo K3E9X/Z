@@ -1,0 +1,153 @@
+# Z platform configuration. Copy to config/z.yaml. Validated against contracts/config.schema.json.
+
+workspace:
+  name: Cyber Ops
+  environment: local            # local | k3s-production | ...
+
+auth:
+  provider: gitlab               # GitLab as the OIDC identity provider (see docs/12)
+  mode: ${Z_AUTH_MODE:-oidc}     # oidc | dev (single local user, refused when Z_ENV=production)
+  issuer_url: ${OIDC_ISSUER_URL} # https://gitlab.example.internal
+  client_id: ${OIDC_CLIENT_ID}
+  client_secret: ${OIDC_CLIENT_SECRET}
+  scopes: [openid, profile, email]
+  groups_claim: groups           # read from /oauth/userinfo (paths, inherited included)
+  allowed_groups: [cyber]        # users outside these groups cannot sign in
+  no_match: viewer               # viewer | deny
+  group_mapping:
+    - { group: cyber/z/z-admins,    role: admin,    scope: org }
+    - { group: cyber/z/z-auditors,  role: auditor,  scope: org }
+    - { group: cyber/z/z-builders,  role: builder,  scope: org }
+    - { group: cyber/z/z-approvers, role: approver, scope: team }
+    - { group: cyber/z/z-operators, role: operator, scope: team }
+  team_mapping:
+    - { group: cyber/soc-csirt, team: Cyber Ops }
+    - { group: cyber/archi,     team: Architecture }
+  reevaluate_groups_minutes: 60
+  session: { idle_minutes: 120, absolute_hours: 12, cli_token_days: 30 }
+  step_up_max_age_s: 300
+  api_tokens: { max_days: 90 }
+  cli: { device_flow: true, loopback_redirect: "http://127.0.0.1:8765/callback" }
+  local_accounts:                # docs/12 §1 "Local accounts"
+    bootstrap: { enabled: true, ttl_hours: 24 }   # first connection only; auto-disabled after the first GitLab admin login
+    test_accounts:               # refused when Z_ENV=production
+      - { name: tester, role: operator, team: Cyber Ops, expires_days: 30 }
+      - { name: tester-approver, role: approver, team: Cyber Ops, expires_days: 30 }
+    password_policy: { min_length: 14, lockout_after: 5, lockout_minutes: 15 }
+  breakglass: { enabled: false } # only with Z_BREAKGLASS=true; TOTP step-up; every use alerts all admins
+
+audit:
+  retention_days: 365
+  checkpoint_minutes: 60
+  forward:                      # at-least-once, in order; a new destination starts from now unless from_now: false
+    syslog: { enabled: false, url: "tls://syslog.example.internal:6514", format: rfc5424 }   # TLS only, octet-counted
+    https: { enabled: false, url: "", token_ref: "" }   # JSON lines; token_ref: env:/file:/vault:/kubernetes: reference
+
+executor:
+  kind: docker                  # docker | process (dev only) | kubernetes
+  docker: { socket_proxy_url: http://docker-socket-proxy:2375, network: z_runners }   # compose declares the network with name: z_runners
+  kubernetes: { namespace: z-runners, runtime_class: "", job_ttl_s: 3600 }
+  tool_images: []              # cli connector tools (ADR 0025): name@sha256:..., also in the socket proxy's Z_TOOL_IMAGES
+  default_concurrency: 8
+  max_concurrency: 32
+
+inference:
+  gateway_url: ${LITELLM_URL}
+  aliases: [z-heavy, z-fast, z-judge, z-embed]
+  internal_cost_per_mtok:       # inferX shared-model prices (EUR per million tokens, catalogue of 2026-10-07)
+    z-heavy: { input: 1.50, output: 5.50 }   # glm-5-3-nvfp4
+    z-fast: { input: 1.00, output: 2.00 }    # qwen3-8-27b-nvfp4
+    z-judge: { input: 1.00, output: 2.00 }
+  prometheus:
+    url: ${INFERENCE_PROMETHEUS_URL}
+    queries:                    # verify metric names against your exporters
+      requests_running: sum by (model_name) (vllm:num_requests_running)
+      requests_waiting: sum by (model_name) (vllm:num_requests_waiting)
+      kv_cache_usage: avg by (model_name) (vllm:gpu_cache_usage_perc)
+      prefix_cache_hit: sum(rate(vllm:prefix_cache_hits_total[5m])) / sum(rate(vllm:prefix_cache_queries_total[5m]))
+      ttft_p95: histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+      gen_tokens_per_s: sum by (model_name) (rate(vllm:generation_tokens_total[1m]))
+      prompt_tokens_per_s: sum by (model_name) (rate(vllm:prompt_tokens_total[1m]))
+      preemptions_24h: sum(increase(vllm:num_preemptions_total[24h]))
+      gpu_util: avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)
+      gpu_mem_used_ratio: sum by (Hostname) (DCGM_FI_DEV_FB_USED) / (sum by (Hostname) (DCGM_FI_DEV_FB_USED) + sum by (Hostname) (DCGM_FI_DEV_FB_FREE))
+      gpu_temp: max by (Hostname) (DCGM_FI_DEV_GPU_TEMP)
+  probes: { models_poll_s: 60, tool_call_probe_s: 600 }
+
+providers:
+  - { name: inferX, kind: internal, enabled: true, aliases: [z-heavy, z-fast, z-judge, z-embed], data_classes: [C0, C1, C2, C3] }
+  - { name: Anthropic API, kind: external, enabled: false, aliases: [ext-claude], data_classes: [C0, C1] }
+  - { name: Azure OpenAI, kind: external, enabled: false, aliases: [ext-azure], data_classes: [C0, C1] }
+  - { name: Mistral API, kind: external, enabled: false, aliases: [ext-mistral], data_classes: [C0, C1] }
+
+routing_policy:
+  data_classes:
+    C0: Public
+    C1: Internal
+    C2: Confidential
+    C3: Restricted
+  default_mission_class: C2
+  external_fallback_when_degraded: false
+  never_external: [C2, C3]
+  never_in_memory: [C3]
+
+budgets:
+  org_monthly_tokens: 600000000
+  default_mission_tokens: 10000000
+  alert_at: 0.8
+
+judge:                          # docs/04 §6; the pattern scan always runs, the model can only raise its verdict
+  model: z-judge
+  model_stage: true             # off also when the judge_injection_scan guardrail is off
+  timeout_s: 8
+
+guardrails:                     # locked values cannot be changed from the UI
+  human_approval_for_writes: { value: true, locked: true }
+  two_approvers_for_destructive: { value: true, locked: true }
+  sandbox_network: { value: deny, locked: true }
+  judge_injection_scan: { value: true, locked: true }     # invariant 6: the scan cannot be turned off
+  learning_requires_approval: { value: true, locked: true }
+  max_steps_per_job: 120
+  max_job_minutes: 60
+
+egress:
+  proxy_url: ${EGRESS_PROXY_URL}
+  mirrors:                      # the only destinations runners can reach besides Z itself
+    - https://nexus.example.internal
+    - https://harbor.example.internal
+  browser_targets: []           # apps the z-browser worker may open (browser connectors)
+
+secrets:
+  backend: ${Z_SECRETS_BACKEND:-env}  # env | file | vault | kubernetes
+  vault: { address: "", mount: kv, path_prefix: z/ }
+
+channels:
+  teams: { enabled: false, app_id: "", default_agent: orchestrator }
+  mattermost: { enabled: false, default_agent: orchestrator }
+  slack: { enabled: false, default_agent: orchestrator }
+  email: { enabled: false, address: "", default_agent: orchestrator }
+
+notifications:
+  mattermost_webhook: ${MATTERMOST_WEBHOOK_URL}
+  slack_webhook: ${SLACK_WEBHOOK_URL}
+  smtp_url: ${SMTP_URL}
+  digest: { daily_decisions: "0 9 * * 1-5", weekly_report: "0 16 * * 5" }
+
+memory:
+  embedding_dim: ${Z_EMBEDDING_DIM:-1024}   # must match the z-embed model; changing it needs a migration
+
+retention:
+  events_days: 180
+  artifacts_days: 90
+  c3_artifacts_days: 7
+
+learning:
+  schedule: "0 2 * * *"
+  shadow_replay_missions: 10
+  max_token_cost_increase: 0.15
+  min_signals: 3
+  # run_as: alice                 # who the eval missions of proposals run as (needs learning:apply)
+
+ui:
+  default_theme: night          # night | day | slate | contrast
+  default_font: plex            # plex | inter | editorial | geist

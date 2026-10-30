@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/skill-frontmatter.schema.json",
+  "title": "Skill front matter",
+  "description": "YAML front matter of skills/<name>/SKILL.md (AgentSkills format). Z adds the optional keys version, evals and owner. The directory name must equal `name`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description"],
+  "properties": {
+    "name": { "$ref": "common.schema.json#/$defs/Slug" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "license": { "type": "string" },
+    "compatibility": { "type": "string", "maxLength": 500 },
+    "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+    "allowed-tools": { "type": "string" },
+    "version": { "$ref": "common.schema.json#/$defs/SemVer" },
+    "evals": { "type": "string", "description": "Eval suite path relative to the pack." },
+    "owner": { "type": "string" }
+  }
+}

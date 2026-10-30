@@ -1,0 +1,9 @@
+# gitleaks: the default rules plus the key formats of the platforms Z talks to.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "inferx-api-key"
+description = "inferX API key (ixk_ followed by 64 hexadecimal characters)"
+regex = '''\bixk_[0-9a-fA-F]{64}\b'''
+keywords = ["ixk_"]

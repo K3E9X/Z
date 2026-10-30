@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/agent.schema.json",
+  "title": "Agent",
+  "description": "agents/<name>.yaml in a pack, and the editable profile of an agent in the API (03 §4). An agent never lists write operations; writes are proposed with the implicit propose_action built-in for the writes of the current step.",
+  "$ref": "#/$defs/AgentProfile",
+  "required": ["name", "display_name", "handle", "version", "role", "model", "skills", "tools", "autonomy", "limits"],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "AgentProfile": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "common.schema.json#/$defs/Slug", "description": "Stable slug from the template; never changes on rename." },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Free name chosen by the team, e.g. Atlas." },
+        "handle": { "$ref": "common.schema.json#/$defs/Handle" },
+        "avatar": { "$ref": "common.schema.json#/$defs/Avatar" },
+        "version": { "$ref": "common.schema.json#/$defs/SemVer" },
+        "role": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "instructions": { "type": "string", "maxLength": 20000 },
+        "persona": { "$ref": "common.schema.json#/$defs/Persona" },
+        "template": { "type": ["string", "null"], "description": "Slug of the agent this one was created from or duplicated from." },
+        "model": { "$ref": "common.schema.json#/$defs/ModelAlias" },
+        "escalate_model": { "$ref": "common.schema.json#/$defs/ModelAlias" },
+        "skills": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/Slug" }, "uniqueItems": true },
+        "tools": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/ToolRef" }, "uniqueItems": true },
+        "memory": { "$ref": "common.schema.json#/$defs/MemoryConfig" },
+        "autonomy": { "$ref": "common.schema.json#/$defs/Autonomy" },
+        "limits": { "$ref": "common.schema.json#/$defs/Limits" },
+        "evals": { "type": "string", "description": "Eval suite path relative to the pack (evals/<agent>.jsonl)." },
+        "visibility": { "type": "string", "enum": ["team", "org"], "default": "team" }
+      }
+    }
+  }
+}

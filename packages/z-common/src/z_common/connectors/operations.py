@@ -1,0 +1,198 @@
+"""Operations a connector exposes, as far as they are known from its manifest (docs/03 §4, docs/05 §3).
+
+- `operation_map` entries (MCP tool names or OpenAPI operationIds), `declared` operations, a local OpenAPI
+  spec and exact-id rules are materialized here. Remote specs and MCP tool lists are discovered at runtime
+  by the gateway and go through the same `decide()`.
+- class = max(classifier floor, matching rule class); globs only match read operations.
+- proposed_exposed comes from the first matching rule, else `default_exposed`. Nothing is exposed to
+  agents until an admin approves (`exposed` starts False).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from z_common.connectors.openapi import METHODS, id_from_path, slug
+from z_common.contracts import load_document
+from z_common.models.enums import OperationClass
+from z_common.packs.classify import classify, glob_match, is_glob, raise_only
+
+
+@dataclass
+class OperationSpec:
+    local_id: str
+    source_ref: str
+    classifier_class: OperationClass
+    op_class: OperationClass
+    proposed_exposed: bool
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    description: str = ""
+    method: str | None = None
+
+
+def decide(
+    manifest: dict[str, Any],
+    local_id: str,
+    method: str | None,
+    read_only_hint: bool | None = None,
+    *,
+    require_hint: bool = False,
+) -> tuple[OperationClass, OperationClass, bool]:
+    """(classifier floor, effective class, proposed exposure) for one operation."""
+    floor = classify(local_id, method, read_only_hint, require_hint=require_hint)
+    policy = manifest.get("operations") or {}
+    for rule in policy.get("rules") or []:
+        match = str(rule["match"])
+        hit = match == local_id or (is_glob(match) and floor == OperationClass.read and glob_match(match, local_id))
+        if not hit:
+            continue
+        requested = OperationClass(rule["class"]) if rule.get("class") else None
+        cls = raise_only(floor, requested)
+        exposed = rule.get("exposed")
+        return floor, cls, bool(policy.get("default_exposed", False)) if exposed is None else bool(exposed)
+    return floor, floor, bool(policy.get("default_exposed", False))
+
+
+def _openapi_input_schema(operation: dict[str, Any], path_item: dict[str, Any]) -> dict[str, Any]:
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for param in [*(path_item.get("parameters") or []), *(operation.get("parameters") or [])]:
+        if not isinstance(param, dict) or param.get("in") not in {"path", "query"}:
+            continue
+        properties[param["name"]] = param.get("schema") or {"type": "string"}
+        if param.get("required") or param.get("in") == "path":
+            required.append(param["name"])
+    content = (operation.get("requestBody") or {}).get("content") or {}
+    body = (content.get("application/json") or {}).get("schema")
+    raw_type = next((ct for ct in content if ct.startswith("text/") or ct == "application/octet-stream"), None)
+    if not isinstance(body, dict) and raw_type is not None:
+        # a raw body (file content): sent as is with this content type, never JSON-encoded (gateway.http.prepare)
+        body = {"type": "string", "x-content-type": raw_type, "description": "Raw request body (text)"}
+    if isinstance(body, dict):
+        properties["body"] = body
+        if (operation.get("requestBody") or {}).get("required"):
+            required.append("body")
+    schema: dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        schema["required"] = sorted(set(required))
+    if "body" in properties:
+        # a write is reviewed from its parameters and body only: an extra top-level key would be merged into the
+        # request (gateway.http.prepare) without appearing in the preview
+        schema["additionalProperties"] = False
+    return schema
+
+
+def from_openapi(manifest: dict[str, Any], spec: dict[str, Any]) -> list[OperationSpec]:
+    mode = manifest.get("operation_ids") or "from_operation_id"
+    overrides = manifest.get("operation_map") or {}
+    out = []
+    for route, item in (spec.get("paths") or {}).items():
+        if not isinstance(item, dict):
+            continue
+        for method in METHODS:
+            operation = item.get(method)
+            if not isinstance(operation, dict):
+                continue
+            op_id = operation.get("operationId")
+            if op_id in overrides:
+                local_id = str(overrides[op_id])
+            elif mode == "from_operation_id" and op_id:
+                local_id = slug(str(op_id))
+            else:
+                local_id = id_from_path(method, route)
+            floor, cls, exposed = decide(manifest, local_id, method.upper())
+            out.append(
+                OperationSpec(
+                    local_id=local_id,
+                    source_ref=f"{method.upper()} {route}",
+                    classifier_class=floor,
+                    op_class=cls,
+                    proposed_exposed=exposed,
+                    input_schema=_openapi_input_schema(operation, item),
+                    description=str(operation.get("summary") or operation.get("description") or ""),
+                    method=method.upper(),
+                )
+            )
+    return out
+
+
+def flow_ref(manifest: dict[str, Any], name: str) -> str:
+    """`flow:<name>@<digest>`: any change to the steps changes the reference, so exposure is reviewed again."""
+    body = json.dumps((manifest.get("flows") or {}).get(name), sort_keys=True, separators=(",", ":"))
+    return f"flow:{name}@{hashlib.sha256(body.encode()).hexdigest()[:12]}"
+
+
+def materialize(manifest: dict[str, Any], connector_dir: Path | None = None) -> list[OperationSpec]:
+    """Operations known statically. Local OpenAPI specs are read from `connector_dir`."""
+    found: dict[str, OperationSpec] = {}
+    spec_ref = manifest.get("spec")
+    if (
+        manifest.get("kind") == "openapi"
+        and isinstance(spec_ref, str)
+        and connector_dir is not None
+        and not spec_ref.startswith(("http", "$", "builtin:"))
+    ):
+        path = (connector_dir / spec_ref).resolve()
+        if path.is_file():
+            for op in from_openapi(manifest, load_document(path)):
+                found[op.local_id] = op
+    for declared in manifest.get("declared") or []:
+        method = declared.get("method")
+        floor, cls, exposed = decide(manifest, declared["id"], method)
+        if manifest.get("kind") == "browser" and declared.get("flow"):
+            ref = flow_ref(manifest, str(declared["flow"]))
+        else:
+            ref = (
+                f"{method} {declared.get('path')}"
+                if method
+                else str(declared.get("query") or declared.get("command") or declared.get("flow") or declared["id"])
+            )
+        found[declared["id"]] = OperationSpec(
+            declared["id"],
+            ref,
+            floor,
+            cls,
+            exposed,
+            declared.get("input_schema") or {"type": "object"},
+            declared.get("description", ""),
+            method,
+        )
+    if manifest.get("kind") == "mcp":
+        for tool, local_id in (manifest.get("operation_map") or {}).items():
+            if local_id in found:
+                continue
+            floor, cls, exposed = decide(manifest, local_id, None)  # refined with MCP hints at discovery
+            found[local_id] = OperationSpec(local_id, f"mcp:{tool}", floor, cls, exposed, {"type": "object"})
+    for rule in (manifest.get("operations") or {}).get("rules") or []:
+        match = str(rule["match"])
+        if is_glob(match) or match in found:
+            continue
+        floor, cls, exposed = decide(manifest, match, None)
+        found[match] = OperationSpec(match, f"{manifest.get('kind')}:{match}", floor, cls, exposed, {"type": "object"})
+    for op in found.values():
+        builtin = builtin_schema(f"{manifest.get('name')}.{op.local_id}")
+        if builtin is not None:
+            op.input_schema = builtin
+    return list(found.values())
+
+
+def builtin_schema(operation_id: str) -> dict[str, Any] | None:
+    """Writes with a built-in preview take the reviewer-facing payload (models/actions.py), not the tool's native
+    request: the agent proposes it, the reviewer reads it, the executor maps it to the tool's API."""
+    from z_common.models.actions import BUILTIN_PAYLOADS
+
+    model = BUILTIN_PAYLOADS.get(operation_id)
+    return model.model_json_schema(by_alias=True) if model is not None else None
+
+
+def name_problems(manifest: dict[str, Any]) -> list[str]:
+    """A connector name is a slug, but it also prefixes every operation id (`<connector>.<operation>`), whose
+    segments allow letters, digits and `_` only."""
+    name = str(manifest.get("name") or "")
+    if "-" in name:
+        return [f"name {name!r}: no '-' in a connector name, its operation ids are {name}.<operation>"]
+    return []

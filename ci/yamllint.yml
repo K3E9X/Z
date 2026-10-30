@@ -1,0 +1,17 @@
+# yamllint for CI files (workflows, .gitlab-ci.yml, ci/, security/): yamllint --strict -c ci/yamllint.yml ...
+extends: default
+rules:
+  document-start: disable
+  line-length:
+    max: 160
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false # GitHub's `on:` key
+  comments:
+    min-spaces-from-content: 1
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1

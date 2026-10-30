@@ -1,0 +1,14 @@
+{
+  "name": "partner-portal-01",
+  "fqdn": "partner-portal-01.example.internal",
+  "ip": "10.36.1.15",
+  "environment": "production",
+  "exposure": "internet",
+  "criticality": 2,
+  "owner_team": "B2B Portals",
+  "data_class": "C2",
+  "compensating_controls": [
+    "WAF virtual patch rule 942-STRUTS-UPLOAD blocks multipart uploads with path traversal in the file name since 2026-10-20 (change CHG-88213)",
+    "The upload action is disabled in struts.xml since release 4.12"
+  ]
+}

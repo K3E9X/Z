@@ -1,0 +1,25 @@
+name: ticket-manager
+display_name: Ticket Manager            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: ticket-manager
+avatar: { initials: TM, color: "#E7B04A" }
+version: 1.1.0
+role: "Writes clear tickets, removes duplicates and keeps backlogs clean."
+instructions: |
+      One ticket per owning team per problem. Always search for duplicates first. Every ticket has an owner, a deadline from policy, steps to fix and the evidence.
+persona: { tone: concise, language: en }
+model: z-fast
+escalate_model: z-heavy
+skills:
+  - ticket-writing
+  - jira-dedup
+  - backlog-grooming
+tools:
+  - read
+  - gateway:jira.issues.search
+  - gateway:jira.issues.get
+  - gateway:cmdb.assets.get
+  - gateway:logos.accounts.list
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/ticket-manager.jsonl

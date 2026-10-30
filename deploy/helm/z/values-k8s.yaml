@@ -1,0 +1,68 @@
+# Vanilla Kubernetes: ingress-nginx, external Postgres (DSNs in an existing Secret), PDBs on.
+# NetworkPolicy needs a CNI that enforces it (Cilium, Calico...).
+#   kubectl create namespace z && kubectl label namespace z pod-security.kubernetes.io/enforce=restricted
+#   kubectl -n z create secret generic z-db \
+#     --from-literal=DATABASE_URL='postgresql://z_app:...@pg.example.internal:5432/z' \
+#     --from-literal=MIGRATE_DATABASE_URL='postgresql://z:...@pg.example.internal:5432/z' \
+#     --from-literal=LITELLM_DATABASE_URL='postgresql://litellm:...@pg.example.internal:5432/litellm'
+#   helm upgrade --install z deploy/helm/z -n z -f deploy/helm/z/values-k8s.yaml -f my-values.yaml
+
+server:
+  # Two `all` replicas: the queue, action executor and intake claim work with FOR UPDATE SKIP LOCKED, and the
+  # gateway divides its per-minute limits by Z_GATEWAY_REPLICAS. Both write artifacts: RWX storage below.
+  replicas: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: z
+          app.kubernetes.io/component: server
+
+ui:
+  replicas: 2
+
+litellm:
+  replicas: 2
+
+postgres:
+  embedded: false
+
+database:
+  existingSecret: z-db
+
+migrate:
+  mode: auto               # hook: pre-install,pre-upgrade Job with MIGRATE_DATABASE_URL
+
+persistence:
+  artifacts:
+    storageClass: ""       # a StorageClass that provides ReadWriteMany (NFS, CephFS, EFS, Azure Files...)
+    accessModes: [ReadWriteMany]
+
+ingress:
+  className: nginx
+
+# Cluster ranges differ per distribution and CNI: set your pod CIDR (also the default of server.trustedProxies;
+# empty keeps the server's 127.0.0.1) and service CIDR (kubeadm default below).
+cluster:
+  podCIDR: ""
+  serviceCIDR: 10.96.0.0/12
+
+networkPolicy:
+  # Site values (my-values.yaml), required with env=production and the external Postgres:
+  #   litellmEgress:  [{to: [{ipBlock: {cidr: <inferX gateway>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #   databaseEgress: [{to: [{ipBlock: {cidr: <postgres>/32}}], ports: [{port: 5432, protocol: TCP}]}]
+  #   serverEgress:
+  #     kubernetesApi: [{to: [{ipBlock: {cidr: <control plane>/32}}], ports: [{port: 443, protocol: TCP}]}]
+  #     allow: [{to: [{ipBlock: {cidr: <GitLab and tools>}}], ports: [{port: 443, protocol: TCP}]}]
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+
+podDisruptionBudget:
+  enabled: true

@@ -1,0 +1,108 @@
+# Jira Cloud (REST API v3). Rich text is Atlassian Document Format: the gateway flattens it to text for agents
+# and the executor converts the reviewed text back to ADF. Pagination of searches uses nextPageToken.
+# Auth: Atlassian API tokens with basic auth (account e-mail + token). Use two service accounts: one with
+# Browse permission only (read), one with Create/Edit/Comment (write). Never the same token (invariant 7).
+name: jira
+kind: rest
+display_name: Jira Cloud
+description: Issues, comments and transitions in Jira Cloud.
+base_url: ${JIRA_URL}            # https://<site>.atlassian.net
+auth:
+  read:  { type: basic, username: "${JIRA_READ_EMAIL}", secret: env:JIRA_READ_TOKEN }
+  write: { type: basic, username: "${JIRA_WRITE_EMAIL}", secret: env:JIRA_WRITE_TOKEN }   # executor only
+declared:
+  - id: issues.search
+    description: Search issues with JQL (newest first). Returns up to maxResults issues and a nextPageToken.
+    method: GET
+    path: /rest/api/3/search/jql
+    input_schema:
+      type: object
+      required: [jql]
+      properties:
+        jql: { type: string, description: "JQL, e.g. project = SEC AND statusCategory != Done ORDER BY updated DESC" }
+        maxResults: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        fields: { type: string, default: "summary,status,priority,assignee,labels,issuetype,updated,created,reporter", description: "Comma-separated fields" }
+        nextPageToken: { type: string, description: "From the previous page" }
+  - id: issues.get
+    description: Get one issue with its description and fields.
+    method: GET
+    path: /rest/api/3/issue/{issueIdOrKey}
+    input_schema:
+      type: object
+      required: [issueIdOrKey]
+      properties:
+        issueIdOrKey: { type: string, description: "Issue key, e.g. SEC-123" }
+        fields: { type: string, description: "Comma-separated fields (default: all navigable fields)" }
+  - id: comments.list
+    description: Comments of an issue, oldest first.
+    method: GET
+    path: /rest/api/3/issue/{issueIdOrKey}/comment
+    input_schema:
+      type: object
+      required: [issueIdOrKey]
+      properties:
+        issueIdOrKey: { type: string }
+        maxResults: { type: integer, minimum: 1, maximum: 100, default: 50 }
+  - id: transitions.list
+    description: Workflow transitions available for an issue.
+    method: GET
+    path: /rest/api/3/issue/{issueIdOrKey}/transitions
+    input_schema: { type: object, required: [issueIdOrKey], properties: { issueIdOrKey: { type: string } } }
+  - id: projects.list
+    description: Projects visible to the read account.
+    method: GET
+    path: /rest/api/3/project/search
+    input_schema:
+      type: object
+      properties:
+        query: { type: string, description: "Filter by project key or name" }
+        maxResults: { type: integer, minimum: 1, maximum: 50, default: 50 }
+  - id: users.search
+    description: Find users by name or e-mail (returns accountId).
+    method: GET
+    path: /rest/api/3/user/search
+    input_schema: { type: object, required: [query], properties: { query: { type: string } } }
+  - id: issues.create
+    description: Create an issue (reviewed payload, converted to Jira fields by the executor).
+    method: POST
+    path: /rest/api/3/issue
+  - id: issues.update
+    description: Update fields of an issue.
+    method: PUT
+    path: /rest/api/3/issue/{issue}
+  - id: comments.create
+    description: Add a comment to an issue.
+    method: POST
+    path: /rest/api/3/issue/{issue}/comment
+  - id: issues.transition
+    description: Move an issue through its workflow (transition id from transitions.list).
+    method: POST
+    path: /rest/api/3/issue/{issueIdOrKey}/transitions
+    input_schema:
+      type: object
+      required: [issueIdOrKey, transition]
+      properties:
+        issueIdOrKey: { type: string }
+        transition: { type: object, required: [id], properties: { id: { type: string } } }
+  - id: issues.delete
+    description: Delete an issue.
+    method: DELETE
+    path: /rest/api/3/issue/{issueIdOrKey}
+    input_schema: { type: object, required: [issueIdOrKey], properties: { issueIdOrKey: { type: string } } }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "issues.search", class: read, exposed: true }
+    - { match: "issues.get", class: read, exposed: true }
+    - { match: "comments.list", class: read, exposed: true }
+    - { match: "transitions.list", class: read, exposed: true }
+    - { match: "projects.list", class: read, exposed: true }
+    - { match: "users.search", class: read, exposed: false }   # personal data: expose only if a playbook needs it
+    - { match: "issues.create", class: write, exposed: true }
+    - { match: "issues.update", class: write, exposed: true }
+    - { match: "comments.create", class: write, exposed: true }
+    - { match: "issues.transition", class: write, exposed: false }
+    - { match: "issues.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 300, per_mission_per_minute: 60 }
+health: { path: /rest/api/3/myself }
+data_class: C2

@@ -1,0 +1,643 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/common.schema.json",
+  "title": "Z common definitions",
+  "description": "Shared enums and small shapes referenced by every other contract. Values are canonical: the database, the API, the runner, the CLI and the UI use exactly these names.",
+  "$defs": {
+    "Slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$",
+      "description": "Stable machine name (agents, skills, playbooks, packs, connectors)."
+    },
+    "Handle": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]{0,39}$",
+      "description": "@mention handle without the @, unique per org."
+    },
+    "SemVer": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Server-assigned identifier (UUID or prefixed id)."
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339, UTC."
+    },
+    "DataClass": {
+      "type": "string",
+      "enum": [
+        "C0",
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "description": "C0 public, C1 internal, C2 confidential, C3 restricted. Only goes up during a mission."
+    },
+    "Autonomy": {
+      "type": "string",
+      "enum": [
+        "read_only",
+        "propose"
+      ],
+      "description": "Strictest of agent, playbook and mission wins. auto_reversible is reserved for v2."
+    },
+    "OperationClass": {
+      "type": "string",
+      "enum": [
+        "read",
+        "write",
+        "destructive"
+      ]
+    },
+    "LocalOperationId": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+      "description": "Operation id inside a connector file, without the connector prefix (e.g. merge_requests.create, fetch)."
+    },
+    "OperationId": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+      "description": "Canonical full operation id <connector>.<resource>.<verb> with a plural resource (e.g. gitlab.merge_requests.create, m365.calendar.events.create). Builtin connectors may have a single segment after the prefix (web.fetch)."
+    },
+    "OperationGlob": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+(\\.([a-z0-9_]+|\\*))+$",
+      "description": "Full operation id where segments may be '*'. Globs only ever match read operations."
+    },
+    "ToolRef": {
+      "description": "Neutral tool name an agent may list (04 \u00a71). Built-ins ask_human, search_memory, report_objective and propose_action are implicit; spawn_subagent must be listed.",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "read",
+            "edit",
+            "terminal",
+            "browser",
+            "code",
+            "documents",
+            "spawn_subagent",
+            "ask_human",
+            "search_memory",
+            "report_objective"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^gateway:(@read|[a-z0-9_]+(\\.([a-z0-9_]+|\\*))+)$"
+        }
+      ]
+    },
+    "ModelAlias": {
+      "type": "string",
+      "pattern": "^(z|ext)-[a-z0-9][a-z0-9-]*$",
+      "description": "LiteLLM alias (z-heavy, z-fast, z-judge, z-embed, ext-*). Never a provider model id."
+    },
+    "RoleName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,39}$",
+      "description": "Built-in (viewer, operator, approver, builder, auditor, admin) or custom role name."
+    },
+    "BuiltinRole": {
+      "type": "string",
+      "enum": [
+        "viewer",
+        "operator",
+        "approver",
+        "builder",
+        "auditor",
+        "admin"
+      ]
+    },
+    "Permission": {
+      "type": "string",
+      "pattern": "^[a-z_]+:[a-z_]+$",
+      "description": "resource:action, see contracts/permissions.yaml."
+    },
+    "Scope": {
+      "type": "string",
+      "pattern": "^(org|team:.+)$",
+      "description": "org or team:<team id>."
+    },
+    "Subject": {
+      "type": "string",
+      "pattern": "^(user|group):.+$",
+      "description": "user:<user id> or group:<GitLab group path>."
+    },
+    "SecretRef": {
+      "type": "string",
+      "pattern": "^(env|file|vault|kubernetes):.+$",
+      "description": "Reference to a secret in a secrets backend, never the value."
+    },
+    "MissionStatus": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "planned",
+        "queued",
+        "running",
+        "waiting",
+        "paused",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "budget_exceeded",
+        "timed_out"
+      ]
+    },
+    "WaitingReason": {
+      "type": "string",
+      "enum": [
+        "approval",
+        "question"
+      ]
+    },
+    "JobStatus": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "needs_attention",
+        "paused",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "budget_exceeded",
+        "timed_out"
+      ]
+    },
+    "NeedsAttentionReason": {
+      "type": "string",
+      "enum": [
+        "question",
+        "approval",
+        "invalid_output",
+        "loop_detected",
+        "guardrail_confirm",
+        "connector_down",
+        "judge_blocked"
+      ]
+    },
+    "StepStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "skipped",
+        "cancelled"
+      ]
+    },
+    "ActionStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "applying",
+        "applied",
+        "failed",
+        "rejected",
+        "superseded"
+      ]
+    },
+    "ProposalStatus": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "proposed",
+        "evaluating",
+        "ready",
+        "discarded",
+        "applied",
+        "rejected",
+        "rolled_back"
+      ]
+    },
+    "ProposalKind": {
+      "type": "string",
+      "enum": [
+        "skill_edit",
+        "memory_fact",
+        "routing_rule",
+        "playbook_edit"
+      ]
+    },
+    "SignalKind": {
+      "type": "string",
+      "enum": [
+        "action_edited",
+        "action_rejected",
+        "question_answered",
+        "mission_reassigned",
+        "retry",
+        "repair",
+        "failure",
+        "guardrail_hit",
+        "feedback",
+        "connector_error"
+      ]
+    },
+    "ConnectorHealth": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "degraded",
+        "token_expiring",
+        "unreachable",
+        "disabled"
+      ]
+    },
+    "ConnectorKind": {
+      "type": "string",
+      "enum": [
+        "mcp",
+        "openapi",
+        "rest",
+        "graphql",
+        "cli",
+        "database",
+        "browser",
+        "webhook",
+        "builtin"
+      ]
+    },
+    "ReviewStatus": {
+      "type": "string",
+      "enum": [
+        "pending_review",
+        "approved"
+      ]
+    },
+    "ObjectiveStatus": {
+      "type": "string",
+      "enum": [
+        "on_track",
+        "at_risk",
+        "off_track",
+        "paused"
+      ]
+    },
+    "ObjectiveMode": {
+      "type": "string",
+      "enum": [
+        "suggest",
+        "auto_start_read_only"
+      ]
+    },
+    "TaskSource": {
+      "type": "string",
+      "enum": [
+        "jira",
+        "gitlab",
+        "webhook",
+        "email",
+        "chat",
+        "schedule",
+        "manual"
+      ]
+    },
+    "TaskStatus": {
+      "type": "string",
+      "enum": [
+        "incoming",
+        "scheduled",
+        "started",
+        "dismissed"
+      ]
+    },
+    "TriggerKind": {
+      "type": "string",
+      "enum": [
+        "schedule",
+        "jira",
+        "gitlab",
+        "webhook",
+        "email",
+        "chat"
+      ]
+    },
+    "Surface": {
+      "type": "string",
+      "enum": [
+        "cli",
+        "web",
+        "teams",
+        "slack",
+        "mattermost"
+      ]
+    },
+    "ChannelKind": {
+      "type": "string",
+      "enum": [
+        "teams",
+        "slack",
+        "mattermost",
+        "email"
+      ]
+    },
+    "AssignmentKind": {
+      "type": "string",
+      "enum": [
+        "repo",
+        "group",
+        "jira_project",
+        "product",
+        "mailbox",
+        "channel",
+        "connector",
+        "document_space",
+        "custom"
+      ]
+    },
+    "UserStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "deprovisioned"
+      ]
+    },
+    "SessionKind": {
+      "type": "string",
+      "enum": [
+        "web",
+        "cli"
+      ]
+    },
+    "BindingSource": {
+      "type": "string",
+      "enum": [
+        "gitlab",
+        "manual"
+      ]
+    },
+    "MappingSource": {
+      "type": "string",
+      "enum": [
+        "config",
+        "db"
+      ]
+    },
+    "CredentialPurpose": {
+      "type": "string",
+      "enum": [
+        "read",
+        "write"
+      ]
+    },
+    "CredentialScope": {
+      "type": "string",
+      "enum": [
+        "service",
+        "user"
+      ]
+    },
+    "JudgeVerdict": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "flagged",
+        "blocked"
+      ]
+    },
+    "WorkspaceMode": {
+      "type": "string",
+      "enum": [
+        "none",
+        "git_clone",
+        "files"
+      ]
+    },
+    "BudgetScopeKind": {
+      "type": "string",
+      "enum": [
+        "org",
+        "team",
+        "user",
+        "playbook",
+        "mission",
+        "agent",
+        "objective"
+      ]
+    },
+    "BudgetPeriod": {
+      "type": "string",
+      "enum": [
+        "mission",
+        "day",
+        "week",
+        "month"
+      ]
+    },
+    "ArtifactKind": {
+      "type": "string",
+      "enum": [
+        "result",
+        "report",
+        "document",
+        "patch",
+        "diff",
+        "terminal",
+        "screenshot",
+        "data",
+        "image",
+        "log",
+        "archive",
+        "other"
+      ]
+    },
+    "Avatar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initials"
+      ],
+      "properties": {
+        "initials": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "image_url": {
+          "type": "string"
+        }
+      }
+    },
+    "Persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tone": {
+          "type": "string",
+          "enum": [
+            "concise",
+            "detailed",
+            "friendly",
+            "formal"
+          ]
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        }
+      }
+    },
+    "MemoryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "org",
+              "team",
+              "agent"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        }
+      }
+    },
+    "Limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_steps",
+        "max_tokens",
+        "timeout_s"
+      ],
+      "properties": {
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "MissionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Every mission has a token budget, a step limit (per job, from the agent) and a timeout.",
+      "properties": {
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "RunsAs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "identity"
+      ],
+      "description": "Whose identity a call or an action uses (shown as 'runs as').",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/CredentialScope"
+        },
+        "identity": {
+          "type": "string",
+          "description": "Service account name, or the user's username for user scope."
+        },
+        "user_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Problem": {
+      "type": "object",
+      "description": "RFC 9457 problem details. `type` is one of the urn:z:problem:* values listed in contracts/README.md.",
+      "required": [
+        "type",
+        "title",
+        "status"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "permission": {
+          "type": "string"
+        },
+        "step_up_url": {
+          "type": "string"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FieldError"
+          }
+        }
+      }
+    },
+    "FieldError": {
+      "type": "object",
+      "required": [
+        "path",
+        "message"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "WriteOperationId": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+){2,}$",
+      "description": "Full id of a write or destructive operation: always <connector>.<resource>.<verb>, never a glob."
+    }
+  }
+}

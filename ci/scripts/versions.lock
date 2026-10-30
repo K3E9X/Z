@@ -1,0 +1,31 @@
+# Scanner and CI tool binaries (docs/13 §3), installed by ci/scripts/install-scanners.sh, which refuses any file
+# whose sha256 differs and any version listed in security/blocked-versions.yaml. Never mutable tags or "latest".
+# The sha256 values come from each release's own checksums file (fetched 2026-10-29, releases at least 7 days old).
+# Never trivy 0.69.4-0.69.6 (compromised releases, March 2026). Python tools are pinned with hashes in
+# ci/scripts/requirements/*.txt (zizmor, semgrep, bandit, pip-audit, yamllint, uv).
+#
+# tool        version  arch   sha256                                                            kind             url
+trivy         0.76.1   amd64  c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0  tgz:trivy        https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz
+trivy         0.76.1   arm64  e174dff2a6dba5e3ae41f8d0537a6324405bd08132497340304c6b20e0f16a1f  tgz:trivy        https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-ARM64.tar.gz
+gitleaks      8.30.1   amd64  551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  tgz:gitleaks     https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+gitleaks      8.30.1   arm64  e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080  tgz:gitleaks     https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz
+osv-scanner   2.7.0    amd64  160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  bin              https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
+osv-scanner   2.7.0    arm64  4061ef4c021ed3c47f203b818f337e351336cc5cd67c0274fc36bd1dfc728dd7  bin              https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_arm64
+syft          1.55.0   amd64  bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d  tgz:syft         https://github.com/anchore/syft/releases/download/v1.55.0/syft_1.55.0_linux_amd64.tar.gz
+syft          1.55.0   arm64  929bd163db2d7cd2255d3bcb8967208079813d7b46b0c952f7b794d8e2c7d304  tgz:syft         https://github.com/anchore/syft/releases/download/v1.55.0/syft_1.55.0_linux_arm64.tar.gz
+cosign        3.1.4    amd64  424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  bin              https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+cosign        3.1.4    arm64  ade83b7aac62e131cacfe96d958948b2150cc9efec46a570a2649b8e27dedad2  bin              https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-arm64
+actionlint    1.7.12   amd64  8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  tgz:actionlint   https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+actionlint    1.7.12   arm64  325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6  tgz:actionlint   https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz
+hadolint      2.14.0   amd64  6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47  bin              https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-x86_64
+hadolint      2.14.0   arm64  331f1d3511b84a4f1e3d18d52fec284723e4019552f4f47b19322a53ce9a40ed  bin              https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-arm64
+dockle        0.4.15   amd64  8bfc9183d1d3d67800edb45bea4bb63ddf1d28bec5f89944075a07007d79caad  tgz:dockle       https://github.com/goodwithtech/dockle/releases/download/v0.4.15/dockle_0.4.15_Linux-64bit.tar.gz
+dockle        0.4.15   arm64  14c2fbcd675afaa0f1717e97ab71eee178dabdef676066189f49bad0f53b8762  tgz:dockle       https://github.com/goodwithtech/dockle/releases/download/v0.4.15/dockle_0.4.15_Linux-ARM64.tar.gz
+kubeconform   0.8.0    amd64  9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  tgz:kubeconform  https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+kubeconform   0.8.0    arm64  1f53fc8e81258197a35e8603054162a5af1de8c5af13746c71ab680d9534ed87  tgz:kubeconform  https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-arm64.tar.gz
+kube-score    1.20.0   amd64  a1dbb75fa02707ece54c4bb01bc2ff1c7425b4503fc52c808f149745b587308a  bin              https://github.com/zegl/kube-score/releases/download/v1.20.0/kube-score_1.20.0_linux_amd64
+kube-score    1.20.0   arm64  cc5a894674d50a918e0ce8c4b88f346c2f0dd7a7811fdcd63286c13d4d44a497  bin              https://github.com/zegl/kube-score/releases/download/v1.20.0/kube-score_1.20.0_linux_arm64
+kubescape     4.0.16   amd64  fcf172f0d1fb5683379586bcf8875091da4d0d815bd304f8098d58be65ecab0d  bin              https://github.com/kubescape/kubescape/releases/download/v4.0.16/kubescape_4.0.16_linux_amd64
+kubescape     4.0.16   arm64  ea0a5c51d299e88209e2f17877dd76f66d36b772cf313e8fe68ee37325c9b382  bin              https://github.com/kubescape/kubescape/releases/download/v4.0.16/kubescape_4.0.16_linux_arm64
+kind          0.33.0   amd64  aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  bin              https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+kind          0.33.0   arm64  20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2  bin              https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-arm64

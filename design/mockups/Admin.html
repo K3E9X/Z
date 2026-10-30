@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Z — Admin</title>
+
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0}
+[data-font="plex"]{--sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--display:'IBM Plex Sans',ui-sans-serif,sans-serif;--display-w:500;--display-ls:-0.025em}
+[data-font="inter"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Inter',ui-sans-serif,sans-serif;--display-w:600;--display-ls:-0.035em}
+[data-font="editorial"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Newsreader',Georgia,serif;--display-w:400;--display-ls:-0.015em}
+[data-font="geist"]{--sans:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;--display:'Instrument Serif',Georgia,serif;--display-w:400;--display-ls:0}
+[data-theme="night"]{--bg:#0C0C0B;--panel:#121211;--raised:#1A1A18;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);--text:#EDECE8;--text-2:#A9A79F;--text-3:#8B8981;--inv-bg:#EDECE8;--inv-text:#0C0C0B;--run:#6AA6FF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="day"]{--bg:#F7F7F5;--panel:#FFFFFF;--raised:#F1F1EE;--line:rgba(20,20,18,.08);--line-2:rgba(20,20,18,.15);--text:#171715;--text-2:#5A5953;--text-3:#6F6D66;--inv-bg:#171715;--inv-text:#FFFFFF;--run:#1F5FD1;--wait:#9A5B00;--ok:#1C7A4A;--err:#B92B27;--wait-bg:rgba(154,91,0,.08);--err-bg:rgba(185,43,39,.08)}
+[data-theme="slate"]{--bg:#0D1015;--panel:#12161D;--raised:#1A1F28;--line:rgba(200,215,255,.08);--line-2:rgba(200,215,255,.15);--text:#E4E9F1;--text-2:#A2ACBB;--text-3:#8792A3;--inv-bg:#E4E9F1;--inv-text:#0D1015;--run:#74AEFF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="contrast"]{--bg:#000000;--panel:#000000;--raised:#161616;--line:rgba(255,255,255,.30);--line-2:rgba(255,255,255,.60);--text:#FFFFFF;--text-2:#E2E2E2;--text-3:#C9C9C9;--inv-bg:#FFFFFF;--inv-text:#000000;--run:#8CC2FF;--wait:#FFD166;--ok:#7EE2A8;--err:#FF8F87;--wait-bg:rgba(255,209,102,.14);--err-bg:rgba(255,143,135,.14)}
+a{color:var(--text)}a:hover{color:var(--text-2)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+th{font-weight:500;text-align:left}
+[data-theme="night"],[data-theme="slate"]{--ok-bg:rgba(93,190,138,.10);--run-bg:rgba(106,166,255,.10)}
+[data-theme="day"]{--ok-bg:rgba(28,122,74,.08);--run-bg:rgba(31,95,209,.08)}
+[data-theme="contrast"]{--ok-bg:rgba(126,226,168,.14);--run-bg:rgba(140,194,255,.14)}
+</style>
+
+<div data-theme="slate" data-font="plex" style="min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13.5px; line-height: 1.45; display: flex; flex-wrap: wrap; -webkit-font-smoothing: antialiased">
+  <nav aria-label="Main navigation" style="flex: 0 0 56px; box-sizing: border-box; padding: 14px 0; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 6px">
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" style="margin-bottom: 14px"><rect width="24" height="24" rx="6" fill="#F25C2A"></rect><path d="M7.5 7.5h9l-9 9h9" fill="none" stroke="#0C0C0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <a href="Main.html" aria-label="Mission control" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3"></circle></svg></a>
+    <a href="Inbox.html" aria-label="Review, 4 pending" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center; position: relative"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 13.5h4.5l1.5 2.5h4l1.5-2.5H20"></path><path d="M5.5 5h13L20 13.5V19H4v-5.5z"></path></svg><span style="position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 3px; background: var(--wait)"></span></a>
+    <a href="Playbooks.html" aria-label="Playbooks" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"></path><path d="M5 16.5a3 3 0 0 1 3-3h10.5"></path></svg></a>
+    <a href="Agents.html" aria-label="Agents and skills" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"></circle><path d="M3.5 19c.7-3.2 2.9-5 5.5-5s4.8 1.8 5.5 5"></path><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.4c1.6.6 2.6 2.2 3 4.6"></path></svg></a>
+    <a href="Learning.html" aria-label="Learning" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 17l5-5 4 4 7-7"></path><path d="M15 9h5v5"></path></svg></a>
+    <a href="Connectors.html" aria-label="Connectors" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 4v4M15 4v4M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"></path><path d="M12 17v3.5"></path></svg></a>
+    <a href="Inference.html" aria-label="Inference and usage" style="width: 36px; height: 36px; border-radius: 8px; color: var(--text-2); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><rect x="9.5" y="9.5" width="5" height="5" rx="1"></rect><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"></path></svg></a>
+      <a href="Admin.html" aria-label="Admin" aria-current="page" style="width: 36px; height: 36px; border-radius: 8px; background: var(--raised); color: var(--text); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.7-7 9-4.1-1.3-7-4.7-7-9V6.3z"></path><path d="M9 12l2 2 4-4"></path></svg></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 40px 40px 56px; display: flex; justify-content: center">
+    <div style="width: 100%; max-width: 1320px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px">
+        <div style="flex: 1 1 460px; display: flex; flex-direction: column; gap: 8px">
+          <h1 style="margin: 0; font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-ls); font-size: 44px; line-height: 1.05">Admin</h1>
+          <p style="margin: 0; font-size: 15px; color: var(--text-2); max-width: 70ch">People sign in with GitLab and get their roles from GitLab groups. Every change here shows a diff, asks you to re-authenticate, and lands in the audit log.</p>
+        </div>
+        <span style="font-size: 12.5px; color: var(--text-3)">Signed in as KGX · admin · step-up valid 4 min</span>
+      </div>
+      <div role="status" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line-2); font-size: 12.5px">
+  <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span><b style="font-weight: 600">GitLab OIDC</b>&nbsp;<span style="font-family: var(--mono); color: var(--text-2)">gitlab.example.internal</span></span>
+  <span style="color: var(--text-2)">JWKS ok · groups from userinfo · re-evaluated hourly</span>
+  <span style="color: var(--text-2)">27 users · 2FA enforced on <code style="font-family: var(--mono)">cyber</code></span>
+  <span style="color: var(--text-2)">Break-glass: disabled</span>
+  <span style="margin-left: auto; color: var(--text-2)">Audit chain verified 21:00 · 0 gaps</span>
+</div>
+      <div role="tablist" aria-label="Admin sections" style="display: flex; gap: 22px; border-bottom: 1px solid var(--line); overflow-x: auto"><button type="button" role="tab" aria-selected="true" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text); box-shadow: inset 0 -2px 0 var(--text); font-weight: 500">Users</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Teams</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Roles and permissions</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Group mapping</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Sign-in</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Sessions and tokens</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Audit log</button><button type="button" role="tab" aria-selected="false" style="padding: 10px 0; border: none; background: none; white-space: nowrap; color: var(--text-2)">Platform</button></div>
+      
+<section aria-labelledby="pending" style="border: 1px solid var(--wait); border-radius: 12px; padding: 16px 18px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center">
+  <div style="flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+    <h2 id="pending" style="margin: 0; font-size: 14px; font-weight: 600"><span style="color: var(--wait)">Unsaved change</span> · Group mapping</h2>
+    <div style="font-family: var(--mono); font-size: 12.5px"><span style="color: var(--ok)">+ cyber/archi → approver · team Architecture</span></div>
+    <div style="font-size: 12.5px; color: var(--text-2)">Dry run: 3 users gain <b style="font-weight: 600; color: var(--text)">actions:approve</b> on Architecture connectors. Nobody loses access.</div>
+  </div>
+  <div style="display: flex; gap: 8px">
+    <button type="button" style="height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Discard</button>
+    <button type="button" style="height: 32px; padding: 0 14px; border-radius: 8px; border: none; background: var(--inv-bg); color: var(--inv-text); font-weight: 500">Re-authenticate and save</button>
+  </div>
+</section>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); color: var(--text-3); font-size: 13px">Search people</div>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Role: any</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Source: any</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Team: any</button>
+        <button type="button" style="margin-left: auto; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: none">Who can…?</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <section aria-label="Users" style="flex: 999 1 640px; min-width: 0; overflow-x: auto">
+          <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px">
+            <thead><tr style="color: var(--text-3); font-size: 12px">
+              <th scope="col" style="padding: 0 12px 10px 10px; border-bottom: 1px solid var(--line)">Person</th>
+              <th scope="col" style="padding: 0 12px 10px; border-bottom: 1px solid var(--line)">Team</th>
+              <th scope="col" style="padding: 0 12px 10px; border-bottom: 1px solid var(--line)">Roles and source</th>
+              <th scope="col" style="padding: 0 12px 10px; border-bottom: 1px solid var(--line)">Last sign-in</th>
+              <th scope="col" style="padding: 0 12px 10px; border-bottom: 1px solid var(--line)">2FA</th>
+              <th scope="col" style="padding: 0 0 10px 12px; border-bottom: 1px solid var(--line)">Status</th>
+            </tr></thead>
+            <tbody><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); "><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text)">KG</span><span style="display: flex; flex-direction: column"><span>KGX</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@kgx</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Cyber Ops</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">admin</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">now</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr style="background: var(--raised)">
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); box-shadow: inset 2px 0 0 var(--text);"><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--ok)">SM</span><span style="display: flex; flex-direction: column"><span>Sarah Martin</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@smartin</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Cyber Ops</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">approver</b> <span style="color: var(--text-3)">GitLab group</span></span> <span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--wait-bg); color: var(--wait); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">builder</b> manual · until Nov 30</span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">12 min ago</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); "><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--run)">TL</span><span style="display: flex; flex-direction: column"><span>Thomas Lefèvre</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@tlefevre</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Cyber Ops</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">operator</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">1 h ago</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); "><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--wait)">IB</span><span style="display: flex; flex-direction: column"><span>Inès Benali</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@ibenali</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Architecture</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">approver</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">yesterday</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); "><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text-2)">MD</span><span style="display: flex; flex-direction: column"><span>Marc Dupuis</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@mdupuis</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Architecture</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">viewer</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">3 days ago</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); "><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--err)">LR</span><span style="display: flex; flex-direction: column"><span>Léa Roux</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@lroux</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Cyber Ops</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">auditor</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">5 days ago</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">Enforced</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); "><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--ok)"></span>Active</span></td>
+    </tr><tr>
+      <th scope="row" style="padding: 11px 12px 11px 10px; border-bottom: 1px solid var(--line); color: var(--text-3);"><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text-3)">HP</span><span style="display: flex; flex-direction: column"><span>Hugo Perrin</span><span style="font-weight: 400; font-family: var(--mono); font-size: 11.5px; color: var(--text-3)">@hperrin</span></span></span></th>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">—</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line)"><span style="display: flex; flex-wrap: wrap; gap: 4px"><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-2); font-size: 12px; white-space: nowrap"><b style="font-weight: 600">none</b> <span style="color: var(--text-3)">GitLab group</span></span></span></td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2); white-space: nowrap">21 days ago</td>
+      <td style="padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-2)">—</td>
+      <td style="padding: 11px 0 11px 12px; border-bottom: 1px solid var(--line); color: var(--text-3);"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: var(--text-3)"></span>Deprovisioned · left cyber</span></td>
+    </tr></tbody>
+          </table>
+        </section>
+        
+<aside aria-labelledby="u-name" style="flex: 1 1 340px; min-width: 0; border: 1px solid var(--line-2); border-radius: 14px; background: var(--panel); overflow: hidden">
+  <header style="padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px"><span aria-hidden="true" style="flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--ok)">SM</span><div style="flex: 1; min-width: 0"><h2 id="u-name" style="margin: 0; font-size: 16px; font-weight: 600">Sarah Martin</h2><div style="font-family: var(--mono); font-size: 12px; color: var(--text-3)">@smartin · gitlab sub 4821</div></div></header>
+  <section style="padding: 14px 20px; border-bottom: 1px solid var(--line)">
+    <h3 style="margin: 0 0 10px; font-size: 12px; font-weight: 500; color: var(--text-3)">Effective roles</h3>
+    <ul style="list-style: none; margin: 0; padding: 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 8px">
+      <li style="display: flex; gap: 8px; align-items: baseline"><b style="font-weight: 600; flex: 0 0 64px">approver</b><span style="flex: 1; color: var(--text-2)">team Cyber Ops · from GitLab group <code style="font-family: var(--mono)">cyber/z/z-approvers</code></span></li>
+      <li style="display: flex; gap: 8px; align-items: baseline"><b style="font-weight: 600; flex: 0 0 64px">builder</b><span style="flex: 1; color: var(--text-2)">org · manual, granted by KGX, expires Nov 30 <a href="#" style="color: var(--text-2)">revoke</a></span></li>
+    </ul>
+  </section>
+  <section style="padding: 14px 20px; border-bottom: 1px solid var(--line)">
+    <h3 style="margin: 0 0 10px; font-size: 12px; font-weight: 500; color: var(--text-3)">Sessions and tokens</h3>
+    <ul style="list-style: none; margin: 0; padding: 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 8px">
+      <li style="display: flex; gap: 8px"><span style="flex: 0 0 44px; color: var(--text-3)">Web</span><span style="flex: 1; color: var(--text-2)">Firefox · 10.12.4.31 · seen 12 min ago · step-up 40 min ago</span></li>
+      <li style="display: flex; gap: 8px"><span style="flex: 0 0 44px; color: var(--text-3)">CLI</span><span style="flex: 1; color: var(--text-2)">laptop-smartin · expires in 27 days</span></li>
+      <li style="display: flex; gap: 8px"><span style="flex: 0 0 44px; color: var(--text-3)">Token</span><span style="flex: 1; color: var(--text-2)">nightly-report · <code style="font-family: var(--mono)">missions:read</code> · expires Dec 21</span></li>
+    </ul>
+  </section>
+  <section style="padding: 14px 20px; border-bottom: 1px solid var(--line)">
+    <h3 style="margin: 0 0 10px; font-size: 12px; font-weight: 500; color: var(--text-3)">Recent activity</h3>
+    <ul style="list-style: none; margin: 0; padding: 0; font-size: 12.5px; display: flex; flex-direction: column; gap: 6px; color: var(--text-2)">
+      <li><span style="font-family: var(--mono); color: var(--text-3)">21:58</span> Approved 3 Jira tickets · SECOPS</li>
+      <li><span style="font-family: var(--mono); color: var(--text-3)">21:12</span> Edited skill ticket-writing v2.0</li>
+      <li><span style="font-family: var(--mono); color: var(--text-3)">19:40</span> Signed in · GitLab · 2FA</li>
+    </ul>
+    <a href="History.html" style="display: inline-block; margin-top: 8px; font-size: 12.5px; color: var(--text-2)">Full audit trail</a>
+  </section>
+  <footer style="padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 8px">
+    <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--line-2); background: none">Add a role</button>
+    <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--line-2); background: none">Revoke sessions</button>
+    <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--line-2); background: none; color: var(--err)">Suspend</button>
+  </footer>
+</aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+
+</body>
+</html>

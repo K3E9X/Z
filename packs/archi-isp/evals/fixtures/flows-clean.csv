@@ -1,0 +1,6 @@
+id,fw_rule,source,source_zone,destination,destination_zone,port,protocol,justification,owner
+C-01,fw-crm-web-01,any (internet),INTERNET,rp-crm.example.internal,DMZ,443,TCP/HTTPS,Customer self-care portal,CRM team (L. Besson)
+C-02,fw-crm-app-01,rp-crm.example.internal,DMZ,app-crm-01.example.internal,APP,8443,TCP/HTTPS,Reverse proxy to the CRM application,CRM team (L. Besson)
+C-03,fw-crm-db-01,app-crm-01.example.internal,APP,db-crm-01.example.internal,DATA,5432,TCP/PostgreSQL,CRM application database,CRM team (L. Besson)
+C-04,fw-crm-adm-01,bastion-01.example.internal,ADMIN,app-crm-01.example.internal,APP,22,TCP/SSH,Server administration through the bastion,Infra team (R. Lefort)
+C-05,fw-crm-mon-01,mon-01.example.internal,ADMIN,app-crm-01.example.internal,APP,9100,TCP/HTTPS,Metrics scraping over TLS,Infra team (R. Lefort)

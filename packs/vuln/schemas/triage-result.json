@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TriageResult",
+  "type": "object",
+  "required": [
+    "finding_id",
+    "title",
+    "asset",
+    "priority",
+    "exploitable_in_context",
+    "owner_team",
+    "evidence"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "cve": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "asset": {
+      "type": "string"
+    },
+    "component": {
+      "type": "string"
+    },
+    "priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "exploitable_in_context": {
+      "type": "boolean"
+    },
+    "owner_team": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fix": {
+      "type": "string"
+    },
+    "deadline_days": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}

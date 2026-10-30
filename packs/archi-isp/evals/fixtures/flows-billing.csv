@@ -1,0 +1,9 @@
+id,fw_rule,source,source_zone,destination,destination_zone,port,protocol,justification,owner
+FM-01,fw-bill-web-01,any (internet),INTERNET,rp-billing.example.internal,DMZ,443,TCP/HTTPS,Customer access to the billing portal,Billing team (C. Morel)
+FM-02,fw-bill-app-01,rp-billing.example.internal,DMZ,app-billing-01.example.internal,APP,8443,TCP/HTTPS,Reverse proxy to the billing application,Billing team (C. Morel)
+FM-03,fw-bill-any-01,any,APP,any,DATA,any,any,Temporary during migration,Billing team (C. Morel)
+FM-04,fw-bill-db-01,app-billing-01.example.internal,APP,db-billing-01.example.internal,DATA,5432,TCP/PostgreSQL,Application database,Billing team (C. Morel)
+FM-05,fw-bill-adm-01,bastion-01.example.internal,ADMIN,app-billing-01.example.internal,APP,23,TCP/Telnet,Administration of the application server,Infra team (R. Lefort)
+FM-06,fw-bill-rpt-01,rpt-01.example.internal,USER,db-billing-01.example.internal,DATA,5432,TCP/PostgreSQL,,Finance team (A. Garnier)
+FM-07,fw-bill-ext-01,any (internet),INTERNET,db-billing-01.example.internal,DATA,5432,TCP/PostgreSQL,Partner reconciliation,
+FM-08,fw-bill-ntp-01,app-billing-01.example.internal,APP,ntp-01.example.internal,APP,123,UDP/NTP,Time synchronisation,Infra team (R. Lefort)

@@ -1,0 +1,8 @@
+agent: ticket-manager
+title: No SECOPS ticket without an owner
+scope: [{ kind: jira_project, ref: SECOPS }]
+metric: { source: connector, operation: jira.issues.search, params: { jql: "project = SECOPS AND assignee is EMPTY AND statusCategory != Done" }, path: "$.issues", aggregate: count, target: 0, direction: down }
+cadence: { event: jira }
+allowed_playbooks: [jira-backlog-grooming]
+mode: auto_start_read_only
+budget_per_period: { tokens: 500000, period: week }

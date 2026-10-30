@@ -1,0 +1,23 @@
+diff --git a/counters.py b/counters.py
+--- a/counters.py
++++ b/counters.py
+@@ -7,5 +7,5 @@
+     """Bits per second between two samples of an octet counter."""
+     if interval_s <= 0:
+         raise ValueError("interval must be positive")
+-    delta = curr_octets - prev_octets
++    delta = (curr_octets - prev_octets) % COUNTER32_MODULO  # the counter wrapped between the samples
+     return delta * 8 / interval_s
+diff --git a/test_counters.py b/test_counters.py
+--- a/test_counters.py
++++ b/test_counters.py
+@@ -7,6 +7,9 @@
+     def test_simple_rate(self) -> None:
+         self.assertEqual(rate_bps(1_000, 2_000, 8), 1_000.0)
+ 
++    def test_counter_wrap(self) -> None:
++        self.assertEqual(rate_bps(2**32 - 1_000, 1_000, 8), 2_000.0)
++
+     def test_bad_interval(self) -> None:
+         with self.assertRaises(ValueError):
+             rate_bps(0, 10, 0)

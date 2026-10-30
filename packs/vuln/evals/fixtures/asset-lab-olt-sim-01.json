@@ -1,0 +1,11 @@
+{
+  "name": "lab-olt-sim-01",
+  "fqdn": "lab-olt-sim-01.example.internal",
+  "ip": "172.31.90.14",
+  "environment": "dev",
+  "exposure": "isolated",
+  "criticality": 4,
+  "owner_team": "FTTH Lab",
+  "data_class": "C1",
+  "network": "air-gapped lab segment, no route to production or the internet"
+}

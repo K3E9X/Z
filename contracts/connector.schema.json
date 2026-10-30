@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.z.example/contracts/connector.schema.json",
+  "title": "Connector",
+  "description": "connectors/<name>.yaml (03 §4, 05). Credentials are references, never values. Rules can only RAISE the class the platform classifier gives an operation (05 §3); globs in rules match read operations only; pack `exposed: true` values are proposals until an admin approves exposure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "kind"],
+  "properties": {
+    "name": { "$ref": "common.schema.json#/$defs/Slug" },
+    "kind": { "$ref": "common.schema.json#/$defs/ConnectorKind" },
+    "display_name": { "type": "string" },
+    "description": { "type": "string" },
+    "base_url": { "type": "string", "description": "May use ${ENV} placeholders." },
+    "spec": { "type": "string", "description": "openapi/graphql: relative path, URL, or builtin:<name>." },
+    "operation_ids": { "type": "string", "enum": ["from_operation_id", "from_path"], "description": "openapi only." },
+    "operation_map": {
+      "type": "object",
+      "description": "Source name (MCP tool name, OpenAPI operationId) -> local operation id. For mcp, unmapped tools are ignored.",
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/LocalOperationId" }
+    },
+    "mcp": { "$ref": "#/$defs/McpServer" },
+    "builtin": { "type": "string", "description": "builtin kind: name of the platform-provided connector (web, sandbox)." },
+    "config": { "type": "object", "description": "builtin kind: connector-specific settings." },
+    "declared": { "type": "array", "items": { "$ref": "#/$defs/DeclaredOperation" }, "description": "rest, graphql, cli, database, browser: operations declared explicitly." },
+    "flows": {
+      "type": "object",
+      "description": "browser kind: named flows replayed by the z-browser worker; a declared operation names one in `flow`. Agent arguments ({{args.x}}) only fill values and URLs, credentials ({{auth.username}}, {{auth.password}}) are only typed into fields.",
+      "additionalProperties": { "$ref": "#/$defs/BrowserFlow" }
+    },
+    "auth": { "$ref": "#/$defs/AuthSet" },
+    "oauth": { "$ref": "#/$defs/OAuthApps" },
+    "operations": { "$ref": "#/$defs/OperationPolicy" },
+    "rate_limit": { "$ref": "#/$defs/RateLimit" },
+    "health": { "$ref": "#/$defs/HealthProbe" },
+    "error_body": {
+      "type": "object", "additionalProperties": false, "required": ["path", "equals"],
+      "description": "openapi/rest: for APIs that report errors in a 2xx body (Slack: {\"ok\": false, \"error\": \"...\"}), a 2xx answer whose body field `path` equals `equals` is an error; `message` names the field that holds the reason.",
+      "properties": {
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" },
+        "equals": {},
+        "message": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" }
+      }
+    },
+    "data_class": { "$ref": "common.schema.json#/$defs/DataClass" },
+    "cli": {
+      "type": "object", "additionalProperties": false, "required": ["image"],
+      "description": "cli: the tool runs in a one-shot sandbox container (ADR 0025). Each declared operation's `command` replaces the image CMD (it follows the ENTRYPOINT when the image has one), with {{args.<name>}} placeholders; no shell.",
+      "properties": {
+        "image": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$", "description": "Tool image pinned by digest; must also be listed in executor.tool_images." },
+        "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Literals, or {{auth.secret}}, {{auth.username}}, {{auth.password}} from the read or write credential." },
+        "timeout_s": { "type": "integer", "minimum": 1, "maximum": 300 },
+        "output": { "type": "string", "enum": ["text", "json"], "description": "json: stdout is parsed as JSON." }
+      }
+    },
+    "webhook": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "webhook kind: inbound events.",
+      "properties": {
+        "signature": { "type": "string", "enum": ["z_hmac", "hub_signature", "gitlab_token"] },
+        "secret": { "$ref": "common.schema.json#/$defs/SecretRef" }
+      }
+    }
+  },
+  "$defs": {
+    "McpServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport"],
+      "properties": {
+        "transport": { "type": "string", "enum": ["stdio", "http"] },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "url": { "type": "string" },
+        "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Values may be SecretRefs; resolved by the gateway only." }
+      }
+    },
+    "DeclaredOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/LocalOperationId" },
+        "description": { "type": "string" },
+        "method": { "type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"] },
+        "path": { "type": "string" },
+        "query": { "type": "string", "description": "graphql document or parameterised read-only SQL." },
+        "command": { "type": "array", "items": { "type": "string" }, "description": "cli: argv template." },
+        "flow": { "type": "string", "description": "browser: the name of a flow in `flows`." },
+        "input_schema": { "type": "object" },
+        "output_hint": { "type": "string" }
+      }
+    },
+    "BrowserStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "type": "string", "enum": ["goto", "click", "fill", "select", "check", "uncheck", "press", "wait_for", "wait_for_url", "extract_text", "extract_table", "extract_attribute", "assert_text", "assert_visible", "screenshot"] },
+        "selector": { "type": "string", "description": "Playwright selector; never contains a placeholder." },
+        "url": { "type": "string", "description": "goto, wait_for_url: relative to base_url or absolute on an allowed host." },
+        "value": { "type": "string" },
+        "key": { "type": "string" },
+        "name": { "type": "string", "description": "extract_*: output key; screenshot: file name." },
+        "attribute": { "type": "string" },
+        "all": { "type": "boolean" },
+        "state": { "type": "string", "enum": ["visible", "hidden", "attached", "detached"] },
+        "full_page": { "type": "boolean" },
+        "optional": { "type": "boolean", "description": "A failure of this step does not fail the flow." },
+        "timeout_ms": { "type": "integer", "minimum": 100, "maximum": 120000 }
+      }
+    },
+    "BrowserFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "description": { "type": "string" },
+        "start_url": { "type": "string" },
+        "allowed_hosts": { "type": "array", "items": { "type": "string" }, "description": "Hosts besides base_url's the page may load (exact or *.example.com); every other request is blocked." },
+        "timeout_s": { "type": "integer", "minimum": 5, "maximum": 300 },
+        "steps": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "#/$defs/BrowserStep" } }
+      }
+    },
+    "SimpleAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["bearer", "api_key", "basic", "oauth", "mtls", "none"] },
+        "secret": { "$ref": "common.schema.json#/$defs/SecretRef" },
+        "header": { "type": "string" },
+        "prefix": { "type": "string" },
+        "username": { "type": "string" },
+        "cert": { "$ref": "common.schema.json#/$defs/SecretRef" },
+        "key": { "$ref": "common.schema.json#/$defs/SecretRef" }
+      }
+    },
+    "OAuthFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow", "app"],
+      "properties": {
+        "flow": { "type": "string", "enum": ["authorization_code_pkce", "client_credentials"] },
+        "app": { "type": "string", "enum": ["read_app", "write_app"] },
+        "scopes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ScopedAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "Per credential scope (service = shared account, user = the mission starter's delegated grant).",
+      "properties": {
+        "user": { "$ref": "#/$defs/OAuthFlow" },
+        "service": { "$ref": "#/$defs/OAuthFlow" }
+      }
+    },
+    "Auth": { "oneOf": [{ "$ref": "#/$defs/SimpleAuth" }, { "$ref": "#/$defs/ScopedAuth" }] },
+    "AuthSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "read is used by the gateway for agent calls; write by the action executor only. They are always different credentials.",
+      "properties": {
+        "read": { "$ref": "#/$defs/Auth" },
+        "write": { "$ref": "#/$defs/Auth" }
+      }
+    },
+    "OAuthApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["client_id"],
+      "properties": {
+        "client_id": { "type": "string" },
+        "secret": { "$ref": "common.schema.json#/$defs/SecretRef" }
+      }
+    },
+    "OAuthApps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "enum": ["microsoft", "google"], "description": "Identity platform conventions: microsoft (endpoints from tenant_id, offline_access scope, client credentials with <API origin>/.default) or google (Google endpoints by default, access_type=offline and prompt=consent for a refresh token, delegated flows only: Google has no client credentials grant). Without it: microsoft when tenant_id is set, otherwise the plain OAuth 2.0 authorization code flow with offline_access." },
+        "tenant_id": { "type": "string" },
+        "authorize_url": { "type": "string" },
+        "token_url": { "type": "string" },
+        "read_app": { "$ref": "#/$defs/OAuthApp" },
+        "write_app": { "$ref": "#/$defs/OAuthApp" }
+      }
+    },
+    "OperationRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match"],
+      "properties": {
+        "match": { "type": "string", "pattern": "^[a-z0-9_*]+(\\.[a-z0-9_*]+)*$", "description": "Local operation id or glob. Globs apply only to operations the classifier marks read." },
+        "class": { "$ref": "common.schema.json#/$defs/OperationClass" },
+        "exposed": { "type": "boolean" },
+        "rate_limit": { "$ref": "#/$defs/RateLimit" },
+        "args_map": { "type": "object", "description": "Optional mapping canonical payload field -> source argument (template) for writes with a built-in preview." }
+      }
+    },
+    "OperationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_exposed": { "type": "boolean", "default": false },
+        "rules": { "type": "array", "items": { "$ref": "#/$defs/OperationRule" }, "description": "First match wins." }
+      }
+    },
+    "RateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "per_minute": { "type": "integer", "minimum": 1 },
+        "per_mission_per_minute": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "HealthProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation": { "$ref": "common.schema.json#/$defs/LocalOperationId" },
+        "params": { "type": "object" },
+        "path": { "type": "string" },
+        "interval_s": { "type": "integer", "minimum": 10, "default": 60 }
+      }
+    }
+  }
+}

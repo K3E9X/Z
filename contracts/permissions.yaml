@@ -1,0 +1,69 @@
+# Z permissions and built-in roles (docs/12 §2). Source of truth for z-server RBAC, the UI and the CLI.
+# Every API route declares exactly one permission in openapi.yaml (x-permission). Special values:
+#   public        no authentication (sign-in, health, OIDC callback)
+#   authenticated any signed-in user, acting on their own resources (/me/*)
+#   hmac          request signed with a trigger or channel secret (webhooks, inbound channels)
+#   job_token     a runner job token (internal API, tool gateway)
+#   service       z-server internal service token (gateway -> api calls)
+# Team-scoped bindings grant the permission only on resources owned by that team.
+
+permissions:
+  missions:read: See missions, jobs, events, artifacts and replays
+  missions:start: Create, draft-plan and start missions; run playbooks; save a mission as a playbook
+  missions:control: Pause, resume, cancel, guide, take over and retry missions and jobs
+  questions:answer: Answer agent questions
+  actions:approve: Approve, reject or edit proposed actions (team connectors, or org-wide)
+  agents:read: See agents, versions and objectives
+  agents:write: Create, edit, rename, duplicate agents; manage objectives and assignments
+  skills:read: See skills and versions
+  skills:write: Edit skills and roll back versions
+  playbooks:read: See playbooks
+  playbooks:write: Create and edit playbooks
+  triggers:read: See triggers
+  triggers:write: Create and edit triggers
+  tasks:read: See the task board
+  tasks:write: Start or dismiss tasks
+  sessions:read: See own CLI and chat sessions
+  sessions:write: Create and continue own sessions
+  learning:read: See signals, proposals and eval runs
+  learning:apply: Apply, try or reject learning proposals; run evals
+  usage:read: See token usage, budgets and inference health
+  connectors:read: See connectors, operations and health
+  connectors:manage: Create, edit, test connectors; review exposure; manage credentials and channels
+  providers:manage: Manage model providers and the routing policy
+  guardrails:read: See guardrails and platform settings
+  guardrails:manage: Change guardrails, budgets and retention
+  audit:read_own: See audit events about oneself
+  audit:read: Read the full audit log
+  audit:export: Export the audit log and verify the chain
+  users:manage: Manage users, role bindings, roles, group mappings, sessions, API tokens and sign-in settings
+  teams:read: See teams
+  teams:manage: Create and edit teams and team budgets
+  analytics:read: See analytics
+
+roles:
+  viewer:
+    - missions:read
+    - agents:read
+    - skills:read
+    - playbooks:read
+    - triggers:read
+    - tasks:read
+    - sessions:read
+    - learning:read
+    - usage:read
+    - connectors:read
+    - guardrails:read
+    - audit:read_own
+    - teams:read
+    - analytics:read
+  operator: [viewer, missions:start, missions:control, questions:answer, tasks:write, sessions:write]
+  approver: [operator, actions:approve]
+  builder: [operator, agents:write, skills:write, playbooks:write, triggers:write, learning:apply]
+  auditor: [viewer, audit:read, audit:export]
+  admin: ["*"]
+
+# Local account restrictions (docs/12 §1). Not roles: hard limits applied on top of bindings.
+local_accounts:
+  bootstrap: [users:manage, guardrails:read]   # only the Sign-in and Group mapping admin tabs (enforced per route in z-server)
+  test_max_role: approver                      # never admin, never a second approval on destructive actions

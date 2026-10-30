@@ -1,0 +1,267 @@
+# Images (docs/13 §1 build, scan, sbom and sign): every Z image is built on PRs that touch it (amd64, loaded
+# locally, scanned; nothing pushed, no secrets) and published from main and release tags only:
+#   publish (packages: write)  multi-arch BuildKit build, push to ghcr.io/<owner>/<image> with sha-<short>
+#                              (and vX.Y.Z on tags), SLSA provenance (mode=max) and SBOM attestations;
+#   scan    (read only)        trivy image + dockle on each platform of the pushed digest: a CRITICAL
+#                              vulnerability with a fix blocks (unless excepted in security/exceptions.yaml);
+#   sign    (id-token: write)  only a scanned digest is signed: cosign keyless (GitHub OIDC) + SPDX SBOM
+#                              attestation (syft). Deploys verify this signature (ci/scripts/verify-signatures.sh).
+# Each stage has only the permissions it needs, so a compromised scanner never holds a write token or the
+# OIDC token. Actions are pinned by SHA; scanners come from ci/scripts/install-scanners.sh.
+name: images
+on:
+  pull_request:
+    paths:
+      - "deploy/images/**"
+      - "server/**"
+      - "runner/**"
+      - "cli/**"
+      - "browser/**"
+      - "packages/**"
+      - "ui/**"
+      - "contracts/**"
+      - "packs/**"              # baked into z-server (the seed)
+      - "docs/**"               # z-server serves the documentation of its version (GET /docs)
+      - "deploy/README.md"
+      - "deploy/helm/z/README.md"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "ci/scripts/**"
+      - "security/exceptions.yaml"
+      - ".github/workflows/images.yml"
+  push:
+    branches: [main]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+permissions: {}
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Images Z ships; an entry is built once deploy/images/<name>/Dockerfile exists.
+  IMAGES: "z-server z-runner z-ui z-browser z-socket-proxy egress-proxy"
+  PLATFORMS: linux/amd64,linux/arm64
+  # dockle false positives: upstream nginx keeps KEY_SHA512 (a key checksum) in a RUN line; Python packages
+  # ship modules named settings.py.
+  DOCKLE_ACCEPT: --accept-key KEY_SHA512 --accept-file settings.py
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - id: list
+        run: |
+          found=()
+          for image in $IMAGES; do
+            if [ -f "deploy/images/$image/Dockerfile" ]; then
+              found+=("\"$image\"")
+            else
+              echo "::notice::deploy/images/$image/Dockerfile does not exist yet: $image is skipped"
+            fi
+          done
+          echo "images=[$(IFS=,; echo "${found[*]}")]" >> "$GITHUB_OUTPUT"
+          echo "images: ${found[*]}"
+
+  pr-build:
+    if: github.event_name == 'pull_request'
+    needs: matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.matrix.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/images/${{ matrix.image }}/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          provenance: false
+          tags: z-ci/${{ matrix.image }}:pr
+      - run: ci/scripts/install-scanners.sh trivy dockle
+      - name: Scan (trivy CRITICAL with a fix blocks; dockle FATAL blocks)
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker save -o "$RUNNER_TEMP/image.tar" "z-ci/$IMAGE:pr"
+          python3 ci/scripts/check_exceptions.py ids "image:$IMAGE" > "$RUNNER_TEMP/ignore"
+          trivy image --quiet --input "$RUNNER_TEMP/image.tar" --severity HIGH,CRITICAL --exit-code 0
+          trivy image --quiet --input "$RUNNER_TEMP/image.tar" --severity CRITICAL --ignore-unfixed --exit-code 1 \
+            --ignorefile "$RUNNER_TEMP/ignore"
+          read -ra flags <<< "$DOCKLE_ACCEPT"
+          while read -r id; do flags+=(--ignore "$id"); done < "$RUNNER_TEMP/ignore"
+          dockle --exit-code 1 --exit-level fatal "${flags[@]}" --input "$RUNNER_TEMP/image.tar"
+
+  publish:
+    if: github.event_name == 'push'
+    needs: matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.matrix.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - id: ref
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$IMAGE"
+          tags="$repo:sha-${GITHUB_SHA::7}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "unexpected tag $GITHUB_REF_NAME"; exit 1; }
+            tags="$tags,$repo:$GITHUB_REF_NAME"
+          fi
+          { echo "repo=$repo"; echo "tags=$tags"; } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/images/${{ matrix.image }}/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.ref.outputs.tags }}
+          provenance: mode=max
+          sbom: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Record the digest
+        env:
+          IMAGE: ${{ matrix.image }}
+          REPO: ${{ steps.ref.outputs.repo }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "no digest from the build"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/digest"
+          echo "$REPO@$DIGEST" > "$RUNNER_TEMP/digest/$IMAGE"
+          echo "$REPO@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/digest/${{ matrix.image }}
+          retention-days: 7
+      - if: always()
+        run: docker logout ghcr.io
+
+  scan:
+    needs: [matrix, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.matrix.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/digest
+      - name: Pull each platform, then drop the credentials before any scanner runs
+        env:
+          IMAGE: ${{ matrix.image }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ref=$(cat "$RUNNER_TEMP/digest/$IMAGE")
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for platform in ${PLATFORMS//,/ }; do
+            docker pull -q --platform "$platform" "$ref"
+            docker save --platform "$platform" -o "$RUNNER_TEMP/${platform//\//-}.tar" "$ref"
+          done
+          docker logout ghcr.io
+      - run: ci/scripts/install-scanners.sh trivy dockle
+      - name: trivy image and dockle on every platform
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          python3 ci/scripts/check_exceptions.py ids "image:$IMAGE" > "$RUNNER_TEMP/ignore"
+          read -ra flags <<< "$DOCKLE_ACCEPT"
+          while read -r id; do flags+=(--ignore "$id"); done < "$RUNNER_TEMP/ignore"
+          for tar in "$RUNNER_TEMP"/linux-*.tar; do
+            echo "::group::$(basename "$tar" .tar)"
+            trivy image --quiet --input "$tar" --severity HIGH,CRITICAL --exit-code 0
+            trivy image --quiet --input "$tar" --severity CRITICAL --ignore-unfixed --exit-code 1 \
+              --ignorefile "$RUNNER_TEMP/ignore"
+            dockle --exit-code 1 --exit-level fatal "${flags[@]}" --input "$tar"
+            echo "::endgroup::"
+          done
+
+  sign:
+    needs: [matrix, scan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # signatures and attestations are stored next to the image
+      id-token: write # cosign keyless (Fulcio certificate bound to this workflow)
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.matrix.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/digest
+      - run: ci/scripts/install-scanners.sh cosign syft
+      - name: SBOM (syft, SPDX JSON), signature and attestation
+        env:
+          IMAGE: ${{ matrix.image }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ref=$(cat "$RUNNER_TEMP/digest/$IMAGE")
+          [[ "$ref" =~ ^ghcr\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[0-9a-f]{64}$ ]] || { echo "bad ref $ref"; exit 1; }
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          syft -q "$ref" -o "spdx-json=$RUNNER_TEMP/sbom.spdx.json"
+          cosign sign --yes "$ref"
+          cosign attest --yes --type spdxjson --predicate "$RUNNER_TEMP/sbom.spdx.json" "$ref"
+          docker logout ghcr.io
+      - name: Verify like a deploy would
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          ref=$(cat "$RUNNER_TEMP/digest/$IMAGE")
+          identity="^${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/\.github/workflows/images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$"
+          cosign verify --certificate-identity-regexp "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ref" > /dev/null
+          cosign verify-attestation --type spdxjson --certificate-identity-regexp "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ref" > /dev/null
+          echo "signed and verified: $ref"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ matrix.image }}
+          path: ${{ runner.temp }}/sbom.spdx.json
+          retention-days: 90

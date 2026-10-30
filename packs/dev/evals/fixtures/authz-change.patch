@@ -1,0 +1,12 @@
+diff --git a/portal/lines.py b/portal/lines.py
+--- a/portal/lines.py
++++ b/portal/lines.py
+@@ -13,7 +13,7 @@
+ 
+ 
+ @bp.delete("/lines/<line_id>")
+-@require_role("noc-admin")
++@require_role("support-agent")
+ def remove_line(line_id: str):
+     delete_subscriber_line(line_id)
+     return {"deleted": line_id}

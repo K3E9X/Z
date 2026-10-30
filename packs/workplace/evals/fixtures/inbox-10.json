@@ -1,0 +1,115 @@
+[
+  {
+    "id": "inb-01",
+    "from": "claire.martin@example.test",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "Need the Q4 risk summary by Friday",
+    "received": "2026-10-28T09:12:00+01:00",
+    "isRead": false,
+    "body": "Hi, can you send me the Q4 risk summary by Friday 30 October? Two pages max, top five risks with owners. Thanks, Claire"
+  },
+  {
+    "id": "inb-02",
+    "from": "newsletter@securityweekly.example.test",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "Weekly digest: ransomware trends, patch roundup",
+    "received": "2026-10-28T10:00:00+01:00",
+    "isRead": false,
+    "body": "This week in security news... Unsubscribe at the bottom of this message."
+  },
+  {
+    "id": "inb-03",
+    "from": "julien.roux@example.test",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "CAB approval needed today: firewall change CHG-2291",
+    "received": "2026-10-28T16:40:00+01:00",
+    "isRead": false,
+    "body": "Hello, CHG-2291 opens TCP 8443 from the partner VPN range to edge-proxy-02. The change window is tonight at 22:00. Please approve or reject before 17:00 today. Julien"
+  },
+  {
+    "id": "inb-04",
+    "from": "noreply@gitlab.example.internal",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "Pipeline failed: infra/edge-proxy main #4812",
+    "received": "2026-10-28T18:03:00+01:00",
+    "isRead": false,
+    "body": "Pipeline #4812 failed at stage lint. This is an automated message."
+  },
+  {
+    "id": "inb-05",
+    "from": "noreply@defectdojo.example.internal",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "3 new findings in engagement payments-api-2026Q4",
+    "received": "2026-10-28T19:30:00+01:00",
+    "isRead": false,
+    "body": "3 new findings (1 high, 2 medium) were imported by the nightly scan. This is an automated message."
+  },
+  {
+    "id": "inb-06",
+    "from": "sophie.bernard@example.test",
+    "to": [
+      "dc-users@example.test"
+    ],
+    "subject": "FYI: datacenter maintenance on 5 November",
+    "received": "2026-10-28T20:15:00+01:00",
+    "isRead": false,
+    "body": "For information: the PAR-2 datacenter has a planned power maintenance on 5 November, 01:00-05:00. No action expected from your team.",
+    "cc": [
+      "me@example.test"
+    ]
+  },
+  {
+    "id": "inb-07",
+    "from": "thomas.leroy@example.test",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "Incident review INC-2041 on Thursday",
+    "received": "2026-10-29T07:20:00+01:00",
+    "isRead": false,
+    "body": "Can you join the incident review for INC-2041 next Thursday at 10:00? I need your input on the detection timeline."
+  },
+  {
+    "id": "inb-08",
+    "from": "it-announcements@example.test",
+    "to": [
+      "all-staff@example.test"
+    ],
+    "subject": "Offices closed on 11 November",
+    "received": "2026-10-29T07:45:00+01:00",
+    "isRead": false,
+    "body": "Reminder: all offices are closed on 11 November (public holiday)."
+  },
+  {
+    "id": "inb-09",
+    "from": "nadia.haddad@example.test",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "Pentest budget split: your decision today",
+    "received": "2026-10-29T08:02:00+01:00",
+    "isRead": false,
+    "body": "Finance closes the 2027 budget line today at 16:00. Option A: 60% external pentest, 40% bug bounty. Option B: 50/50. Which one do we go with? Nadia"
+  },
+  {
+    "id": "inb-10",
+    "from": "noreply@jira.example.internal",
+    "to": [
+      "me@example.test"
+    ],
+    "subject": "[JIRA] SECOPS-4810 assigned to you",
+    "received": "2026-10-29T08:10:00+01:00",
+    "isRead": false,
+    "body": "SECOPS-4810 'Rotate TLS certificates on edge-proxy-02' was assigned to you. This is an automated message."
+  }
+]

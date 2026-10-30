@@ -1,0 +1,17 @@
+name: weekly-report
+version: 1.0.0
+domain: workplace
+description: Weekly report from Jira and GitLab as a Word document and a short deck.
+inputs:
+  schema: { type: object, required: [jira_project, gitlab_group], properties: { jira_project: { type: string }, gitlab_group: { type: string } } }
+team: [writer]
+connectors: [jira, gitlab]
+steps:
+  - { id: report, agent: writer, prompt: "Apply weekly-report to Jira {{ inputs.jira_project }} and GitLab {{ inputs.gitlab_group }}; deliver docx and pptx." }
+trigger:
+  kind: schedule
+  cron: "0 16 * * 5"
+  owner_user: <user who creates the trigger>
+  inputs: { jira_project: SECOPS, gitlab_group: infra }
+autonomy: read_only
+budget: { max_tokens: 1500000, timeout_s: 2400 }

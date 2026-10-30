@@ -1,0 +1,756 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Google Workspace APIs (Gmail, Calendar, Drive subset used by Z)",
+    "version": "1",
+    "description": "Paths and parameters checked against Google's discovery documents (gmail v1, calendar v3, drive v3). operationIds are Z operation ids. Every call acts on the signed-in person's own account (users/me, a delegated OAuth grant). gmail.messages.send takes Z's mail shape: the action executor builds the RFC 2822 message, so the reviewer sees every recipient and the agent cannot add headers."
+  },
+  "servers": [
+    {
+      "url": "https://www.googleapis.com"
+    }
+  ],
+  "paths": {
+    "/gmail/v1/users/me/messages": {
+      "get": {
+        "operationId": "gmail.messages.list",
+        "summary": "Messages of my mailbox (ids and thread ids; read one with gmail.messages.get)",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "Gmail search, e.g. 'is:unread newer_than:7d from:alice@example.com'"
+          },
+          {
+            "name": "labelIds",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "A label id, e.g. INBOX, UNREAD, SENT"
+          },
+          {
+            "name": "maxResults",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "nextPageToken of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gmail/v1/users/me/messages/{id}": {
+      "get": {
+        "operationId": "gmail.messages.get",
+        "summary": "One message, with its headers and body parts (body data is base64url)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Message id from gmail.messages.list"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "metadata",
+                "minimal"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gmail/v1/users/me/threads/{id}": {
+      "get": {
+        "operationId": "gmail.threads.get",
+        "summary": "A whole conversation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Thread id"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "metadata",
+                "minimal"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gmail/v1/users/me/messages/send": {
+      "post": {
+        "operationId": "gmail.messages.send",
+        "summary": "Send a mail from my mailbox (a reply stays in its thread with thread_id and in_reply_to)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "to",
+                  "subject",
+                  "body"
+                ],
+                "properties": {
+                  "to": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 320,
+                      "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  },
+                  "cc": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 320,
+                      "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                    },
+                    "maxItems": 50
+                  },
+                  "subject": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300,
+                    "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 100000,
+                    "description": "Plain text"
+                  },
+                  "thread_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{1,32}$",
+                    "description": "threadId of the mail answered"
+                  },
+                  "in_reply_to": {
+                    "type": "string",
+                    "maxLength": 998,
+                    "pattern": "^<[^\\s<>=?]+>$",
+                    "description": "Message-ID header of the mail answered"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gmail/v1/users/me/messages/{id}/trash": {
+      "post": {
+        "operationId": "gmail.messages.trash",
+        "summary": "Move a message to the trash",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Message id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendar/v3/calendars/{calendarId}/events": {
+      "get": {
+        "operationId": "calendar.events.list",
+        "summary": "Events of a calendar (use singleEvents=true and orderBy=startTime for an agenda)",
+        "parameters": [
+          {
+            "name": "calendarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
+            },
+            "description": "primary, or a calendar id (an e-mail address)"
+          },
+          {
+            "name": "timeMin",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "RFC 3339 lower bound (exclusive) of the event end"
+          },
+          {
+            "name": "timeMax",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "RFC 3339 upper bound (exclusive) of the event start"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "Free text search"
+          },
+          {
+            "name": "singleEvents",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "startTime",
+                "updated"
+              ]
+            }
+          },
+          {
+            "name": "maxResults",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "nextPageToken of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "calendar.events.insert",
+        "summary": "Create an event in a calendar (sendUpdates=all invites the attendees)",
+        "parameters": [
+          {
+            "name": "calendarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
+            },
+            "description": "primary, or a calendar id"
+          },
+          {
+            "name": "sendUpdates",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "externalOnly",
+                "none"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "start",
+                  "end"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "start": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "RFC 3339, with an offset unless timeZone is set"
+                      },
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "yyyy-mm-dd, for an all-day event"
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "description": "IANA time zone, e.g. Europe/Paris"
+                      }
+                    }
+                  },
+                  "end": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "RFC 3339, with an offset unless timeZone is set"
+                      },
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "yyyy-mm-dd, for an all-day event"
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "description": "IANA time zone, e.g. Europe/Paris"
+                      }
+                    }
+                  },
+                  "attendees": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "email"
+                      ],
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "maxLength": 320,
+                          "pattern": "^(?!.*=\\?)[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendar/v3/calendars/{calendarId}/events/{eventId}": {
+      "get": {
+        "operationId": "calendar.events.get",
+        "summary": "One event",
+        "parameters": [
+          {
+            "name": "calendarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
+            },
+            "description": "primary, or a calendar id"
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Event id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "calendar.events.delete",
+        "summary": "Delete an event",
+        "parameters": [
+          {
+            "name": "calendarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?!\\.+$)[A-Za-z0-9_.@+\\-]{1,200}$"
+            },
+            "description": "primary, or a calendar id"
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "Event id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drive/v3/files": {
+      "get": {
+        "operationId": "drive.files.list",
+        "summary": "Files I can see in Drive",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "Drive query, e.g. \"name contains 'roadmap' and trashed = false\""
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "e.g. modifiedTime desc"
+          },
+          {
+            "name": "corpora",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "user",
+                "drive",
+                "domain",
+                "allDrives"
+              ]
+            }
+          },
+          {
+            "name": "driveId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "includeItemsFromAllDrives",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "supportsAllDrives",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "Partial response selector, e.g. files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken"
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "description": "nextPageToken of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drive/v3/files/{fileId}": {
+      "get": {
+        "operationId": "drive.files.get",
+        "summary": "Metadata of one file (never its content: use drive.files.get_text for Google Docs, Sheets and Slides)",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "File id"
+          },
+          {
+            "name": "supportsAllDrives",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "Partial response selector, e.g. files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drive/v3/files/{fileId}/export": {
+      "get": {
+        "operationId": "drive.files.get_text",
+        "summary": "The text of a Google Doc (text/plain) or the first sheet of a Google Sheet (text/csv), up to 10 MB",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_\\-]{1,200}$"
+            },
+            "description": "File id"
+          },
+          {
+            "name": "mimeType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "text/plain",
+                "text/csv"
+              ]
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

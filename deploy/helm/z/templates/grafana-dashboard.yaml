@@ -1,0 +1,14 @@
+{{- if .Values.metrics.grafanaDashboard.enabled }}
+# Grafana dashboard "Z overview" (dashboards/z-overview.json) for the Grafana sidecar that loads ConfigMaps
+# carrying its label (kube-prometheus-stack: grafana_dashboard: "1").
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "z.fullname" . }}-grafana-dashboard
+  labels:
+    {{- include "z.componentLabels" (dict "root" . "component" "server") | nindent 4 }}
+    {{- toYaml .Values.metrics.grafanaDashboard.labels | nindent 4 }}
+data:
+  z-overview.json: |-
+{{ .Files.Get "dashboards/z-overview.json" | indent 4 }}
+{{- end }}

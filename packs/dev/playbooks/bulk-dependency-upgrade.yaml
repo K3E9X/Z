@@ -1,0 +1,36 @@
+name: bulk-dependency-upgrade
+version: 2.1.1
+domain: code
+description: Upgrade a dependency across a group of repositories, run the tests, review, and prepare one merge request each.
+inputs:
+  schema:
+    type: object
+    required: [group, dependency, target_version]
+    properties: { group: { type: string }, dependency: { type: string }, target_version: { type: string } }
+team: [orchestrator, dev-engineer, reviewer]
+connectors: [gitlab]
+steps:
+  - { id: find, agent: orchestrator, prompt: "List repositories in {{ inputs.group }} that declare {{ inputs.dependency }}.", output: { schema: schemas/repo-list.json } }
+  - id: upgrade
+    agent: dev-engineer
+    depends_on: [find]
+    fanout: { over: steps.find.output.repos, concurrency: 6 }
+    workspace: git_clone
+    repo: "{{ item.repo }}"
+    prompt: Apply dependency-upgrade for {{ inputs.dependency }} to {{ inputs.target_version }} in {{ item.repo }}. Do not propose yet.
+    output: { schema: schemas/change-result.json }
+  - id: review
+    agent: reviewer
+    depends_on: [upgrade]
+    fanout: { over: steps.upgrade.outputs, concurrency: 6 }
+    workspace: files   # stages the upgrade patches (steps/upgrade/) so the reviewer can read them
+    prompt: Apply security-review to the patch for {{ item.repo }} (artifact {{ item.patch_artifact }}, staged under steps/upgrade/).
+    output: { schema: schemas/review-result.json }
+  - id: propose
+    agent: dev-engineer
+    depends_on: [review]
+    fanout: { over: steps.upgrade.outputs, concurrency: 6, when: "review_for(item).verdict == 'approve'" }
+    prompt: Apply commit-and-mr for {{ item.repo }} with the reviewed patch.
+    writes: [gitlab.merge_requests.create]
+autonomy: propose
+budget: { max_tokens: 12000000, timeout_s: 10800 }

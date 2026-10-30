@@ -1,0 +1,242 @@
+workspace:
+  name: Cyber Ops
+  environment: local
+auth:
+  provider: gitlab
+  mode: dev
+  issuer_url: https://gitlab.example.internal
+  client_id: z
+  client_secret: x
+  scopes:
+  - openid
+  - profile
+  - email
+  groups_claim: groups
+  allowed_groups:
+  - cyber
+  no_match: viewer
+  group_mapping:
+  - group: cyber/z/z-admins
+    role: admin
+    scope: org
+  - group: cyber/z/z-auditors
+    role: auditor
+    scope: org
+  - group: cyber/z/z-builders
+    role: builder
+    scope: org
+  - group: cyber/z/z-approvers
+    role: approver
+    scope: team
+  - group: cyber/z/z-operators
+    role: operator
+    scope: team
+  team_mapping:
+  - group: cyber/soc-csirt
+    team: Cyber Ops
+  - group: cyber/archi
+    team: Architecture
+  reevaluate_groups_minutes: 60
+  session:
+    idle_minutes: 120
+    absolute_hours: 12
+    cli_token_days: 30
+  step_up_max_age_s: 300
+  api_tokens:
+    max_days: 90
+  cli:
+    device_flow: true
+    loopback_redirect: http://127.0.0.1:8765/callback
+  local_accounts:
+    bootstrap:
+      enabled: true
+      ttl_hours: 24
+    test_accounts:
+    - name: tester
+      role: operator
+      team: Cyber Ops
+      expires_days: 30
+    - name: tester-approver
+      role: approver
+      team: Cyber Ops
+      expires_days: 30
+    password_policy:
+      min_length: 14
+      lockout_after: 5
+      lockout_minutes: 15
+  breakglass:
+    enabled: false
+audit:
+  retention_days: 365
+  checkpoint_minutes: 60
+  forward:
+    syslog:
+      enabled: false
+      url: tls://syslog.example.internal:6514
+      format: rfc5424
+    https:
+      enabled: false
+      url: ''
+executor:
+  kind: docker
+  docker:
+    socket_proxy_url: http://docker-socket-proxy:2375
+    network: z_runners
+  kubernetes:
+    namespace: z-runners
+    runtime_class: ''
+    job_ttl_s: 3600
+  default_concurrency: 8
+  max_concurrency: 32
+inference:
+  gateway_url: http://litellm:4000
+  aliases:
+  - z-heavy
+  - z-fast
+  - z-judge
+  - z-embed
+  internal_cost_per_mtok:
+    z-heavy:
+      input: 0.0
+      output: 0.0
+    z-fast:
+      input: 0.0
+      output: 0.0
+  prometheus:
+    url: ''
+    queries:
+      requests_running: sum by (model_name) (vllm:num_requests_running)
+      requests_waiting: sum by (model_name) (vllm:num_requests_waiting)
+      kv_cache_usage: avg by (model_name) (vllm:gpu_cache_usage_perc)
+      prefix_cache_hit: sum(rate(vllm:prefix_cache_hits_total[5m])) / sum(rate(vllm:prefix_cache_queries_total[5m]))
+      ttft_p95: histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+      gen_tokens_per_s: sum by (model_name) (rate(vllm:generation_tokens_total[1m]))
+      prompt_tokens_per_s: sum by (model_name) (rate(vllm:prompt_tokens_total[1m]))
+      preemptions_24h: sum(increase(vllm:num_preemptions_total[24h]))
+      gpu_util: avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)
+      gpu_mem_used_ratio: sum by (Hostname) (DCGM_FI_DEV_FB_USED) / (sum by (Hostname)
+        (DCGM_FI_DEV_FB_USED) + sum by (Hostname) (DCGM_FI_DEV_FB_FREE))
+      gpu_temp: max by (Hostname) (DCGM_FI_DEV_GPU_TEMP)
+  probes:
+    models_poll_s: 60
+    tool_call_probe_s: 600
+providers:
+- name: inferX
+  kind: internal
+  enabled: true
+  aliases:
+  - z-heavy
+  - z-fast
+  - z-judge
+  - z-embed
+  data_classes:
+  - C0
+  - C1
+  - C2
+  - C3
+- name: Anthropic API
+  kind: external
+  enabled: false
+  aliases:
+  - ext-claude
+  data_classes:
+  - C0
+  - C1
+- name: Azure OpenAI
+  kind: external
+  enabled: false
+  aliases:
+  - ext-azure
+  data_classes:
+  - C0
+  - C1
+- name: Mistral API
+  kind: external
+  enabled: false
+  aliases:
+  - ext-mistral
+  data_classes:
+  - C0
+  - C1
+routing_policy:
+  data_classes:
+    C0: Public
+    C1: Internal
+    C2: Confidential
+    C3: Restricted
+  default_mission_class: C2
+  external_fallback_when_degraded: false
+  never_external:
+  - C2
+  - C3
+  never_in_memory:
+  - C3
+budgets:
+  org_monthly_tokens: 600000000
+  default_mission_tokens: 10000000
+  alert_at: 0.8
+guardrails:
+  human_approval_for_writes:
+    value: true
+    locked: true
+  two_approvers_for_destructive:
+    value: true
+    locked: true
+  sandbox_network:
+    value: allow
+    locked: false
+  judge_injection_scan:
+    value: true
+    locked: false
+  learning_requires_approval:
+    value: true
+    locked: true
+  max_steps_per_job: 120
+  max_job_minutes: 60
+egress:
+  proxy_url: http://egress-proxy:3128
+  mirrors:
+  - https://nexus.example.internal
+  - https://harbor.example.internal
+  browser_targets: []
+secrets:
+  backend: env
+  vault:
+    address: ''
+    mount: kv
+    path_prefix: z/
+channels:
+  teams:
+    enabled: false
+    app_id: ''
+    default_agent: orchestrator
+  mattermost:
+    enabled: false
+    default_agent: orchestrator
+  slack:
+    enabled: false
+    default_agent: orchestrator
+  email:
+    enabled: false
+    address: ''
+    default_agent: orchestrator
+notifications:
+  mattermost_webhook: ''
+  slack_webhook: ''
+  smtp_url: ''
+  digest:
+    daily_decisions: 0 9 * * 1-5
+    weekly_report: 0 16 * * 5
+memory:
+  embedding_dim: 1024
+retention:
+  events_days: 180
+  artifacts_days: 90
+  c3_artifacts_days: 7
+learning:
+  schedule: 0 2 * * *
+  shadow_replay_missions: 10
+  max_token_cost_increase: 0.15
+ui:
+  default_theme: night
+  default_font: plex

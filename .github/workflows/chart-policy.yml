@@ -1,0 +1,74 @@
+# Chart policy (docs/13 §1 "chart"), next to helm.yml (lint, render, kubeconform): kubescape (NSA and CIS
+# frameworks, compliance below 85 % blocks) and kube-score (report only: its opinionated checks are not a
+# merge rule in docs/13) on the chart rendered with the k3s and Kubernetes values. helm is built the same
+# verified way as in helm.yml (Go module hash pinned, checked against sum.golang.org); kubescape and kube-score
+# come from ci/scripts/install-scanners.sh.
+name: chart-policy
+on:
+  pull_request:
+    paths: ["deploy/helm/**", "security/kubescape-exceptions.json", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
+  push:
+    branches: [main]
+    paths: ["deploy/helm/**", "security/kubescape-exceptions.json", "ci/scripts/versions.lock", ".github/workflows/chart-policy.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: chart-policy-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
+
+env:
+  HELM_VERSION: v3.22.1
+  HELM_MODULE_SUM: "h1:uo2SouzAxMkKZTNzZ1lLP/c/Bu7xfUJKYDaYMxMHvk8="
+  HELM_K8S_MINOR: "37"
+  GO_TOOLCHAIN: go1.26.10
+  KUBESCAPE_THRESHOLD: "85"
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install helm (verified Go module)
+        env:
+          GOTOOLCHAIN: ${{ env.GO_TOOLCHAIN }}
+          GOSUMDB: sum.golang.org
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"; mkdir -p "$bin"
+          sum=$(go mod download -json "helm.sh/helm/v3@${HELM_VERSION}" | jq -r .Sum)
+          test "$sum" = "$HELM_MODULE_SUM" || { echo "helm module hash mismatch: $sum"; exit 1; }
+          ldf="-s -w -X helm.sh/helm/v3/internal/version.version=${HELM_VERSION}"
+          for p in pkg/lint/rules pkg/chartutil; do
+            ldf="$ldf -X helm.sh/helm/v3/$p.k8sVersionMajor=1 -X helm.sh/helm/v3/$p.k8sVersionMinor=${HELM_K8S_MINOR}"
+          done
+          GOBIN="$bin" go install -trimpath -ldflags "$ldf" "helm.sh/helm/v3/cmd/helm@${HELM_VERSION}"
+          echo "$bin" >> "$GITHUB_PATH"
+      - run: ci/scripts/install-scanners.sh kubescape kube-score
+      - name: Render
+        run: |
+          for v in k3s k8s; do
+            helm template z deploy/helm/z -n z -f "deploy/helm/z/values-$v.yaml" -f deploy/helm/z/ci/render-values.yaml > "$RUNNER_TEMP/rendered-$v.yaml"
+          done
+      - name: kube-score (report only)
+        run: |
+          for v in k3s k8s; do
+            echo "::group::$v"
+            kube-score score --output-format ci "$RUNNER_TEMP/rendered-$v.yaml" || true
+            echo "::endgroup::"
+          done
+      - name: kubescape (NSA, CIS; compliance threshold)
+        run: |
+          for v in k3s k8s; do
+            echo "::group::$v"
+            kubescape scan framework nsa,cis-v1.10.0 "$RUNNER_TEMP/rendered-$v.yaml" \
+              --exceptions security/kubescape-exceptions.json \
+              --compliance-threshold "$KUBESCAPE_THRESHOLD" --format pretty-printer
+            echo "::endgroup::"
+          done

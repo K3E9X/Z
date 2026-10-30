@@ -1,0 +1,59 @@
+name: fwconsole
+kind: browser                   # the console has a web UI only; flows run in the z-browser worker
+display_name: FW Console
+description: Legacy firewall management console (rules and their comments). Example of a browser connector.
+base_url: ${FWCONSOLE_URL}
+auth:
+  # form logins: {{auth.username}} / {{auth.password}} are typed by the worker, never seen by an agent
+  read: { type: basic, username: "${FWCONSOLE_READ_USER}", secret: env:FWCONSOLE_READ_PASSWORD }
+  write: { type: basic, username: "${FWCONSOLE_WRITE_USER}", secret: env:FWCONSOLE_WRITE_PASSWORD }
+declared:
+  - id: rules.search
+    description: Firewall rules whose name contains a text, with port, state, hit count and note.
+    flow: search_rules
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [q]
+      properties: { q: { type: string, maxLength: 64, description: "Part of the rule name" } }
+  - id: rules.comment
+    description: Add a comment to a firewall rule (shown to the network team in the console).
+    flow: comment_rule
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [rule, text]
+      properties:
+        rule: { type: string, pattern: "^[a-z0-9-]{1,64}$" }
+        text: { type: string, minLength: 1, maxLength: 2000 }
+flows:
+  search_rules:
+    description: Sign in with the read account, filter the rules table, extract it.
+    start_url: login
+    steps:
+      - { action: fill, selector: "#username", value: "{{auth.username}}" }
+      - { action: fill, selector: "#password", value: "{{auth.password}}" }
+      - { action: click, selector: "#signin" }
+      - { action: wait_for_url, url: "**/rules" }
+      - { action: goto, url: "rules?q={{args.q}}" }
+      - { action: assert_visible, selector: "#rules" }
+      - { action: extract_table, selector: "#rules", name: rules }
+  comment_rule:
+    description: Sign in with the write account, open the rule, add the comment, check it is listed.
+    start_url: login
+    steps:
+      - { action: fill, selector: "#username", value: "{{auth.username}}" }
+      - { action: fill, selector: "#password", value: "{{auth.password}}" }
+      - { action: click, selector: "#signin" }
+      - { action: wait_for_url, url: "**/rules" }
+      - { action: goto, url: "rules/{{args.rule}}" }
+      - { action: fill, selector: "#comment", value: "{{args.text}}" }
+      - { action: click, selector: "#save" }
+      - { action: assert_text, selector: "#comments", value: "{{args.text}}" }
+      - { action: screenshot, name: comment }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "rules.search", class: read, exposed: true }
+    - { match: "rules.comment", class: write, exposed: true }
+data_class: C2

@@ -1,0 +1,179 @@
+# End-to-end (docs/13 §1 "e2e"): the compose stack with the fake LLM, fake tools and fake GitLab OIDC
+# (tests/e2e/compose.fakes.yml + compose.e2e.yml), images built locally, then `pytest -m e2e tests/e2e` and the socket proxy
+# tests against the real Docker daemon. Runs on PRs that touch the code, packs, contracts, deploy, config, UI or e2e
+# files, and on main. No secrets: the stack's passwords are random per run. Job `kind` installs the Helm chart on a
+# kind cluster; the compose job ends with a ZAP baseline scan.
+name: e2e
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - "runner/**"
+      - "browser/**"
+      - "packages/**"
+      - "cli/**"
+      - "packs/**"
+      - "contracts/**"
+      - "deploy/**"
+      - "config/**"
+      - "tests/e2e/**"
+      - "tests/fakes/**"
+      - "tests/unit/test_socket_proxy.py"
+      - "ui/**"
+      - "ci/kind/**"
+      - "security/zap-baseline.conf"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # every push to main runs to the end
+
+jobs:
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_FILES: -f docker-compose.yml -f ../../tests/e2e/compose.fakes.yml -f ../../tests/e2e/compose.e2e.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with: { version: "0.13.4" }
+      - run: uv sync --frozen --all-packages
+      - name: Configuration with random per-run secrets
+        run: |
+          cp .env.example .env
+          cp config/litellm.example.yaml config/litellm.yaml
+          cp config/z.example.yaml config/z.yaml
+          rand() { openssl rand -hex 24; }
+          {
+            echo "POSTGRES_PASSWORD=$(rand)"
+            echo "Z_APP_DB_PASSWORD=$(rand)"
+            echo "LITELLM_MASTER_KEY=sk-$(rand)"
+            echo "LITELLM_SALT_KEY=sk-$(rand)"
+            echo "LITELLM_DB_PASSWORD=$(rand)"
+            echo "Z_SOCKET_PROXY_TOKEN=$(rand)"
+            echo "Z_SECRET_KEY=$(rand)$(rand)"
+            echo "Z_METRICS_TOKEN=$(rand)"
+            echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)"   # every compose command needs it (socket proxy)
+          } >> .env
+      - name: Build the runner image (started by z-server through the socket proxy, not by compose)
+        run: docker build -t z-runner:local -f deploy/images/z-runner/Dockerfile .
+      - name: Start the stack
+        working-directory: deploy/compose
+        run: |
+          # shellcheck disable=SC2086 # COMPOSE_FILES holds several -f flags
+          DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
+            docker compose --env-file ../../.env $COMPOSE_FILES up -d --build --wait --wait-timeout 600
+      - name: pytest -m e2e
+        run: uv run pytest -m e2e tests/e2e -v
+      # The socket proxy against the real daemon needs z-server:local (built above) and a python:3.12 slim image
+      # (the pinned base of the Z images): they skip in the python job, Z_E2E_REQUIRED makes them fail here.
+      - name: Socket proxy on the real Docker daemon
+        env:
+          Z_E2E_REQUIRED: "1"
+        run: |
+          set -euo pipefail
+          base=$(sed -n 's/^ARG PYTHON_IMAGE=//p' deploy/images/z-server/Dockerfile)
+          docker pull -q "$base"
+          uv run pytest tests/unit/test_socket_proxy.py -v -k real_docker
+      - name: ZAP baseline (passive scan of the web app; security headers and cookie flags fail the job)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zap" && chmod 777 "$RUNNER_TEMP/zap"
+          cp security/zap-baseline.conf "$RUNNER_TEMP/zap/"
+          # ZAP 2.17.0 (the `stable` tag), pinned by index digest
+          docker run --rm --network host -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238 \
+            zap-baseline.py -t http://127.0.0.1:8080/ -c zap-baseline.conf -I -m 2 -r zap-report.html -J zap-report.json
+      - name: ZAP report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-baseline
+          path: ${{ runner.temp }}/zap/zap-report.*
+          if-no-files-found: ignore
+      - name: Compose logs
+        if: failure()
+        working-directory: deploy/compose
+        run: |
+          # shellcheck disable=SC2086
+          docker compose --env-file ../../.env $COMPOSE_FILES logs --no-color --tail 400
+      - name: Stop the stack
+        if: always()
+        working-directory: deploy/compose
+        run: |
+          # shellcheck disable=SC2086
+          docker compose --env-file ../../.env $COMPOSE_FILES down -v --remove-orphans
+
+  # Smoke install of the Helm chart on a kind cluster (docs/13 §1): the images of this commit, the chart on top of
+  # values-k3s.yaml + ci/kind/values-smoke.yaml, in a namespace that enforces Pod Security `restricted`. Proves
+  # the chart deploys and its pods pass `restricted`, the migrations and the seed run, and z-server is ready.
+  kind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HELM_VERSION: v3.22.1
+      HELM_MODULE_SUM: "h1:uo2SouzAxMkKZTNzZ1lLP/c/Bu7xfUJKYDaYMxMHvk8="
+      GO_TOOLCHAIN: go1.26.10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install helm (verified Go module) and kind (pinned, checksum-verified; its node image is pinned by digest)
+        env:
+          GOTOOLCHAIN: ${{ env.GO_TOOLCHAIN }}
+          GOSUMDB: sum.golang.org
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"; mkdir -p "$bin"
+          sum=$(go mod download -json "helm.sh/helm/v3@${HELM_VERSION}" | jq -r .Sum)
+          test "$sum" = "$HELM_MODULE_SUM" || { echo "helm module hash mismatch: $sum"; exit 1; }
+          GOBIN="$bin" go install -trimpath -ldflags "-s -w" "helm.sh/helm/v3/cmd/helm@${HELM_VERSION}"
+          echo "$bin" >> "$GITHUB_PATH"
+          ci/scripts/install-scanners.sh kind
+      - name: Build the images of this commit
+        run: |
+          set -euo pipefail
+          for image in z-server z-ui z-runner; do
+            docker build -t "$image:smoke" -f "deploy/images/$image/Dockerfile" .
+          done
+      - name: Create the cluster and load the images
+        run: |
+          set -euo pipefail
+          kind create cluster --name z --wait 180s
+          kind load docker-image --name z z-server:smoke z-ui:smoke z-runner:smoke
+          kubectl create namespace z
+          kubectl label namespace z pod-security.kubernetes.io/enforce=restricted \
+            pod-security.kubernetes.io/enforce-version=latest
+      - name: helm install (migrations in an initContainer, seed as a post-install hook)
+        run: |
+          helm install z deploy/helm/z -n z -f deploy/helm/z/values-k3s.yaml -f ci/kind/values-smoke.yaml \
+            --wait --timeout 15m
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          kubectl -n z get pods -o wide
+          # the seed Job is a post-install hook: helm install --wait already failed if it failed, and the
+          # playbook check below shows it ran
+          test "$(kubectl get namespace z-runners -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}')" = restricted
+          kubectl -n z port-forward svc/z-server 8000:8000 > "$RUNNER_TEMP/pf.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/readyz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/readyz | jq -e '.status == "ok"'
+          curl -fsS http://127.0.0.1:8000/api/v1/me | jq -e '.user.username == "dev"'
+          curl -fsS "http://127.0.0.1:8000/api/v1/playbooks?q=summarize" | jq -e '[.items[].name] | index("summarize-file") != null'
+      - name: Cluster state
+        if: failure()
+        run: |
+          kubectl get events -A --sort-by=.lastTimestamp | tail -80
+          kubectl -n z describe pods | tail -200
+          for p in $(kubectl -n z get pods -o name); do echo "== $p"; kubectl -n z logs "$p" --all-containers --tail 80 || true; done

@@ -1,0 +1,16 @@
+diff --git a/src/main/java/internal/example/crm/ContractDao.java b/src/main/java/internal/example/crm/ContractDao.java
+--- a/src/main/java/internal/example/crm/ContractDao.java
++++ b/src/main/java/internal/example/crm/ContractDao.java
+@@ -12,9 +12,8 @@
+         this.conn = conn;
+     }
+ 
+-    public ResultSet byCustomer(String customerId) throws SQLException {
+-        PreparedStatement ps = conn.prepareStatement("SELECT * FROM contracts WHERE customer_id = ?");
+-        ps.setString(1, customerId);
+-        return ps.executeQuery();
++    public ResultSet byCustomer(String customerId, String sortColumn) throws SQLException {
++        String sql = "SELECT * FROM contracts WHERE customer_id = '" + customerId + "' ORDER BY " + sortColumn;
++        return conn.createStatement().executeQuery(sql);
+     }
+ }

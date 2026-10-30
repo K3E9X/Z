@@ -1,0 +1,88 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Logos (stub, replace with the real spec)",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/assets/{id}": {
+      "get": {
+        "operationId": "assets.get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Asset"
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "operationId": "accounts.list",
+        "parameters": [
+          {
+            "name": "inactive_days",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounts"
+          }
+        }
+      }
+    },
+    "/accounts/{id}/disable": {
+      "post": {
+        "operationId": "accounts.disable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disabled"
+          }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "delete": {
+        "operationId": "accounts.delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    }
+  }
+}

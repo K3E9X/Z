@@ -1,0 +1,26 @@
+{
+  "id": 7004,
+  "title": "OpenSSL PKCS12 NULL pointer dereference on selfcare-preprod-01",
+  "date": "2026-10-26",
+  "severity": "Medium",
+  "cvssv3_score": 5.5,
+  "cve": "CVE-2024-0727",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2024-0727"
+    }
+  ],
+  "description": "openssl 3.0.12 on the customer self-care pre-production front end. No public exploit is known.",
+  "mitigation": "Upgrade openssl to 3.0.13 or later.",
+  "component_name": "openssl",
+  "component_version": "3.0.12",
+  "service": "selfcare-preprod-01",
+  "known_exploited": false,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2024-0727",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

@@ -1,0 +1,21 @@
+# TEST ONLY overlay on top of compose.fakes.yml: dev sign-in and the fake LLM control port on localhost, so
+# tests/e2e can drive whole missions from the host. Never use it for a deployment.
+#   docker compose -f deploy/compose/docker-compose.yml -f tests/e2e/compose.fakes.yml -f tests/e2e/compose.e2e.yml up -d --wait
+services:
+  fake-llm:
+    ports: ["127.0.0.1:8090:8090"]
+  fake-tools:
+    image: z-fakes:local
+    command: ["tests.fakes.fake_tools", "--host", "0.0.0.0", "--port", "8091"]
+    networks: [core]
+    ports: ["127.0.0.1:8091:8091"]
+  z-server:
+    environment:
+      Z_AUTH_MODE: dev
+      Z_ENV: development
+      Z_OUTBOUND_ALLOW: fake-oidc,fake-tools
+      JIRA_URL: http://fake-tools:8091/jira
+      JIRA_READ_EMAIL: z-read@example.test
+      JIRA_READ_TOKEN: ro-jira
+      JIRA_WRITE_EMAIL: z-write@example.test
+      JIRA_WRITE_TOKEN: rw-jira

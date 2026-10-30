@@ -1,0 +1,19 @@
+name: defectdojo
+kind: openapi
+display_name: DefectDojo
+base_url: ${DEFECTDOJO_URL}
+spec: ${DEFECTDOJO_URL}/api/v2/oa3/schema/?format=json
+operation_ids: from_path            # e.g. GET /api/v2/findings/ -> findings.list, GET /api/v2/findings/{id}/ -> findings.get
+auth:
+  read: { type: api_key, header: Authorization, prefix: "Token ", secret: env:DEFECTDOJO_TOKEN_RO }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "findings.list", class: read, exposed: true }
+    - { match: "findings.get", class: read, exposed: true }
+    - { match: "products.list", class: read, exposed: true }
+    - { match: "products.get", class: read, exposed: true }
+    - { match: "engagements.get", class: read, exposed: true }
+rate_limit: { per_minute: 120 }
+health: { operation: findings.list, params: { limit: 1 }, interval_s: 120 }
+data_class: C2

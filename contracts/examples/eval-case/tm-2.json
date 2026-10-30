@@ -1,0 +1,1 @@
+{"id": "tm-2", "input": {"results": "1 finding already in open ticket SECOPS-4791"}, "checks": [{"type": "count_actions", "operation": "jira.issues.create", "equals": 0}, {"type": "count_actions", "operation": "jira.comments.create", "equals": 1}], "rubric": ["Duplicate excluded and explained"]}

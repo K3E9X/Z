@@ -1,0 +1,4 @@
+{"name": "dev-engineer", "display_name": "Atlas", "handle": "atlas", "avatar": {"initials": "AT", "color": "#6AA6FF"}, "version": "1.1.0",
+ "role": "Makes code changes in an isolated workspace.", "template": "dev-engineer", "model": "z-heavy", "escalate_model": "z-heavy",
+ "skills": ["dependency-upgrade"], "tools": ["read", "edit", "terminal", "gateway:gitlab.projects.*", "gateway:@read"],
+ "memory": {"scopes": ["org", "team", "agent"], "top_k": 8}, "autonomy": "propose", "limits": {"max_steps": 120, "max_tokens": 1500000, "timeout_s": 3600}, "visibility": "team"}

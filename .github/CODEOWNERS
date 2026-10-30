@@ -1,0 +1,8 @@
+# Code owners. Add a second reviewer (e.g. a security team) to the sensitive paths when the team grows.
+*                          @K3E9X
+/docs/07-security.md       @K3E9X
+/docs/12-identity-access-and-admin.md @K3E9X
+/contracts/                @K3E9X
+/deploy/helm/              @K3E9X
+/ci/                       @K3E9X
+/.github/workflows/        @K3E9X

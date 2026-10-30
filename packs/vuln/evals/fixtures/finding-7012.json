@@ -1,0 +1,26 @@
+{
+  "id": 7012,
+  "title": "Ivanti Connect Secure authentication bypass on vpn-edge-01",
+  "date": "2026-10-26",
+  "severity": "High",
+  "cvssv3_score": 8.2,
+  "cve": "CVE-2023-46805",
+  "vulnerability_ids": [
+    {
+      "vulnerability_id": "CVE-2023-46805"
+    }
+  ],
+  "description": "Ivanti Connect Secure 22.4R2 on the remote access VPN appliance. The CVE is listed in the CISA KEV catalog. No public proof-of-concept is referenced by the scanner.",
+  "mitigation": "Apply the vendor mitigation XML, then upgrade to a fixed release.",
+  "component_name": "ivanti-connect-secure",
+  "component_version": "22.4R2",
+  "service": "vpn-edge-01",
+  "known_exploited": true,
+  "references": "https://nvd.nist.gov/vuln/detail/CVE-2023-46805",
+  "active": true,
+  "verified": true,
+  "false_p": false,
+  "tags": [
+    "scanner"
+  ]
+}

@@ -1,0 +1,713 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Microsoft Graph subset for Z",
+    "version": "1.0",
+    "description": "Microsoft Graph v1.0, the subset the workplace pack uses (connector m365). Hand-written from the Graph REST reference: operationIds are the Z operation ids (mail.list -> m365.mail.list). Delegated calls on /me with the scopes of m365.yaml; check paths, parameters and permissions against the Graph docs when Graph changes."
+  },
+  "servers": [
+    {
+      "url": "https://graph.microsoft.com/v1.0"
+    }
+  ],
+  "paths": {
+    "/me/messages": {
+      "get": {
+        "operationId": "mail.list",
+        "summary": "List messages in the signed-in user's mailbox (newest first with $orderby=receivedDateTime desc)",
+        "parameters": [
+          {
+            "name": "$top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "$filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "OData filter, e.g. receivedDateTime ge 2026-10-28T00:00:00Z"
+          },
+          {
+            "name": "$search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "$select",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "$orderby",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/messages/{message_id}": {
+      "get": {
+        "operationId": "mail.get",
+        "summary": "Get one message",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "$select",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "mail.delete",
+        "summary": "Delete a message (moves it to Deleted Items)",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/messages/{message_id}/reply": {
+      "post": {
+        "operationId": "mail.reply",
+        "summary": "Reply to the sender of a message",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "comment"
+                ],
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "The reply text",
+                    "maxLength": 100000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/sendMail": {
+      "post": {
+        "operationId": "mail.send",
+        "summary": "Send a new message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "message"
+                ],
+                "description": "No Bcc, reply-to, extra headers or attachments: the reviewer sees every recipient in the mail preview.",
+                "properties": {
+                  "message": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "subject",
+                      "body",
+                      "toRecipients"
+                    ],
+                    "properties": {
+                      "subject": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300,
+                        "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                      },
+                      "body": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "content"
+                        ],
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "enum": [
+                              "Text",
+                              "HTML"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "maxLength": 100000
+                          }
+                        }
+                      },
+                      "toRecipients": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "emailAddress"
+                          ],
+                          "properties": {
+                            "emailAddress": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "address"
+                              ],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "maxLength": 320,
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200,
+                                  "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "minItems": 1,
+                        "maxItems": 50
+                      },
+                      "ccRecipients": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "emailAddress"
+                          ],
+                          "properties": {
+                            "emailAddress": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "address"
+                              ],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "maxLength": 320,
+                                  "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200,
+                                  "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "maxItems": 50
+                      }
+                    }
+                  },
+                  "saveToSentItems": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calendarView": {
+      "get": {
+        "operationId": "calendar.events.list",
+        "summary": "Events between two dates (recurring events expanded)",
+        "parameters": [
+          {
+            "name": "startDateTime",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDateTime",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "$top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "$select",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/events": {
+      "post": {
+        "operationId": "calendar.events.create",
+        "summary": "Create an event in the signed-in user's calendar",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "subject",
+                  "start",
+                  "end"
+                ],
+                "properties": {
+                  "subject": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "body": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
+                    "properties": {
+                      "contentType": {
+                        "type": "string",
+                        "enum": [
+                          "Text",
+                          "HTML"
+                        ]
+                      },
+                      "content": {
+                        "type": "string",
+                        "maxLength": 100000
+                      }
+                    }
+                  },
+                  "start": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "end": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "location": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "maxLength": 500
+                      }
+                    }
+                  },
+                  "attendees": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "emailAddress"
+                      ],
+                      "properties": {
+                        "emailAddress": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "address"
+                          ],
+                          "properties": {
+                            "address": {
+                              "type": "string",
+                              "maxLength": 320,
+                              "pattern": "^[^\\s<>,;:\\\"()\\[\\]\\\\=?]+@[A-Za-z0-9.\\-]+$"
+                            },
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                            }
+                          }
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "required",
+                            "optional"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chat_id}/messages": {
+      "get": {
+        "operationId": "teams.messages.list",
+        "summary": "Messages of a chat (one-on-one, group or meeting chat)",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "$top",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "teams.messages.post",
+        "summary": "Post a message to a chat",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "properties": {
+                  "body": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
+                    "properties": {
+                      "contentType": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "html"
+                        ]
+                      },
+                      "content": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 28000
+                      }
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/onlineMeetings/{meeting_id}/transcripts/{transcript_id}/content": {
+      "get": {
+        "operationId": "teams.transcripts.get",
+        "summary": "Content of a meeting transcript (text/vtt)",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "transcript_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/drive/items/{item_id}": {
+      "get": {
+        "operationId": "files.get",
+        "summary": "Metadata of a OneDrive or SharePoint file the user can read",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "$select",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/drive/items/{parent_id}:/{filename}:/content": {
+      "put": {
+        "operationId": "files.upload",
+        "summary": "Create or replace a small text file (up to 4 MB) in a OneDrive or SharePoint folder",
+        "parameters": [
+          {
+            "name": "parent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/todo/lists": {
+      "get": {
+        "operationId": "todo.lists.list",
+        "summary": "My Microsoft To Do task lists (id, displayName, wellknownListName)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/todo/lists/{list_id}/tasks": {
+      "post": {
+        "operationId": "todo.tasks.create",
+        "summary": "Add a task to one of my Microsoft To Do lists",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_=\\-]{1,300}$"
+            },
+            "description": "id from todo.lists.list"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?!.*=\\?)[^\\r\\n]*$"
+                  },
+                  "body": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
+                    "properties": {
+                      "contentType": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "html"
+                        ]
+                      },
+                      "content": {
+                        "type": "string",
+                        "maxLength": 10000
+                      }
+                    }
+                  },
+                  "dueDateTime": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "dateTime",
+                      "timeZone"
+                    ],
+                    "properties": {
+                      "dateTime": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "normal",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

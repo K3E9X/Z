@@ -1,0 +1,19 @@
+{
+  "name": "@example-internal/noc-dashboard",
+  "version": "4.6.1",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "axios": "0.21.1",
+    "date-fns": "3.6.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "vite": "5.4.10",
+    "vitest": "2.1.4"
+  }
+}

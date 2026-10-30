@@ -1,0 +1,4 @@
+agent: vuln-analyst
+title: invalid metric
+metric: { source: z, query: made_up_metric, target: 0, direction: down }
+cadence: "0 * * * *"

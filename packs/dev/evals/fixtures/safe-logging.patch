@@ -1,0 +1,16 @@
+diff --git a/cpe/events.py b/cpe/events.py
+--- a/cpe/events.py
++++ b/cpe/events.py
+@@ -2,6 +2,11 @@
+ 
+ log = logging.getLogger("cpe")
+ 
++KNOWN_REASONS = {"firmware", "power", "watchdog", "user"}
++
+ 
+ def on_reboot(serial: str, reason: str) -> None:
+-    print("reboot", serial, reason)
++    """Structured log line for the CPE reboot dashboard."""
++    if reason not in KNOWN_REASONS:
++        reason = "other"
++    log.info("cpe reboot", extra={"serial": serial, "reason": reason})

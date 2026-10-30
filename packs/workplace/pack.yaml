@@ -1,0 +1,6 @@
+name: workplace
+version: 1.1.0
+description: Everyday work with mail, calendar, chat, documents and data on Microsoft 365 or Google Workspace (v1.1)
+owner: platform
+requires_connectors: []    # m365 or google (with gchat), whichever the organisation uses
+optional_connectors: [m365, google, gchat, confluence, web, jira, gitlab, mattermost, slack]

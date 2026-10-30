@@ -1,0 +1,18 @@
+name: mr-security-review
+version: 1.3.0
+domain: code
+description: Review every merge request labelled security and propose a structured comment.
+inputs:
+  schema: { type: object, required: [project, merge_request_iid], properties: { project: { type: string }, merge_request_iid: { type: integer } } }
+team: [reviewer]
+connectors: [gitlab]
+steps:
+  - { id: review, agent: reviewer, prompt: "Apply security-review to merge request !{{ inputs.merge_request_iid }} in {{ inputs.project }} and propose one comment.", output: { schema: schemas/review-result.json }, writes: [gitlab.notes.create] }
+trigger:
+  kind: gitlab
+  event: merge_request
+  filter: { label: security, action: [open, update] }
+  owner_user: <user who creates the trigger>
+  inputs: { project: "{{ event.project.path_with_namespace }}", merge_request_iid: "{{ event.object_attributes.iid }}" }
+autonomy: propose
+budget: { max_tokens: 800000, timeout_s: 1800 }

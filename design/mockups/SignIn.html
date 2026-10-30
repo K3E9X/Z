@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Z — Sign in</title>
+
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0}
+[data-font="plex"]{--sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--display:'IBM Plex Sans',ui-sans-serif,sans-serif;--display-w:500;--display-ls:-0.025em}
+[data-font="inter"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Inter',ui-sans-serif,sans-serif;--display-w:600;--display-ls:-0.035em}
+[data-font="editorial"]{--sans:'Inter',ui-sans-serif,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Newsreader',Georgia,serif;--display-w:400;--display-ls:-0.015em}
+[data-font="geist"]{--sans:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;--display:'Instrument Serif',Georgia,serif;--display-w:400;--display-ls:0}
+[data-theme="night"]{--bg:#0C0C0B;--panel:#121211;--raised:#1A1A18;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);--text:#EDECE8;--text-2:#A9A79F;--text-3:#8B8981;--inv-bg:#EDECE8;--inv-text:#0C0C0B;--run:#6AA6FF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="day"]{--bg:#F7F7F5;--panel:#FFFFFF;--raised:#F1F1EE;--line:rgba(20,20,18,.08);--line-2:rgba(20,20,18,.15);--text:#171715;--text-2:#5A5953;--text-3:#6F6D66;--inv-bg:#171715;--inv-text:#FFFFFF;--run:#1F5FD1;--wait:#9A5B00;--ok:#1C7A4A;--err:#B92B27;--wait-bg:rgba(154,91,0,.08);--err-bg:rgba(185,43,39,.08)}
+[data-theme="slate"]{--bg:#0D1015;--panel:#12161D;--raised:#1A1F28;--line:rgba(200,215,255,.08);--line-2:rgba(200,215,255,.15);--text:#E4E9F1;--text-2:#A2ACBB;--text-3:#8792A3;--inv-bg:#E4E9F1;--inv-text:#0D1015;--run:#74AEFF;--wait:#E7B04A;--ok:#5DBE8A;--err:#F07067;--wait-bg:rgba(231,176,74,.10);--err-bg:rgba(240,112,103,.10)}
+[data-theme="contrast"]{--bg:#000000;--panel:#000000;--raised:#161616;--line:rgba(255,255,255,.30);--line-2:rgba(255,255,255,.60);--text:#FFFFFF;--text-2:#E2E2E2;--text-3:#C9C9C9;--inv-bg:#FFFFFF;--inv-text:#000000;--run:#8CC2FF;--wait:#FFD166;--ok:#7EE2A8;--err:#FF8F87;--wait-bg:rgba(255,209,102,.14);--err-bg:rgba(255,143,135,.14)}
+a{color:var(--text)}a:hover{color:var(--text-2)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+th{font-weight:500;text-align:left}
+[data-theme="night"],[data-theme="slate"]{--ok-bg:rgba(93,190,138,.10);--run-bg:rgba(106,166,255,.10)}
+[data-theme="day"]{--ok-bg:rgba(28,122,74,.08);--run-bg:rgba(31,95,209,.08)}
+[data-theme="contrast"]{--ok-bg:rgba(126,226,168,.14);--run-bg:rgba(140,194,255,.14)}
+</style>
+
+<div data-theme="night" data-font="plex" style="min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13.5px; line-height: 1.45; display: flex; align-items: center; justify-content: center; padding: 40px 24px; box-sizing: border-box; -webkit-font-smoothing: antialiased">
+  <div style="width: 100%; max-width: 1320px; display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start"><section style="width: 100%; max-width: 400px; box-sizing: border-box; padding: 36px 32px 28px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--panel); display: flex; flex-direction: column; gap: 20px; ">
+  <div style="display: flex; flex-direction: column; gap: 14px"><svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#F25C2A"></rect><path d="M7.5 7.5h9l-9 9h9" fill="none" stroke="#0C0C0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <div><h1 style="margin: 0; font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-ls); font-size: 30px; line-height: 1.1">Sign in to Z</h1>
+    <p style="margin: 6px 0 0; color: var(--text-2)">Cyber Ops · k3s production</p></div></div>
+  <a href="Main.html" style="height: 42px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 10px; background: var(--inv-bg); color: var(--inv-text); text-decoration: none; font-weight: 500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="15" r="4"></circle><path d="M11 12l8-8M16 7l2 2M14 9l2 2"></path></svg>Continue with GitLab</a>
+  <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-3)"><span style="flex: 1; height: 1px; background: var(--line)"></span>or<span style="flex: 1; height: 1px; background: var(--line)"></span></div>
+  <button type="button" style="height: 38px; border-radius: 10px; border: 1px solid var(--line-2); background: none">Use a local account</button>
+  <p style="margin: -10px 0 0; font-size: 12px; color: var(--wait)">Shown only while the bootstrap account or test accounts are enabled · test environment</p>
+  <p style="margin: 0; font-size: 12.5px; color: var(--text-2)">Your access comes from your GitLab groups. Every action in Z, including what agents do on your behalf, is recorded in the audit log.</p>
+  <div style="padding-top: 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text-3)">From a terminal: <code style="font-family: var(--mono); color: var(--text)">z login</code></div></section><section style="width: 100%; max-width: 400px; box-sizing: border-box; padding: 36px 32px 28px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--panel); display: flex; flex-direction: column; gap: 20px; opacity: .92">
+  <div style="display: flex; flex-direction: column; gap: 10px"><span style="font-size: 12px; color: var(--text-3)">Error state</span>
+    <h2 style="margin: 0; font-size: 18px; font-weight: 600">You don't have access yet</h2>
+    <p style="margin: 0; color: var(--text-2)">You're signed in to GitLab as <code style="font-family: var(--mono); color: var(--text)">@jdoe</code>, but you're not in a group that can use Z.</p></div>
+  <div style="padding: 12px 14px; border-radius: 10px; background: var(--raised); font-size: 12.5px; color: var(--text-2)">Ask an admin to add you to <code style="font-family: var(--mono); color: var(--text)">cyber/z/z-operators</code>, or to the group of your team. Access is checked again at your next sign-in.</div>
+  <div style="display: flex; gap: 8px"><button type="button" style="flex: 1; height: 36px; border-radius: 9px; border: 1px solid var(--line-2); background: none">Try again</button><button type="button" style="flex: 1; height: 36px; border-radius: 9px; border: 1px solid var(--line-2); background: none">Sign out of GitLab</button></div></section><section style="width: 100%; max-width: 400px; box-sizing: border-box; padding: 36px 32px 28px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--panel); display: flex; flex-direction: column; gap: 20px; opacity: .92">
+  <div style="display: flex; flex-direction: column; gap: 10px"><span style="font-size: 12px; color: var(--text-3)">Step-up prompt</span>
+    <h2 style="margin: 0; font-size: 18px; font-weight: 600">Confirm it's you</h2>
+    <p style="margin: 0; color: var(--text-2)">Approving a destructive action needs a fresh sign-in with GitLab (less than 5 minutes old).</p></div>
+  <div style="padding: 12px 14px; border-radius: 10px; border: 1px solid var(--err); font-size: 12.5px; color: var(--text-2)"><b style="font-weight: 600; color: var(--err)">Destructive</b> · logos · accounts.disable × 4 · second approval</div>
+  <div style="display: flex; gap: 8px"><button type="button" style="flex: 1; height: 36px; border-radius: 9px; border: 1px solid var(--line-2); background: none">Cancel</button><button type="button" style="flex: 1; height: 36px; border-radius: 9px; border: none; background: var(--inv-bg); color: var(--inv-text); font-weight: 500">Re-authenticate</button></div></section></div>
+</div>
+
+
+</body>
+</html>

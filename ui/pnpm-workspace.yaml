@@ -1,0 +1,10 @@
+# ui/ is its own pnpm workspace root (the repository root is a uv workspace).
+packages:
+  - .
+
+# Supply chain (docs/13 §3): never resolve a version published less than 7 days ago.
+# pnpm 10 setting, in minutes: 7 days = 10080.
+minimumReleaseAge: 10080
+
+# Install scripts of dependencies are not run unless listed here.
+onlyBuiltDependencies: []

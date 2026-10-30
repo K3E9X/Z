@@ -1,0 +1,10 @@
+{
+  "name": "webmail-01",
+  "fqdn": "webmail-01.example.internal",
+  "ip": "10.35.2.11",
+  "environment": "production",
+  "exposure": "internet",
+  "criticality": 2,
+  "owner_team": "Messaging Platform",
+  "data_class": "C2"
+}

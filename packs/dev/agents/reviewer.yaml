@@ -1,0 +1,22 @@
+name: reviewer
+display_name: Reviewer            # rename freely (e.g. "Atlas"); keep `name` stable
+handle: reviewer
+avatar: { initials: RV, color: "#A2ACBB" }
+version: 1.0.0
+role: "Reviews diffs and merge requests for security, correctness and maintainability."
+instructions: |
+      Separate blockers from remarks. Every blocker points to a line and explains the risk. Do not restyle code.
+persona: { tone: concise, language: en }
+model: z-heavy
+escalate_model: z-heavy
+skills:
+  - security-review
+tools:
+  - read
+  - gateway:gitlab.merge_requests.get
+  - gateway:gitlab.merge_requests.diff
+  - gateway:gitlab.files.get
+memory: { scopes: [org, team, agent], top_k: 8 }
+autonomy: propose
+limits: { max_steps: 60, max_tokens: 600000, timeout_s: 1800 }
+evals: evals/reviewer.jsonl

@@ -1,0 +1,452 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Slack Web API (subset used by Z)",
+    "version": "1",
+    "description": "Methods and arguments checked against the official Slack SDK (slackapi/python-slack-sdk, slack_sdk/web/client.py). operationIds are Z operation ids. Authentication: a bot token as a bearer token. Slack answers errors with HTTP 200 and ok: false."
+  },
+  "servers": [
+    {
+      "url": "https://slack.com/api"
+    }
+  ],
+  "paths": {
+    "/conversations.list": {
+      "get": {
+        "operationId": "channels.list",
+        "summary": "Channels the token can see",
+        "parameters": [
+          {
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public_channel",
+                "private_channel",
+                "public_channel,private_channel"
+              ]
+            }
+          },
+          {
+            "name": "exclude_archived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "next_cursor of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (errors also answer 200 with ok: false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Channel"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations.history": {
+      "get": {
+        "operationId": "messages.list",
+        "summary": "Messages of a channel, newest first (threads: threads.get)",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[CGD][A-Z0-9]{8,}$",
+              "description": "Conversation id (C\u2026, G\u2026 or D\u2026)"
+            },
+            "required": true
+          },
+          {
+            "name": "oldest",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{10}\\.[0-9]{6}$",
+              "description": "Message timestamp (its id), e.g. 1730199600.000100"
+            }
+          },
+          {
+            "name": "latest",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{10}\\.[0-9]{6}$",
+              "description": "Message timestamp (its id), e.g. 1730199600.000100"
+            }
+          },
+          {
+            "name": "inclusive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "next_cursor of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (errors also answer 200 with ok: false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Message"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "response_metadata": {
+                      "type": "object",
+                      "properties": {
+                        "next_cursor": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations.replies": {
+      "get": {
+        "operationId": "threads.get",
+        "summary": "A thread: its parent message and the replies",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[CGD][A-Z0-9]{8,}$",
+              "description": "Conversation id (C\u2026, G\u2026 or D\u2026)"
+            },
+            "required": true
+          },
+          {
+            "name": "ts",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{10}\\.[0-9]{6}$",
+              "description": "Message timestamp (its id), e.g. 1730199600.000100"
+            },
+            "required": true,
+            "description": "Timestamp of the parent message"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "next_cursor of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (errors also answer 200 with ok: false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Message"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "response_metadata": {
+                      "type": "object",
+                      "properties": {
+                        "next_cursor": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat.postMessage": {
+      "post": {
+        "operationId": "messages.post",
+        "summary": "Post in a channel, or reply in a thread with thread_ts",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "channel",
+                  "text"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "pattern": "^[CGD][A-Z0-9]{8,}$",
+                    "description": "Conversation id (C\u2026, G\u2026 or D\u2026)"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40000
+                  },
+                  "thread_ts": {
+                    "type": "string",
+                    "pattern": "^[0-9]{10}\\.[0-9]{6}$",
+                    "description": "Parent message of the thread to reply in"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK (errors also answer 200 with ok: false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "channel": {
+                      "type": "string"
+                    },
+                    "ts": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat.delete": {
+      "post": {
+        "operationId": "messages.delete",
+        "summary": "Delete a message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "channel",
+                  "ts"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "pattern": "^[CGD][A-Z0-9]{8,}$",
+                    "description": "Conversation id (C\u2026, G\u2026 or D\u2026)"
+                  },
+                  "ts": {
+                    "type": "string",
+                    "pattern": "^[0-9]{10}\\.[0-9]{6}$",
+                    "description": "Message timestamp (its id), e.g. 1730199600.000100"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK (errors also answer 200 with ok: false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "is_archived": {
+            "type": "boolean"
+          },
+          "topic": {
+            "type": "object"
+          },
+          "purpose": {
+            "type": "object"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "bot_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "thread_ts": {
+            "type": "string"
+          },
+          "reply_count": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

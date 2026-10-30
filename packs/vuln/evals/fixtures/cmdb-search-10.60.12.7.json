@@ -1,0 +1,27 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "name": "nms-collector-02",
+      "fqdn": "nms-collector-02.example.internal",
+      "ip": "10.60.12.7",
+      "environment": "production",
+      "exposure": "internal",
+      "criticality": 2,
+      "owner_team": "Network Supervision",
+      "data_class": "C2",
+      "vrf": "OAM-NORTH"
+    },
+    {
+      "name": "olt-mgmt-lyon-11",
+      "fqdn": "olt-mgmt-lyon-11.example.internal",
+      "ip": "10.60.12.7",
+      "environment": "production",
+      "exposure": "internal",
+      "criticality": 1,
+      "owner_team": "FTTH Operations",
+      "data_class": "C2",
+      "vrf": "OAM-SOUTH"
+    }
+  ]
+}

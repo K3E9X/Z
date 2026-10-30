@@ -1,0 +1,13 @@
+[
+  {
+    "name": "z-config-references-not-credentials",
+    "policyType": "postureExceptionPolicy",
+    "actions": ["alertOnly"],
+    "reason": "C-0012 matches key names (client_secret, master_key, api_key); the values are ${ENV} or os.environ/ references resolved at runtime, never credentials. Owner: platform. Review by 2027-01-31.",
+    "resources": [
+      { "designatorType": "Attributes", "attributes": { "kind": "ConfigMap", "name": "z-config" } },
+      { "designatorType": "Attributes", "attributes": { "kind": "ConfigMap", "name": "z-litellm-config" } }
+    ],
+    "posturePolicies": [{ "controlID": "C-0012" }]
+  }
+]

@@ -1,0 +1,25 @@
+# Slack through its Web API. Two Slack apps keep read and write apart: the read app's bot token (channels:history,
+# channels:read, groups:history, groups:read) goes to the gateway; the write app's bot token (chat:write, plus
+# channels:history and groups:history so the executor can check after a crash whether a post already went out)
+# only to the executor. Invite each bot only to the channels Z should reach.
+name: slack
+kind: openapi
+display_name: Slack
+base_url: ${SLACK_API_URL:-https://slack.com/api}
+spec: ./slack.openapi.json    # Web API subset (operationIds = Z operation ids)
+operation_ids: from_operation_id
+auth:
+  read:  { type: bearer, secret: env:SLACK_TOKEN_RO }
+  write: { type: bearer, secret: env:SLACK_TOKEN_RW }
+error_body: { path: ok, equals: false, message: error }    # Slack answers errors with HTTP 200
+health: { operation: channels.list, params: { limit: 1 }, interval_s: 300 }
+operations:
+  default_exposed: false
+  rules:
+    - { match: "channels.list", class: read, exposed: true }
+    - { match: "messages.list", class: read, exposed: true }
+    - { match: "threads.get", class: read, exposed: true }
+    - { match: "messages.post", class: write, exposed: true }
+    - { match: "messages.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 50 }
+data_class: C2

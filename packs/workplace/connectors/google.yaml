@@ -1,0 +1,52 @@
+# Google Workspace (Gmail, Calendar, Drive) through Google's REST APIs, on each person's own account. Two OAuth
+# clients (Google Cloud console, type "Web application", redirect URI <Z URL>/api/v1/me/connections/oauth/callback)
+# keep read and write apart:
+#   z-google-read  -> read scopes, tokens held by the gateway
+#   z-google-write -> write scopes, tokens held by the executor only; gmail.metadata lets the executor check after a
+#                     crash whether a mail already went out (headers and labels only, never a body)
+# Each person consents to both from Settings > Connections. Google has no client credentials grant: these connectors
+# are delegated only (steps run with credentials: user). Verify scope names in Google's OAuth scope list.
+name: google
+kind: openapi
+display_name: Google Workspace
+base_url: ${GOOGLE_API_URL:-https://www.googleapis.com}
+spec: ./google.openapi.json    # Gmail v1, Calendar v3 and Drive v3 subset (operationIds = Z operation ids)
+operation_ids: from_operation_id
+oauth:
+  provider: google
+  read_app:  { client_id: <z-google-read-client-id>,  secret: env:GOOGLE_READ_CLIENT_SECRET }
+  write_app: { client_id: <z-google-write-client-id>, secret: env:GOOGLE_WRITE_CLIENT_SECRET }
+auth:
+  read:
+    user:
+      flow: authorization_code_pkce
+      app: read_app
+      scopes:
+        - https://www.googleapis.com/auth/gmail.readonly
+        - https://www.googleapis.com/auth/calendar.readonly
+        - https://www.googleapis.com/auth/drive.readonly
+  write:
+    user:
+      flow: authorization_code_pkce
+      app: write_app
+      scopes:
+        - https://www.googleapis.com/auth/gmail.send
+        - https://www.googleapis.com/auth/gmail.metadata
+        - https://www.googleapis.com/auth/calendar.events
+operations:
+  default_exposed: false
+  rules:
+    - { match: "gmail.messages.list", class: read, exposed: true }
+    - { match: "gmail.messages.get", class: read, exposed: true }
+    - { match: "gmail.threads.get", class: read, exposed: true }
+    - { match: "calendar.events.list", class: read, exposed: true }
+    - { match: "calendar.events.get", class: read, exposed: true }
+    - { match: "drive.files.list", class: read, exposed: true }
+    - { match: "drive.files.get", class: read, exposed: true }
+    - { match: "drive.files.get_text", class: read, exposed: true }
+    - { match: "gmail.messages.send", class: write, exposed: true }
+    - { match: "calendar.events.insert", class: write, exposed: true }
+    - { match: "gmail.messages.trash", class: destructive, exposed: false }
+    - { match: "calendar.events.delete", class: destructive, exposed: false }
+rate_limit: { per_minute: 120 }
+data_class: C2
