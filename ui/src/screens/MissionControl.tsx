@@ -24,6 +24,7 @@ import { useIsMobile, useNow } from '@/lib/useMedia'
 import { TopBar } from '@/shell/TopBar'
 import { useShellData } from '@/shell/useShellData'
 import { MobileHome } from './MobileHome'
+import { ObjectivesWidget } from './ObjectivesWidget'
 
 function firstName(name: string): string {
   return name.split(/\s+/)[0] ?? name
@@ -512,6 +513,8 @@ export function MissionControl() {
             <Preview key={selected.id} mission={selected} agents={agents} onLiveNow={setLiveNow} />
           )}
         </div>
+
+        <ObjectivesWidget />
 
         <section aria-labelledby="done" className="flex flex-col">
           <SectionHeader id="done" title="Finished today" />
