@@ -5,9 +5,10 @@ from __future__ import annotations
 import base64
 import re
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import func, select
 from z_common.connectors import browser, cli, graphql_import, queries
 from z_common.connectors import oauth as oauth_checks
@@ -21,9 +22,9 @@ from z_server.api.framework import ContractRouter, Ctx, CtxDep
 from z_server.auth.identity import now
 from z_server.db.models import Agent, Connector, Credential, Operation, Setting
 from z_server.errors import Problem
-from z_server.gateway import admin
+from z_server.gateway import admin, typed
 from z_server.gateway import browser as browser_gw
-from z_server.gateway.auth import AuthError
+from z_server.gateway.auth import AuthError, Purpose
 from z_server.ids import new_id
 from z_server.security import check_outbound_url
 
@@ -332,6 +333,74 @@ async def patch_connector(ctx: CtxDep, id: str, body: m.ConnectorPatch) -> m.Con
         after["enabled"] = body.enabled
     await ctx.db.flush()
     await ctx.audit("connector.changed", "connector", row.id, before=before, after=after)
+    return await connector_out(ctx, row)
+
+
+# ---------------------------------------------------------------- typed secrets (ADR 0033)
+
+
+class CredentialValue(BaseModel):
+    """contracts CredentialValue. The value is a SecretStr: it never shows in a repr, a log line or an error."""
+
+    model_config = ConfigDict(extra="forbid")
+    value: SecretStr = Field(min_length=1, max_length=16384)
+    username: str | None = Field(default=None, max_length=255)
+
+
+def _typed_purpose(row: Connector, purpose: str) -> Purpose:
+    if purpose not in typed.PURPOSES:
+        raise Problem("validation", "purpose is read or write")
+    if not admin.takes_typed_secret(row, purpose):
+        raise Problem(
+            "validation",
+            f"connector {row.name} does not declare a {purpose} secret (bearer, api_key or basic) in its manifest auth",
+        )
+    return cast(Purpose, purpose)
+
+
+def _forget_secrets(ctx: Ctx) -> None:
+    async def forget() -> None:
+        if ctx.state.gateway is not None:
+            ctx.state.gateway.resolver.forget()
+
+    ctx.after_commit.append(forget)
+
+
+@router.operation("setConnectorCredential")
+async def set_connector_credential(ctx: CtxDep, id: str, purpose: str, body: CredentialValue) -> m.Connector:
+    row = await _connector(ctx, id)
+    which = _typed_purpose(row, purpose)
+    value = body.value.get_secret_value().strip("\r\n")
+    if not value:
+        raise Problem("validation", "the secret is empty")
+    username = (body.username or "").strip() or None
+    credential = await admin.set_typed_secret(ctx.db, ctx.state, row, which, value, username)
+    await ctx.audit(
+        "connector.secret_set",
+        "connector",
+        row.id,
+        after={
+            "connector": row.name,
+            "purpose": which,
+            "credential": credential.id,
+            "identity": credential.identity,
+            "fingerprint": typed.fingerprint(ctx.state, value),
+        },
+    )
+    _forget_secrets(ctx)
+    return await connector_out(ctx, row)
+
+
+@router.operation("clearConnectorCredential")
+async def clear_connector_credential(ctx: CtxDep, id: str, purpose: str) -> m.Connector:
+    row = await _connector(ctx, id)
+    if purpose not in typed.PURPOSES:
+        raise Problem("validation", "purpose is read or write")
+    which = cast(Purpose, purpose)
+    if not await admin.clear_typed_secret(ctx.db, row, which):
+        raise Problem("not-found", f"no secret was typed for the {which} credential of {row.name}")
+    await ctx.audit("connector.secret_cleared", "connector", row.id, after={"connector": row.name, "purpose": which})
+    _forget_secrets(ctx)
     return await connector_out(ctx, row)
 
 

@@ -24,7 +24,7 @@ from z_common.redaction import Redactor
 from z_server import artifacts, audit, events, judge, judge_model
 from z_server.crypto import token_hash
 from z_server.db.models import Connector, Job, Mission, Operation
-from z_server.gateway import adf, browser, cli, mcp_client, oauth, queries
+from z_server.gateway import adf, browser, cli, mcp_client, oauth, queries, typed
 from z_server.gateway import http as http_invoker
 from z_server.gateway.auth import AuthError, AuthMaterial, Purpose, material
 from z_server.gateway.limits import CallStats, SlidingWindow, replica_share
@@ -101,7 +101,7 @@ class Gateway:
 
     @classmethod
     def create(cls, state: AppState) -> Gateway:
-        return cls(state, SecretResolver(state.http))
+        return cls(state, SecretResolver(state.http, sealed=typed.lookup(state)))
 
     # ---------------------------------------------------------------- shared invocation
 

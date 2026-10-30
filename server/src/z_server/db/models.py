@@ -293,6 +293,8 @@ class Credential(Base):
     owner_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     backend: Mapped[str] = mapped_column(String(20))
     ref: Mapped[str] = mapped_column(Text)
+    # ADR 0033: a secret typed in the web app, sealed with the platform key (backend "sealed"); never returned
+    sealed_value: Mapped[bytes | None] = mapped_column(LargeBinary)
     identity: Mapped[str | None] = mapped_column(String(255))
     scopes: Mapped[list[Any]] = mapped_column(default=list)
     rotated_at: Mapped[datetime | None]

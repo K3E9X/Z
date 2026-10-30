@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from sqlalchemy import delete, select
@@ -24,9 +24,10 @@ from z_common.redaction import Redactor
 
 from z_server.db.models import Connector, Credential, Operation
 from z_server.errors import Problem
-from z_server.gateway import mcp_client
-from z_server.gateway.auth import AuthError, auth_config, material
+from z_server.gateway import mcp_client, typed
+from z_server.gateway.auth import TYPED_KINDS, AuthError, Purpose, auth_config, material
 from z_server.gateway.core import Gateway, shape
+from z_server.gateway.secrets import SecretError
 from z_server.ids import new_id
 from z_server.security import check_outbound_url
 from z_server.state import AppState
@@ -95,14 +96,33 @@ async def sync_operations(db: AsyncSession, connector: Connector, specs: list[Op
     return report
 
 
+def manifest_reference(connector: Connector, purpose: str) -> dict[str, Any] | None:
+    """What the manifest says for a purpose's service credential: backend, ref and identity (never a value)."""
+    auth = auth_config(connector.manifest, cast(Purpose, purpose))
+    if auth and auth.get("secret"):
+        ref = str(auth["secret"])
+        return {"backend": ref.split(":", 1)[0], "ref": ref, "identity": auth.get("username")}
+    return None
+
+
+def takes_typed_secret(connector: Connector, purpose: str) -> bool:
+    """The manifest declares a static secret for this purpose (bearer, api_key, basic): one can be typed for it.
+    Scoped OAuth flows and `none` cannot take one."""
+    if purpose not in typed.PURPOSES:
+        return False
+    auth = auth_config(connector.manifest, cast(Purpose, purpose))
+    return auth is not None and auth.get("type") in TYPED_KINDS
+
+
 async def sync_credentials(db: AsyncSession, connector: Connector) -> None:
-    """Credential rows mirror the manifest's auth references (values never stored)."""
+    """Credential rows mirror the manifest's auth references (values never stored). A secret typed in the web app
+    (ADR 0033) is kept as long as the manifest still declares a static secret for its purpose: a pack re-seed or a
+    manifest edit never replaces it silently; clearing it (`clear_typed_secret`) restores the manifest reference."""
     wanted: dict[str, dict[str, Any]] = {}
-    for purpose in ("read", "write"):
-        auth = auth_config(connector.manifest, purpose)
-        if auth and auth.get("secret"):
-            ref = str(auth["secret"])
-            wanted[purpose] = {"backend": ref.split(":", 1)[0], "ref": ref, "identity": auth.get("username")}
+    for purpose in typed.PURPOSES:
+        data = manifest_reference(connector, purpose)
+        if data is not None:
+            wanted[purpose] = data
     rows = {
         c.purpose: c
         for c in (
@@ -111,16 +131,76 @@ async def sync_credentials(db: AsyncSession, connector: Connector) -> None:
             )
         ).scalars()
     }
-    for purpose, data in wanted.items():
-        row = rows.get(purpose)
-        if row is None:
-            db.add(Credential(id=new_id("cred"), connector_id=connector.id, purpose=purpose, scope="service", **data))
-        elif (row.ref, row.identity) != (data["ref"], data["identity"]):
-            row.backend, row.ref, row.identity = data["backend"], data["ref"], data["identity"]
-            row.rotated_at = datetime.now(UTC)  # a new secret reference: "rotated X ago" counts from here
     for purpose, row in rows.items():
-        if purpose not in wanted:
+        if typed.is_typed(row) and takes_typed_secret(connector, purpose):
+            continue  # the typed secret stands
+        data = wanted.get(purpose)
+        if data is None:
             await db.delete(row)
+        elif (row.backend, row.ref, row.identity) != (data["backend"], data["ref"], data["identity"]):
+            row.backend, row.ref, row.identity, row.sealed_value = data["backend"], data["ref"], data["identity"], None
+            row.rotated_at = datetime.now(UTC)  # a new secret reference: "rotated X ago" counts from here
+    for purpose, data in wanted.items():
+        if purpose not in rows:
+            db.add(Credential(id=new_id("cred"), connector_id=connector.id, purpose=purpose, scope="service", **data))
+
+
+async def set_typed_secret(
+    db: AsyncSession, state: AppState, connector: Connector, purpose: Purpose, value: str, username: str | None
+) -> Credential:
+    """Seal `value` on the connector's service credential for `purpose` (ADR 0033). The caller checked the
+    purpose; read and write must stay different secrets (invariant 7)."""
+    other: Purpose = "write" if purpose == "read" else "read"
+    other_row = await typed.service_row(db, connector, other)
+    if other_row is not None and typed.is_typed(other_row) and typed.unseal(state, other_row) == value:
+        raise Problem("validation", "read and write credentials must be different secrets (invariant 7)")
+    if other_row is not None and not typed.is_typed(other_row) and state.gateway is not None:
+        try:
+            if await state.gateway.resolver.resolve(other_row.ref) == value:
+                raise Problem("validation", "read and write credentials must be different secrets (invariant 7)")
+        except SecretError:
+            pass  # the other reference does not resolve here: nothing to compare with
+    row = await typed.service_row(db, connector, purpose, lock=True)
+    if row is None:
+        reference = manifest_reference(connector, purpose)
+        row = Credential(
+            id=new_id("cred"),
+            connector_id=connector.id,
+            purpose=purpose,
+            scope="service",
+            backend=typed.BACKEND,
+            ref=typed.marker(connector.name, purpose),
+            identity=(reference or {}).get("identity"),
+        )
+        db.add(row)
+    row.backend, row.ref = typed.BACKEND, typed.marker(connector.name, purpose)
+    row.sealed_value = typed.seal(state, row, value)
+    if username:
+        row.identity = username
+    row.rotated_at = typed.now()
+    await db.flush()
+    return row
+
+
+async def clear_typed_secret(db: AsyncSession, connector: Connector, purpose: Purpose) -> bool:
+    """Drop the typed secret of `purpose`: the credential goes back to the manifest reference (or disappears when
+    the manifest has none). False when no secret was typed."""
+    row = await typed.service_row(db, connector, purpose, lock=True)
+    if row is None or not typed.is_typed(row):
+        return False
+    reference = manifest_reference(connector, purpose)
+    if reference is None:
+        await db.delete(row)
+    else:
+        row.backend, row.ref, row.identity, row.sealed_value = (
+            reference["backend"],
+            reference["ref"],
+            reference["identity"],
+            None,
+        )
+        row.rotated_at = typed.now()
+    await db.flush()
+    return True
 
 
 async def _fetch_capped(state: AppState, method: str, url: str, what: str, **kwargs: Any) -> tuple[int, bytes]:

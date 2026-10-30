@@ -7,6 +7,10 @@ Reference formats (common.schema.json SecretRef):
 - `vault:<mount>/<path>#<key>`       HashiCorp Vault KV v2 (VAULT_ADDR + VAULT_TOKEN, or Kubernetes auth with
                                      VAULT_K8S_ROLE); `vault:<mount>/<path>` without key returns the JSON object
 Values are cached for a short TTL so rotation is picked up without restarts.
+
+Typed secrets (ADR 0033): a service credential row may hold a value an admin typed in the web app, sealed with the
+platform key. `typed(connector, purpose)` returns it (through the `sealed` lookup the gateway installs), and the
+credential injection uses it in place of the manifest reference. Read and write are looked up separately.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ import base64
 import json
 import os
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,12 +34,27 @@ class SecretError(RuntimeError):
     """A reference could not be resolved. The message never contains a value."""
 
 
+@dataclass(frozen=True)
+class TypedSecret:
+    """A secret typed in the web app for one connector and purpose (ADR 0033). `ref` is the non-secret marker."""
+
+    ref: str
+    value: str = field(repr=False)
+    username: str | None = None
+
+
+# (connector name, purpose) -> the typed secret of that service credential, or None
+SealedLookup = Callable[[str, str], Awaitable[TypedSecret | None]]
+
+
 @dataclass
 class SecretResolver:
     http: httpx.AsyncClient
     env: dict[str, str] | None = None
     ttl_s: float = CACHE_TTL_S
+    sealed: SealedLookup | None = None
     _cache: dict[str, tuple[float, str]] = field(default_factory=dict)
+    _typed: dict[tuple[str, str], tuple[float, TypedSecret | None]] = field(default_factory=dict)
     _vault_token: str | None = None
     _k8s: httpx.AsyncClient | None = None
 
@@ -69,6 +89,18 @@ class SecretResolver:
         self._cache[ref] = (time.monotonic() + self.ttl_s, value)
         return value
 
+    async def typed(self, connector: str, purpose: str) -> TypedSecret | None:
+        """The typed secret of `connector`'s service credential for `purpose` (read or write), if one is set."""
+        if self.sealed is None or not connector:
+            return None
+        key = (connector, purpose)
+        cached = self._typed.get(key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+        found = await self.sealed(connector, purpose)
+        self._typed[key] = (time.monotonic() + self.ttl_s, found)
+        return found
+
     async def aclose(self) -> None:
         if self._k8s is not None:
             await self._k8s.aclose()
@@ -76,6 +108,7 @@ class SecretResolver:
     def forget(self, ref: str | None = None) -> None:
         if ref is None:
             self._cache.clear()
+            self._typed.clear()
         else:
             self._cache.pop(ref, None)
 

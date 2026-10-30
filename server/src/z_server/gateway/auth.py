@@ -1,7 +1,8 @@
 """Credential injection (docs/05 §4): manifest `auth.read` for the gateway, `auth.write` for the executor.
 
 Read and write are always different credentials (invariant 7); a connector without a write credential cannot
-apply actions. Values come from the secrets backends and only ever exist in request headers.
+apply actions. Values come from the secrets backends, or from a secret typed in the web app and sealed with the
+platform key (ADR 0033), and only ever exist in request headers.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from z_common.config import substitute
 from z_server.gateway.secrets import SecretError, SecretResolver
 
 Purpose = Literal["read", "write"]
+TYPED_KINDS = frozenset({"bearer", "api_key", "basic"})  # static secrets: the kinds a typed secret can replace
 
 
 class AuthError(RuntimeError):
@@ -47,18 +49,30 @@ async def material(manifest: dict[str, Any], purpose: Purpose, resolver: SecretR
     kind = auth.get("type")
     if kind == "none":
         return AuthMaterial()
-    other = auth_config(manifest, "write" if purpose == "read" else "read")
-    if other and other.get("secret") and other.get("secret") == auth.get("secret"):
+    other_purpose: Purpose = "write" if purpose == "read" else "read"
+    other = auth_config(manifest, other_purpose)
+    name = str(manifest.get("name") or "")
+    # ADR 0033: a secret typed in the web app replaces the manifest reference of this purpose only
+    typed = await resolver.typed(name, purpose) if kind in TYPED_KINDS else None
+    other_typed = await resolver.typed(name, other_purpose) if typed is not None and other else None
+    mine = typed.ref if typed else auth.get("secret")
+    theirs = other_typed.ref if other_typed else (other or {}).get("secret")
+    if (mine and mine == theirs) or (typed and other_typed and typed.value == other_typed.value):
         raise AuthError("read and write credentials must be different secrets (invariant 7)")
-    if kind not in {"bearer", "api_key", "basic"}:
+    if kind not in TYPED_KINDS:
         raise AuthError(f"auth type {kind!r} is not supported by this gateway build")
-    ref = auth.get("secret")
-    if not ref:
-        raise AuthError(f"{purpose} credential has no secret reference")
-    try:
-        secret = await resolver.resolve(str(ref))
-    except SecretError as exc:
-        raise AuthError(f"{purpose} credential unavailable: {exc}") from exc
+    if typed is not None:
+        secret = typed.value
+        if typed.username:
+            auth = {**auth, "username": typed.username}
+    else:
+        ref = auth.get("secret")
+        if not ref:
+            raise AuthError(f"{purpose} credential has no secret reference and no typed secret")
+        try:
+            secret = await resolver.resolve(str(ref))
+        except SecretError as exc:
+            raise AuthError(f"{purpose} credential unavailable: {exc}") from exc
     if kind == "bearer":
         prefix = auth.get("prefix", "Bearer")
         header = auth.get("header", "Authorization")
