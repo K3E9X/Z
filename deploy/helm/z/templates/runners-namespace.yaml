@@ -24,6 +24,9 @@ metadata:
   labels:
     {{- include "z.componentLabels" (dict "root" . "component" "runners") | nindent 4 }}
 automountServiceAccountToken: false
+{{- /* runner and cli-tool Jobs use this account: a private registry's pull Secret (same name, created in this
+namespace too) reaches them through it */}}
+{{- include "z.imagePullSecrets" . | nindent 0 }}
 {{- if $r.resourceQuota.enabled }}
 ---
 apiVersion: v1
