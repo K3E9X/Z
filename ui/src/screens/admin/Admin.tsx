@@ -26,8 +26,8 @@ const TABS: { id: Tab; label: string; anyOf: PermissionName[] }[] = [
   { id: 'mapping', label: 'Group mapping', anyOf: ['users:manage'] },
   { id: 'signin', label: 'Sign-in', anyOf: ['users:manage'] },
   { id: 'sessions', label: 'Sessions and tokens', anyOf: ['users:manage'] },
-  // audit settings: users:manage; chain verification: audit:export
-  { id: 'audit', label: 'Audit log', anyOf: ['users:manage', 'audit:export'] },
+  // audit settings: users:manage; chain verification: audit:export; search and saved searches: audit:read
+  { id: 'audit', label: 'Audit log', anyOf: ['users:manage', 'audit:export', 'audit:read'] },
   { id: 'notifications', label: 'Notifications', anyOf: ['guardrails:manage'] },
   // maintenance mode: guardrails:manage
   { id: 'platform', label: 'Platform', anyOf: ['users:manage', 'guardrails:manage'] },

@@ -13,6 +13,7 @@ import { Button, Checkbox, DefList, Field, Input, Select, Textarea, Toggle } fro
 import { dateTime, relative, titleCase } from '@/lib/format'
 import { useCan } from '@/lib/auth'
 import { StepUpCancelled, useStepUp } from '@/shell/stepup'
+import { AuditSearchPanel } from './AuditSearch'
 import { PendingChange } from './PendingChange'
 
 // ------------------------------------------------------------------ Sign-in
@@ -381,6 +382,7 @@ export function AuditTab({
 }) {
   const canSettings = useCan('users:manage')
   const canVerify = useCan('audit:export')
+  const canSearch = useCan('audit:read')
   const q = useQuery({
     queryKey: qk.admin.auditSettings,
     queryFn: () => unwrap(api.GET('/admin/audit-settings')),
@@ -455,6 +457,7 @@ export function AuditTab({
           Search the log
         </Link>
       </section>
+      {canSearch && <AuditSearchPanel />}
       {canSettings && (
         <QueryState query={q} what="Audit settings" endpoint="GET /admin/audit-settings">
           {() =>

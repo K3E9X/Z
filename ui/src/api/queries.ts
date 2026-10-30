@@ -75,6 +75,7 @@ export const qk = {
   evalRun: (id: string) => ['eval', id] as const,
   analytics: (params: Record<string, unknown>) => ['analytics', params] as const,
   audit: (params: Record<string, unknown>) => ['audit', params] as const,
+  auditSearches: ['me', 'audit-searches'] as const,
   guardrails: ['guardrails'] as const,
   maintenance: ['maintenance'] as const,
   teams: ['teams'] as const,
@@ -498,6 +499,14 @@ export function useAudit(params: AuditParams, cursor?: string) {
     queryFn: () => unwrap(api.GET('/audit', { params: { query } })),
     placeholderData: keepPreviousData,
     refetchInterval: POLL_MS * 3,
+  })
+}
+
+export function useAuditSearches(enabled = true) {
+  return useQuery({
+    queryKey: qk.auditSearches,
+    queryFn: () => unwrap(api.GET('/me/audit-searches')),
+    enabled,
   })
 }
 

@@ -85,6 +85,7 @@ const ARRAY_GETS = [
   '/connectors',
   '/connectors/:id/operations',
   '/me/connections',
+  '/me/audit-searches',
   '/channels',
   '/docs',
   '/inference/models',
