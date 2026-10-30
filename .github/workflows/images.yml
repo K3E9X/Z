@@ -198,6 +198,7 @@ jobs:
           for platform in ${PLATFORMS//,/ }; do
             docker pull -q --platform "$platform" "$ref"
             docker save --platform "$platform" -o "$RUNNER_TEMP/${platform//\//-}.tar" "$ref"
+            docker image rm -f "$ref" > /dev/null   # the next platform has the same digest: "cannot overwrite digest"
           done
           docker logout ghcr.io
       - run: ci/scripts/install-scanners.sh trivy dockle
