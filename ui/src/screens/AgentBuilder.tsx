@@ -1,18 +1,94 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, unwrap } from '@/api/client'
 import { isNotServed } from '@/api/problem'
 import { qk, useAgents, useSkills, useTeams } from '@/api/queries'
-import type { AgentProfile } from '@/api/types'
+import type { AgentProfile, Mission } from '@/api/types'
 import { Avatar } from '@/components/Avatar'
 import { NotServed } from '@/components/states'
+import { StatusText } from '@/components/StatusMark'
 import { useToast } from '@/components/toast'
 import { Button, Checkbox, Field, Input, PageTitle, Select, Tabs, Textarea } from '@/components/ui'
 import { useCan } from '@/lib/auth'
 import { initials, titleCase } from '@/lib/format'
+import { missionStatus } from '@/lib/status'
 
 type Way = 'describe' | 'template' | 'duplicate'
+
+const SAMPLE_PROMPT =
+  'Look at what you can read today and say, in a short plan, what you would do first and why.'
+
+/**
+ * After creation: a read-only trial mission with the new agent (POST /agents/{id}/test), then open it.
+ * The trial never proposes a write.
+ */
+function TrialStep({ id, name, handle }: { id: string; name: string; handle: string }) {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const [prompt, setPrompt] = useState(SAMPLE_PROMPT)
+  const [busy, setBusy] = useState(false)
+  const [trial, setTrial] = useState<Mission | null>(null)
+  const run = async () => {
+    setBusy(true)
+    try {
+      setTrial(
+        await unwrap(
+          api.POST('/agents/{id}/test', { params: { path: { id } }, body: { prompt: prompt.trim() } }),
+        ),
+      )
+    } catch (e) {
+      toast.error(e, 'Trial not started')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const st = trial ? missionStatus(trial.status) : null
+  return (
+    <section
+      aria-label="Try it on a sample mission"
+      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-5"
+    >
+      <div className="flex flex-col gap-1">
+        <h2 className="m-0 text-[15px] font-semibold">
+          Try {name} (@{handle}) on a sample mission
+        </h2>
+        <p className="m-0 text-meta text-text-2">
+          The trial is read-only: it never proposes a write. Check how the agent works before you give it real
+          missions.
+        </p>
+      </div>
+      <Field label="Sample mission">
+        {(fid) => (
+          <Textarea
+            id={fid}
+            rows={3}
+            maxLength={4000}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        )}
+      </Field>
+      {trial && st && (
+        <div role="status" className="flex flex-wrap items-center gap-3 text-ui">
+          <StatusText tone={st.tone} label={st.label} />
+          <span className="text-text-2">{trial.title}</span>
+          <Link to="/missions/$id" params={{ id: trial.id }} className="font-medium">
+            Open the trial mission
+          </Link>
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => void navigate({ to: '/agents', search: { agent: id } })}>
+          {trial ? 'Done' : 'Skip the trial'}
+        </Button>
+        <Button variant="primary" busy={busy} disabled={!prompt.trim()} onClick={() => void run()}>
+          {trial ? 'Run another trial' : 'Run a trial mission'}
+        </Button>
+      </div>
+    </section>
+  )
+}
 
 function slug(s: string): string {
   return s
@@ -22,7 +98,10 @@ function slug(s: string): string {
     .slice(0, 39)
 }
 
-/** Agent builder (docs/09 §5): describe → drafted profile → edit → create; or from a template, or by duplicating. */
+/**
+ * Agent builder (docs/09 §5): describe → drafted profile → edit → create → try on a sample mission; or from a
+ * template, or by duplicating.
+ */
 export function AgentBuilder() {
   const search = useSearch({ from: '/agents/new' })
   const navigate = useNavigate()
@@ -43,6 +122,7 @@ export function AgentBuilder() {
   const [color, setColor] = useState('#74AEFF')
   const [team, setTeam] = useState('')
   const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState<{ id: string; name: string; handle: string } | null>(null)
   const list = agents.data?.items ?? []
   const validHandle = /^[a-z0-9][a-z0-9-]{1,38}$/.test(handle)
   const taken = list.some((a) => a.handle === handle)
@@ -117,7 +197,7 @@ export function AgentBuilder() {
         label: 'Give it a mission',
         run: () => void navigate({ to: '/missions/new', search: { agent: handle } }),
       })
-      void navigate({ to: '/agents', search: { agent: id } })
+      setCreated({ id, name, handle })
     } catch (e) {
       toast.error(e, 'Agent not created')
     } finally {
@@ -136,6 +216,14 @@ export function AgentBuilder() {
     )
   }
   const sourceAgent = list.find((a) => a.id === source || a.name === source)
+  if (created) {
+    return (
+      <main className="mx-auto flex w-full max-w-[900px] flex-col gap-8 px-10 pt-12 pb-16 max-md:px-5">
+        <PageTitle title="New agent" lead={`${created.name} (@${created.handle}) is created.`} />
+        <TrialStep {...created} />
+      </main>
+    )
+  }
   return (
     <main className="mx-auto flex w-full max-w-[900px] flex-col gap-8 px-10 pt-12 pb-16 max-md:px-5">
       <PageTitle
