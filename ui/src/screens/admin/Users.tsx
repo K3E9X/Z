@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { api, unwrap } from '@/api/client'
 import { PERMISSIONS, type PermissionName } from '@/api/permissions.gen'
 import { qk, useTeams } from '@/api/queries'
-import type { EffectiveRole, User } from '@/api/types'
+import type { EffectiveRole, PersonalConnection, User } from '@/api/types'
 import { Avatar } from '@/components/Avatar'
 import { Dialog } from '@/components/Dialog'
 import { EmptyState, QueryState } from '@/components/states'
@@ -30,6 +30,16 @@ function RoleChip({ r }: { r: EffectiveRole }) {
       </span>
     </span>
   )
+}
+
+const CONNECTION_STATUS: Record<
+  PersonalConnection['status'],
+  { tone: 'ok' | 'wait' | 'idle'; label: string }
+> = {
+  active: { tone: 'ok', label: 'Active' },
+  expired: { tone: 'wait', label: 'Expired' },
+  revoked: { tone: 'idle', label: 'Revoked' },
+  disabled: { tone: 'idle', label: 'Disabled' },
 }
 
 function statusLine(u: User): { tone: 'ok' | 'err' | 'idle'; label: string } {
@@ -322,6 +332,37 @@ function UserPanel({ id }: { id: string }) {
         {(sessions.data?.items ?? []).length + (tokens.data?.items ?? []).length === 0 && (
           <span className="text-meta text-text-3">No active session or token.</span>
         )}
+      </section>
+      <section
+        aria-label="Personal connections"
+        className="flex flex-col gap-2 border-b border-line px-5 py-4 text-ui"
+      >
+        <h3 className="m-0 text-meta font-normal text-text-3">Personal connections</h3>
+        {(u.connections ?? []).map((c) => {
+          const st = CONNECTION_STATUS[c.status]
+          return (
+            <div key={c.id} className="flex flex-col gap-0.5">
+              <span className="flex items-center gap-2">
+                <span className="font-medium">{c.connector}</span>
+                <span className="flex items-center gap-1.5 text-meta text-text-2">
+                  <Dot tone={st.tone} />
+                  {st.label}
+                </span>
+              </span>
+              <span className="text-meta text-text-3">
+                read <span className="font-mono">{c.read_scopes.join(', ') || '—'}</span> · write{' '}
+                <span className="font-mono">{c.write_scopes.join(', ') || '—'}</span> · last used{' '}
+                {c.last_used_at ? relative(c.last_used_at) : 'never'}
+              </span>
+            </div>
+          )
+        })}
+        {(u.connections ?? []).length === 0 && (
+          <span className="text-meta text-text-3">No personal connection.</span>
+        )}
+        <span className="text-meta text-text-3">
+          Read-only here: the user manages them in Settings. Suspending the user revokes them.
+        </span>
       </section>
       <section
         aria-label="Recent activity"
