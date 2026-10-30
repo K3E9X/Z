@@ -17,9 +17,9 @@ import jsonschema
 from sqlalchemy import or_, select
 from z_common.models import api_missions as m
 from z_common.models.actions import BUILTIN_PAYLOADS
-from z_common.models.enums import JobStatus, MissionStatus, OperationClass, SignalKind
+from z_common.models.enums import MissionStatus, OperationClass, SignalKind
 
-from z_server import events, signals
+from z_server import events, questions, signals
 from z_server.actions import prechecks
 from z_server.actions.previews import build as build_preview
 from z_server.api.framework import ContractRouter, Ctx, CtxDep
@@ -30,7 +30,6 @@ from z_server.db.models import (
     ActionApproval,
     Agent,
     Connector,
-    Job,
     Mission,
     MissionSuggestion,
     Operation,
@@ -311,47 +310,8 @@ async def batch_approve(ctx: CtxDep, body: m.BatchApprove) -> m.BatchResult:
 
 @router.operation("answerQuestion")
 async def answer_question(ctx: CtxDep, id: str, body: m.AnswerRequest) -> m.Question:
-    row, mission = await service.lock_with_mission(ctx.db, Question, id)
-    if row is None or mission is None or not can_see(ctx, mission):
-        raise Problem("not-found")
-    if mission.created_by != ctx.user.user_id:
-        ctx.require("questions:answer", mission.team_id)
-    if row.answer is not None:
-        raise Problem("conflict", "this question is already answered")
-    if row.options and body.answer not in row.options:
-        raise Problem("validation", f"answer must be one of: {', '.join(row.options)}")
-    row.answer, row.answered_by, row.answered_at = body.answer, ctx.user.username, identity.now()
-    job = await ctx.db.get(Job, row.job_id, with_for_update=True)
-    await events.append(
-        ctx.db,
-        row.mission_id,
-        "question_answered",
-        {"question_id": row.id, "answer": body.answer, "answered_by": ctx.user.username},
-        job_id=row.job_id,
-        agent=row.agent,
-    )
-    if row.agent == service.JUDGE and job is not None and job.needs_attention_reason == "judge_blocked":
-        if body.answer == service.JUDGE_STOP:
-            await service.finish(ctx.db, ctx.state, mission, MissionStatus.cancelled, "stopped after a judge block")
-        else:  # the agent goes on without the withheld content
-            job.control_state, job.control_reason = "run", None
-            await service.set_job_status(ctx.db, job, JobStatus.running, "released after a judge block")
-    elif job is not None and job.status == JobStatus.needs_attention.value and job.needs_attention_reason == "question":
-        still_open = (
-            await ctx.db.execute(
-                select(Question.id).where(Question.job_id == job.id, Question.answer.is_(None), Question.id != row.id)
-            )
-        ).first()
-        if still_open is None:
-            await service.set_job_status(ctx.db, job, JobStatus.running, "question answered")
-    await ctx.audit(
-        "question.answered",
-        "question",
-        row.id,
-        team=mission.team_id,
-        after={"mission": mission.id, "length": len(body.answer)},
-    )
-    await service.advance(ctx.db, ctx.state, mission)
+    row, _mission = await questions.answer(ctx.db, ctx.state, ctx.user, id, body.answer, ctx.actor())
+    ctx.audited = True  # questions.answer audits `question.answered`
     return question_out(row)
 
 
