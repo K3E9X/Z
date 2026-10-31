@@ -126,8 +126,7 @@ See `13-ci-cd.md`: GitHub Actions on the GitHub repo (build, scan, sign, publish
 | `memory.top_k_max` | Not read (schema only, not in the example) | The agent profile's `memory.top_k` |
 | `memory.embedding_dim` | Not read from the file | The migration reads `Z_EMBEDDING_DIM` from the environment (the example substitutes the same variable) |
 | `secrets.backend`, `secrets.vault.{address,mount,path_prefix}` | Not read | Each credential reference names its backend (`env:`, `file:`, `kubernetes:`, `vault:<mount>/<path>#<key>`); Vault uses `VAULT_ADDR`, `VAULT_TOKEN` or `VAULT_K8S_ROLE`, `VAULT_NAMESPACE`. There is no path prefix |
-| `inference.probes.{models_poll_s,tool_call_probe_s}` | Not read | Inference metrics are queried on demand (15 s cache); the synthetic tool-call probe is not built yet |
+| `inference.probes.models_poll_s` | Not read | Inference metrics are queried on demand (15 s cache); `tool_call_probe_s` is read (ADR 0034) |
 | `notifications.{mattermost_webhook,slack_webhook,smtp_url}` | Not read | Notification channels and SMTP are set in Admin → Notifications (stored in the database) |
-| `notifications.digest.*` | Not read | E-mail digests are not built yet |
 | `egress.browser_targets` | Not read | Each browser connector's hosts (checked by z-browser), and Helm `browser.egressTo` for the network policy |
 | `ui.default_theme`, `ui.default_font` | Not read | Present in Helm values only, used by nothing; the web app starts in `night` and each user switches the theme from the user menu or ⌘K; the font is not selectable |

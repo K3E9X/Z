@@ -59,7 +59,7 @@ Z does not assume how inferX is built. The monitor reads a **Prometheus** endpoi
 | GPU utilization, memory, temperature | `DCGM_FI_DEV_GPU_UTIL`, `DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)`, `DCGM_FI_DEV_GPU_TEMP` by node |
 | Replicas ready | `kube_deployment_status_replicas_available` (kube-state-metrics), if the cluster is visible |
 
-Also: `GET /v1/models` and `/model/info` on the gateway, queried when the Inference screen or the health check asks (cached 15 s, not polled on a timer). A synthetic tool-call probe per alias (recording `tool_call_parse_error_rate`) is not built yet: the field stays empty and `inference.probes` is not read. If no Prometheus is configured, the screen shows gateway-side numbers only (latency, errors, tokens from LiteLLM).
+Also: `GET /v1/models` and `/model/info` on the gateway, queried when the Inference screen or the health check asks (cached 15 s, not polled on a timer). A synthetic tool-call probe sends each chat alias one small request with one tool every `inference.probes.tool_call_probe_s` (default 600 s, one replica at a time) and records whether the answer is a parsable tool call; `tool_call_parse_error_rate` is the failure rate over the last probes (ADR 0034). If no Prometheus is configured, the screen shows gateway-side numbers only (latency, errors, tokens from LiteLLM).
 
 ## 6. Usage and budgets
 - **Views**: tokens per hour by model (stacked), by agent, top missions with used/cap, by team, by playbook; input/output split; cache hit; requests and errors; GPU-hours when available.

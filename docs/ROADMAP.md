@@ -11,7 +11,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Missions, plans, fan-out, scheduler, resume | B1 | done (draft-plan with the planner model, sessions, save-as-playbook; take-over as a web editor over the checkpointed workspace with restart from the edited checkpoint, ADR 0019) |
 | Runner with OpenHands backend, guardrails, code and document tools | B2 | done (real mission on compose through LiteLLM; hardened container via z-socket-proxy) |
 | Tool gateway, MCP/OpenAPI/REST/web connectors, exposure review, executor with git helper | B3 | doing (gateway MCP endpoint, REST/OpenAPI/MCP connectors, Jira Cloud and GitLab executors with idempotency, git helper, personal OAuth connections and app-only OAuth, channels Slack/Mattermost/Teams/email, browser connectors with reviewed flows replayed by z-browser and recording by demonstration (ADR 0016), GraphQL and read-only PostgreSQL connectors (ADR 0020), cli connectors in tool containers (ADR 0025), GraphQL import by introspection, rest drafts from API docs, Mattermost and Slack tool connectors (ADR 0026) done; remaining catalog templates of docs/05 §7 are added when a team needs them) |
-| CLI: subcommands, headless, interactive session | B4 | doing (headless, interactive session, saved sessions `z -c`, `z --resume`, `z --session` done; `z skills rollback` done; `z skills diff`, `z playbooks save-from` and `z connectors import|record-browser` of docs/10 §3 not built, though their API routes exist) |
+| CLI: subcommands, headless, interactive session | B4 | doing (headless, interactive session, saved sessions `z -c`, `z --resume`, `z --session` done; `z skills rollback|diff`, `z playbooks save-from`, `z connectors import|record-browser` done) |
 | Web: Mission control, Agent, New mission, Review, Connectors, Inference, History, Settings | B5 | done (every screen of docs/09, plus admin, take-over, browser recorder, notifications) |
 | Judge, routing policy (key allowlists), evals, memory | B6 | done (pattern + raise-only model judge, pre-action checks, routing policy and rules, signals derived from mission events and action edits (see v1.1 below for the kinds never emitted), eval runs on real missions, learner proposals with eval gates, shadow replay, apply/try, memory retrieval in job specs) |
 | Packs core, vuln, ticketing, dev, archi-isp with evals | B7 | done (seeded and lint-clean; every seed agent has ≥ 10 eval cases and every skill ≥ 5 (docs/08 §6), with injection, missing-fact and write-scope cases; the linter enforces rooted check paths and warns below the minimums; not yet run against the real inferX models) |
@@ -23,7 +23,7 @@ Build order (decided with the user): base first, then one verified slice at a ti
 | Audit log (append-only, hash chain, signed checkpoints, export, forwarding) | B1 | done (scheduled signed checkpoints and at-least-once syslog/TLS and HTTPS forwarding with delivery status, ADR 0021) |
 | CI: GitHub Actions + GitLab CI (scans, signed images, SBOM, k3s deploy) | B8 | done for guard, lint, tests, security scans, images (build, scan, sign, SBOM), chart policy, compose e2e, GitLab staging/production deploy (ADR 0018), license gate on installed packages, kind smoke install under PSS restricted, release notes from conventional commits, ZAP baseline in the e2e job (passive and unauthenticated, web app only, not the API) |
 | Compose, Helm (k3s + Kubernetes), images | B8 | doing (compose with z-ui, Helm chart linted and kubeconform-valid for k3s and k8s, kubernetes executor, egress proxy (squid allowlist), z-browser image + compose profile + Helm Deployment/NetworkPolicy done) |
-| E2E and acceptance | C | doing (compose e2e: 2 tests, a real mission through the hardened runner, LiteLLM and the fake LLM, and the inferX key set from Z reaching the gateway, plus a ZAP baseline; kind smoke install; most phase C scenarios of BUILD §4 are covered by in-process server tests, not on Compose; `docs/ACCEPTANCE.md` lists the evidence per criterion; acceptance against the real inferX, GitLab and Jira pending) |
+| E2E and acceptance | C | doing (compose e2e: 10 tests (triage fan-out within its cap and one Jira create, injection, sandbox and direct-write denials, budget, two approvers for destructive writes, audit coverage and tamper detection, `@atlas`), a real mission through the hardened runner, LiteLLM and the fake LLM, and the inferX key set from Z reaching the gateway, plus a ZAP baseline; kind smoke install; the other phase C scenarios of BUILD §4 are in-process server tests; `docs/ACCEPTANCE.md` lists the evidence per criterion; acceptance against the real inferX, GitLab and Jira pending) |
 
 ## v1.1 — complete (BUILD P1)
 | Item | Status |
@@ -45,20 +45,13 @@ Build order (decided with the user): base first, then one verified slice at a ti
 ## Known gaps
 Not built yet, although the spec describes them:
 - Judge classification of staged inputs beyond credentials: a file holding credentials raises the mission to C3; regulated or personal data is not detected.
-- Synthetic tool-call probe and `tool_call_parse_error_rate` (the Inference screen shows the field, nothing fills it; `inference.probes` is not read).
-- E-mail digests (`notifications.digest`), and answering an agent question by replying to a Z mail (cards link to Z instead).
 - Budgets with an objective scope (scopes are org, team, user, playbook and agent).
-- Objectives widget on Mission control (the Objectives screen exists).
-- Saved searches in the Admin audit log.
-- Maintenance mode (no config key, no API).
-- Personal connections in the Admin user detail panel.
-- The agent builder's "test on a sample mission" step.
-- Phase C e2e on Compose: 2 tests against about 18 scenarios in BUILD §4; most are in-process server tests.
+- Phase C e2e on Compose: 7 scenarios of BUILD §4 run on the stack; bulk upgrade, kill-and-resume, data classes, connector rules, the cloned README injection, bootstrap and groups, objectives and Teams are in-process only.
 - Acceptance (BUILD §4 step 6): `docs/ACCEPTANCE.md` gives the evidence and status of each criterion. Most criteria are partial, and nothing has run against the real inferX, GitLab, Jira or k3s yet.
 - ZAP scan: passive, unauthenticated, web app only.
 - TUI tests are Textual pilot tests, not snapshot tests.
 - Observability: OpenTelemetry traces, JSON logs and Langfuse export (docs/02 §3).
-- CLI: `z skills diff` (versions carry no content in the API), `z playbooks save-from`, `z connectors import|record-browser`.
+
 
 ## v2 — later
 - Admin-enabled `auto_reversible` autonomy for specific low-risk operations (comments, labels), never destructive, always audited.
