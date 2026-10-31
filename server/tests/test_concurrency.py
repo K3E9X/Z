@@ -427,3 +427,18 @@ def test_subagent_gets_its_share_of_the_parent_budget(
         "payload": {"model": "z-fast", "tokens_in": limit, "tokens_out": 0},
     }
     assert child.events(over)["state"] == "cancel"  # the server stops a child past its share
+
+
+# ------------------------------------------------------------------ 8. a renamed agent is introduced by its new name
+
+
+def test_renamed_agent_runs_under_its_new_name(
+    app: TestClient, jars: dict[str, dict[str, str]], executor: RecordingExecutor
+) -> None:
+    a = as_user(app, jars, "alice")
+    renamed = app.patch("/api/v1/agents/summarizer", json={"display_name": "Atlas", "handle": "atlas"}, headers=a)
+    assert renamed.status_code == 200, renamed.text
+    fanout(app, as_user(app, jars, "bob"))
+    [job_id] = dispatch(app, executor)
+    agent = ScriptedRunner.for_job(app, executor, job_id).get_spec()["agent"]
+    assert (agent["display_name"], agent["handle"]) == ("Atlas", "atlas"), agent

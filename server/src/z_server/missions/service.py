@@ -841,9 +841,10 @@ async def agent_profile(db: AsyncSession, job: Job) -> dict[str, Any]:
             select(AgentVersion).where(AgentVersion.agent_id == job.agent_id, AgentVersion.version == job.agent_version)
         )
     ).scalar_one_or_none()
-    if version is not None:
-        return dict(version.profile)
     agent = await db.get(Agent, job.agent_id)
-    if agent is None:
+    if version is None and agent is None:
         raise Problem("not-found", "agent of the job disappeared")
-    return dict(agent.profile)
+    profile = dict(version.profile if version is not None else agent.profile)  # type: ignore[union-attr]
+    if agent is not None:  # a rename changes who the agent is called, not what it does: no new version
+        profile["display_name"], profile["handle"] = agent.display_name, agent.handle
+    return profile
