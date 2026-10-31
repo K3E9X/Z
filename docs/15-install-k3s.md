@@ -79,6 +79,21 @@ cosign verify ghcr.io/k3e9x/z-server@sha256:<digest> --certificate-oidc-issuer h
   --certificate-identity-regexp '^https://github.com/K3E9X/Z/\.github/workflows/images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$'
 ```
 
+## 3b. TLS: find out what the cluster already has
+
+```bash
+kubectl get crd certificates.cert-manager.io 2>/dev/null && kubectl get clusterissuer   # cert-manager and its issuers
+kubectl get secret -A --field-selector type=kubernetes.io/tls                          # certificates already there
+```
+
+- **cert-manager with a ClusterIssuer** (ACME or your internal CA): add to the values
+  `ingress.annotations: {cert-manager.io/cluster-issuer: <issuer>}` with `ingress.tls.secretName: z-tls`;
+  cert-manager creates and renews `z-tls`.
+- **A certificate from your PKI**: `kubectl -n $NS create secret tls z-tls --cert=z.crt --key=z.key` (full chain in
+  `z.crt`), and renew it before it expires.
+- **Neither yet**: install cert-manager first (it is the usual way on k3s), or use your PKI. Do not run Z without
+  TLS: sessions, the step-up and the CLI token exchange need HTTPS.
+
 ## 4. Namespaces and the registry Secret
 
 ```bash
